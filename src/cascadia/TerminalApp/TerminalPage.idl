@@ -120,5 +120,8 @@ namespace TerminalApp
         String SplitProtocolPane(String paneId, Microsoft.Terminal.Settings.Model.SplitDirection direction, Single size, Microsoft.Terminal.Settings.Model.NewTerminalArgs args, Boolean background);
         Boolean CloseProtocolPane(String paneId);
         Boolean SendProtocolInput(String paneId, String text);
+        void InitializeCoordinator(Microsoft.Terminal.Settings.Model.NewTerminalArgs args);
+        void ToggleCoordinator();
+        Boolean CoordinatorVisible { get; };
     }
 }

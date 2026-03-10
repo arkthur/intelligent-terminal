@@ -90,6 +90,7 @@ private:
     std::unique_ptr<ProtocolRequestHandler> _protocolHandler;
     std::unique_ptr<TerminalProtocolServer> _protocolServer;
     void _initializeProtocolServer();
+    void _startCoordinatorIfEnabled();
     std::vector<winrt::Microsoft::Terminal::Settings::Model::GlobalSummonArgs> _hotkeys;
     NOTIFYICONDATA _notificationIcon{};
     UINT WM_TASKBARCREATED = 0;

@@ -1641,4 +1641,11 @@ namespace winrt::TerminalApp::implementation
         _OpenOrReuseAgentPane(L"");
         args.Handled(true);
     }
+
+    void TerminalPage::_HandleToggleCoordinator(const IInspectable& /*sender*/,
+                                                const ActionEventArgs& args)
+    {
+        ToggleCoordinator();
+        args.Handled(true);
+    }
 }

@@ -456,6 +456,9 @@
   <data name="ToggleCommandPaletteCommandKey" xml:space="preserve">
     <value>Toggle command palette</value>
   </data>
+  <data name="ToggleCoordinatorCommandKey" xml:space="preserve">
+    <value>Toggle AI assistant</value>
+  </data>
   <data name="SuggestionsCommandKey" xml:space="preserve">
     <value>Open suggestions</value>
   </data>

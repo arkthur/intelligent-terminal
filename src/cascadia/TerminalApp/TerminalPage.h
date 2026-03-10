@@ -192,6 +192,9 @@ namespace winrt::TerminalApp::implementation
         hstring SplitProtocolPane(hstring paneId, Microsoft::Terminal::Settings::Model::SplitDirection direction, float size, Microsoft::Terminal::Settings::Model::NewTerminalArgs args, bool background);
         bool CloseProtocolPane(hstring paneId);
         bool SendProtocolInput(hstring paneId, hstring text);
+        void InitializeCoordinator(Microsoft::Terminal::Settings::Model::NewTerminalArgs args);
+        void ToggleCoordinator();
+        bool CoordinatorVisible();
 
         til::property_changed_event PropertyChanged;
 
@@ -262,6 +265,10 @@ namespace winrt::TerminalApp::implementation
         // Temporary env vars to inject into the next pane created via protocol.
         // Set before calling _OpenNewTab/_SplitPane, cleared after.
         std::optional<std::unordered_map<std::wstring, std::wstring>> _pendingProtocolEnvVars;
+
+        // Coordinator sidecar state
+        winrt::Microsoft::Terminal::Control::TermControl _coordinatorControl{ nullptr };
+        bool _coordinatorInitialized{ false };
         bool _showTabsFullscreen{ false };
 
         std::optional<uint32_t> _loadFromPersistedLayoutIdx{};

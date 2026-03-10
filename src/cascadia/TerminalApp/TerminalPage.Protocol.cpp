@@ -581,6 +581,74 @@ namespace winrt::TerminalApp::implementation
         });
     }
 
+    void TerminalPage::InitializeCoordinator(NewTerminalArgs args)
+    {
+        _runOnUIThreadVoid(*this, [&]() {
+            if (_coordinatorInitialized)
+            {
+                return;
+            }
+
+            // Resolve the profile and create terminal settings.
+            const auto profile = _settings.GetProfileForArgs(args);
+            const auto controlSettings = winrt::Microsoft::Terminal::Settings::TerminalSettings::CreateWithNewTerminalArgs(_settings, args);
+
+            // Create the connection (this picks up _pendingProtocolEnvVars).
+            auto connection = _CreateConnectionFromSettings(profile, *controlSettings.DefaultSettings(), false);
+            _pendingProtocolEnvVars.reset();
+
+            // Create the TermControl.
+            _coordinatorControl = _CreateNewControlAndContent(controlSettings, connection);
+
+            // Host the control in the sidecar container.
+            CoordinatorContainer().Children().Clear();
+            CoordinatorContainer().Children().Append(_coordinatorControl);
+
+            _coordinatorInitialized = true;
+        });
+    }
+
+    void TerminalPage::ToggleCoordinator()
+    {
+        _runOnUIThreadVoid(*this, [&]() {
+            if (!_coordinatorInitialized)
+            {
+                return;
+            }
+
+            const auto border = CoordinatorBorder();
+            if (border.Visibility() == winrt::Windows::UI::Xaml::Visibility::Visible)
+            {
+                border.Visibility(winrt::Windows::UI::Xaml::Visibility::Collapsed);
+                // Return focus to the active pane in the current tab.
+                if (const auto tab = _GetFocusedTab())
+                {
+                    tab.Focus(winrt::Windows::UI::Xaml::FocusState::Programmatic);
+                }
+            }
+            else
+            {
+                border.Visibility(winrt::Windows::UI::Xaml::Visibility::Visible);
+                // Focus the coordinator when showing it.
+                if (_coordinatorControl)
+                {
+                    _coordinatorControl.Focus(winrt::Windows::UI::Xaml::FocusState::Programmatic);
+                }
+            }
+        });
+    }
+
+    bool TerminalPage::CoordinatorVisible()
+    {
+        return _runOnUIThread(*this, [&]() -> bool {
+            if (!_coordinatorInitialized)
+            {
+                return false;
+            }
+            return CoordinatorBorder().Visibility() == winrt::Windows::UI::Xaml::Visibility::Visible;
+        });
+    }
+
     hstring TerminalPage::CreateProtocolTab(NewTerminalArgs args, bool background)
     {
         return _runOnUIThread(*this, [&]() -> hstring {
