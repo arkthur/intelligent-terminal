@@ -609,6 +609,11 @@ Json::Value ProtocolRequestHandler::_handleCreateTab(const Json::Value& params)
     {
         page.SetPendingProtocolEnv(L"WT_MCP_TOKEN", winrt::to_hstring(_authToken));
         page.SetPendingProtocolEnv(L"WT_PIPE_NAME", winrt::hstring{ _emperor.GetProtocolPipeName() });
+        const auto& comClsid = _emperor.GetComClsid();
+        if (!comClsid.empty())
+        {
+            page.SetPendingProtocolEnv(L"WT_COM_CLSID", winrt::hstring{ comClsid });
+        }
     }
 
     const auto background = params.get("background", true).asBool();

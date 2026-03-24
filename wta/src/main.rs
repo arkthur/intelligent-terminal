@@ -16,7 +16,7 @@ use serde_json::json;
 use std::io;
 use std::sync::Arc;
 
-use shell::wt_channel::{PipeChannel, WtChannel};
+use shell::wt_channel::{ComChannel, PipeChannel, WtChannel};
 use shell::ShellManager;
 
 // ─── CLI Definition ─────────────────────────────────────────────────────────
@@ -259,7 +259,7 @@ async fn main() -> Result<()> {
             let channel = connect_channel(&pipe_override).await?;
             let wid = match window_id {
                 Some(id) => id,
-                None => get_first_window_id(&channel).await?,
+                None => get_first_window_id(channel.as_ref()).await?,
             };
             let result = channel
                 .request("list_tabs", json!({ "window_id": wid }))
@@ -277,9 +277,9 @@ async fn main() -> Result<()> {
                 None => {
                     let wid = match window_id {
                         Some(id) => id,
-                        None => get_first_window_id(&channel).await?,
+                        None => get_first_window_id(channel.as_ref()).await?,
                     };
-                    get_first_tab_id(&channel, &wid).await?
+                    get_first_tab_id(channel.as_ref(), &wid).await?
                 }
             };
             let result = channel
@@ -317,7 +317,7 @@ async fn main() -> Result<()> {
             command,
         }) => {
             let channel = connect_channel(&pipe_override).await?;
-            let pane_id = resolve_pane_id(&channel, &target).await?;
+            let pane_id = resolve_pane_id(channel.as_ref(), &target).await?;
             let split_dir = if horizontal {
                 "horizontal"
             } else if vertical {
@@ -343,7 +343,7 @@ async fn main() -> Result<()> {
         // ── Send keys ──
         Some(Command::SendKeys { target, keys }) => {
             let channel = connect_channel(&pipe_override).await?;
-            let pane_id = resolve_pane_id(&channel, &target).await?;
+            let pane_id = resolve_pane_id(channel.as_ref(), &target).await?;
             let text = translate_keys(&keys);
             channel
                 .request("send_input", json!({ "pane_id": pane_id, "text": text }))
@@ -354,7 +354,7 @@ async fn main() -> Result<()> {
         // ── Capture pane ──
         Some(Command::CapturePane { target, max_lines }) => {
             let channel = connect_channel(&pipe_override).await?;
-            let pane_id = resolve_pane_id(&channel, &target).await?;
+            let pane_id = resolve_pane_id(channel.as_ref(), &target).await?;
             let mut params = json!({ "pane_id": pane_id });
             if let Some(n) = max_lines {
                 params["max_lines"] = json!(n);
@@ -371,7 +371,7 @@ async fn main() -> Result<()> {
         // ── Kill pane ──
         Some(Command::KillPane { target }) => {
             let channel = connect_channel(&pipe_override).await?;
-            let pane_id = resolve_pane_id(&channel, &target).await?;
+            let pane_id = resolve_pane_id(channel.as_ref(), &target).await?;
             channel
                 .request("close_pane", json!({ "pane_id": pane_id }))
                 .await?;
@@ -391,7 +391,7 @@ async fn main() -> Result<()> {
         // ── Pane status ──
         Some(Command::PaneStatus { target }) => {
             let channel = connect_channel(&pipe_override).await?;
-            let pane_id = resolve_pane_id(&channel, &target).await?;
+            let pane_id = resolve_pane_id(channel.as_ref(), &target).await?;
             let result = channel
                 .request("get_process_status", json!({ "pane_id": pane_id }))
                 .await?;
@@ -503,13 +503,25 @@ fn resolve_pipe_info(po: &PipeOverride) -> Option<shell::wt_channel::ConnectionI
     discover_connection_info()
 }
 
-// ─── Helper: connect to WT pipe (no debug channel, no ShellManager) ─────────
+// ─── Helper: connect to WT (COM first, pipe fallback, no debug channel) ─────
 
-async fn connect_channel(po: &PipeOverride) -> Result<PipeChannel> {
-    if let Some(info) = resolve_pipe_info(po) {
-        return PipeChannel::connect_with(&info.pipe_name, &info.token).await;
+async fn connect_channel(po: &PipeOverride) -> Result<Box<dyn WtChannel>> {
+    // Try COM channel first (if WT_COM_CLSID is set and no explicit pipe override).
+    if po.pipe_name.is_none() {
+        if let Ok(clsid) = std::env::var("WT_COM_CLSID") {
+            let token = std::env::var("WT_MCP_TOKEN").unwrap_or_default();
+            match ComChannel::connect_with(&clsid, &token).await {
+                Ok(ch) => return Ok(Box::new(ch)),
+                Err(e) => eprintln!("[wta] COM connect failed, trying pipe: {}", e),
+            }
+        }
     }
-    bail!("Cannot find Windows Terminal pipe. Use --pipe-name or set WT_PIPE_NAME.");
+    // Fall back to pipe channel.
+    if let Some(info) = resolve_pipe_info(po) {
+        let ch = PipeChannel::connect_with(&info.pipe_name, &info.token).await?;
+        return Ok(Box::new(ch));
+    }
+    bail!("Cannot find Windows Terminal. Use --pipe-name, set WT_PIPE_NAME, or set WT_COM_CLSID.");
 }
 
 /// Single-shot: connect + call + return JSON
@@ -519,7 +531,7 @@ async fn wt_call(po: &PipeOverride, method: &str, params: serde_json::Value) -> 
 }
 
 /// Resolve -t target: Some(id) → use it, None → get_active_pane fallback
-async fn resolve_pane_id(channel: &PipeChannel, target: &Option<String>) -> Result<String> {
+async fn resolve_pane_id(channel: &dyn WtChannel, target: &Option<String>) -> Result<String> {
     match target {
         Some(id) => Ok(id.clone()),
         None => {
@@ -538,7 +550,7 @@ async fn resolve_pane_id(channel: &PipeChannel, target: &Option<String>) -> Resu
 }
 
 /// Get the first window ID from list_windows.
-async fn get_first_window_id(channel: &PipeChannel) -> Result<String> {
+async fn get_first_window_id(channel: &dyn WtChannel) -> Result<String> {
     let result = channel.request("list_windows", json!({})).await?;
     result
         .get("windows")
@@ -551,7 +563,7 @@ async fn get_first_window_id(channel: &PipeChannel) -> Result<String> {
 }
 
 /// Get the first tab ID from a window.
-async fn get_first_tab_id(channel: &PipeChannel, window_id: &str) -> Result<String> {
+async fn get_first_tab_id(channel: &dyn WtChannel, window_id: &str) -> Result<String> {
     let result = channel
         .request("list_tabs", json!({ "window_id": window_id }))
         .await?;
@@ -841,12 +853,12 @@ async fn run_default_tui(cli: Cli, po: PipeOverride) -> Result<()> {
     // Debug channel for TUI debug panel (pipe traffic viewer)
     let (debug_tx, debug_rx) = tokio::sync::mpsc::unbounded_channel::<app::DebugMessage>();
 
-    // Try to connect to the Windows Terminal pipe.
+    // Try to connect to Windows Terminal (COM or pipe).
     let mut shell_mgr = ShellManager::new();
-    let wt_connected = match connect_to_wt_pipe(&po, debug_tx.clone()).await {
+    let wt_connected = match connect_to_wt(&po, debug_tx.clone()).await {
         Ok(channel) => {
-            eprintln!("[wta] Connected to Windows Terminal pipe");
-            shell_mgr = shell_mgr.with_wt_channel(Arc::new(channel));
+            eprintln!("[wta] Connected to Windows Terminal");
+            shell_mgr = shell_mgr.with_wt_channel(Arc::from(channel));
             true
         }
         Err(e) => {
@@ -871,10 +883,10 @@ async fn run_mcp_mode(po: &PipeOverride) -> Result<()> {
     let mut shell_mgr = ShellManager::new();
     match connect_channel(po).await {
         Ok(channel) => {
-            shell_mgr = shell_mgr.with_wt_channel(Arc::new(channel));
+            shell_mgr = shell_mgr.with_wt_channel(Arc::from(channel));
         }
         Err(e) => {
-            eprintln!("[wta] No WT pipe for MCP: {}", e);
+            eprintln!("[wta] No WT connection for MCP: {}", e);
         }
     }
     protocol::mcp::server::run_mcp_server(Arc::new(shell_mgr)).await
@@ -948,9 +960,7 @@ async fn run_acp_tui_mode(
 }
 
 async fn run_test_pipe(po: &PipeOverride) -> Result<()> {
-    use shell::wt_channel::WtChannel;
-
-    println!("Connecting to Windows Terminal pipe...");
+    println!("Connecting to Windows Terminal...");
     let channel = connect_channel(po).await?;
     println!("Connected and authenticated!\n");
 
@@ -969,23 +979,36 @@ async fn run_test_pipe(po: &PipeOverride) -> Result<()> {
     Ok(())
 }
 
-/// Try to connect to the WT pipe using CLI override, VT discovery, or env var fallback.
-async fn connect_to_wt_pipe(
+/// Try to connect to WT using COM (preferred) or pipe fallback.
+async fn connect_to_wt(
     po: &PipeOverride,
     debug_tx: tokio::sync::mpsc::UnboundedSender<app::DebugMessage>,
-) -> Result<shell::wt_channel::PipeChannel> {
-    use shell::wt_channel::PipeChannel;
+) -> Result<Box<dyn WtChannel>> {
+    // Try COM channel first (if WT_COM_CLSID is set and no explicit pipe override).
+    if po.pipe_name.is_none() {
+        if let Ok(clsid) = std::env::var("WT_COM_CLSID") {
+            let token = std::env::var("WT_MCP_TOKEN").unwrap_or_default();
+            match ComChannel::connect_with(&clsid, &token).await {
+                Ok(ch) => {
+                    eprintln!("[wta] Connected via COM (CLSID={})", clsid);
+                    return Ok(Box::new(ch.with_debug_sender(debug_tx)));
+                }
+                Err(e) => eprintln!("[wta] COM connect failed, trying pipe: {}", e),
+            }
+        }
+    }
 
+    // Fall back to pipe channel.
     if let Some(info) = resolve_pipe_info(po) {
         eprintln!(
             "[wta] Discovered pipe via {:?}: {}",
             info.source, info.pipe_name
         );
         let channel = PipeChannel::connect_with(&info.pipe_name, &info.token).await?;
-        return Ok(channel.with_debug_sender(debug_tx));
+        return Ok(Box::new(channel.with_debug_sender(debug_tx)));
     }
 
-    bail!("Cannot find Windows Terminal pipe. Use --pipe-name or set WT_PIPE_NAME.");
+    bail!("Cannot find Windows Terminal. Use --pipe-name, set WT_PIPE_NAME, or set WT_COM_CLSID.");
 }
 
 /// Show Windows Terminal protocol connection info and pane identity.
@@ -995,11 +1018,35 @@ async fn run_info_mode(po: &PipeOverride) -> Result<()> {
     println!("Windows Terminal Protocol Info");
     println!("========================================");
 
+    // Show COM info
+    let com_clsid = std::env::var("WT_COM_CLSID").ok();
+    if let Some(ref clsid) = com_clsid {
+        println!("  COM CLSID: {}", clsid);
+    } else {
+        println!("  COM CLSID: (not set)");
+    }
+
     let info = match resolve_pipe_info(po) {
         Some(info) => info,
         None => {
-            println!("  Status: Not running inside Windows Terminal");
-            println!("  (No VT response, WT_PIPE_NAME not set, no --pipe-name)");
+            if com_clsid.is_none() {
+                println!("  Status: Not running inside Windows Terminal");
+                println!("  (No VT response, WT_PIPE_NAME not set, no --pipe-name, no WT_COM_CLSID)");
+                return Ok(());
+            }
+            // COM-only mode — try connecting via COM
+            println!("  Pipe:   (not available)");
+            println!();
+            let channel: Box<dyn WtChannel> = match connect_channel(po).await {
+                Ok(ch) => ch,
+                Err(e) => {
+                    println!("  Connection failed: {}", e);
+                    return Ok(());
+                }
+            };
+            // Print basic capabilities and return
+            let result = channel.request("get_capabilities", json!({})).await?;
+            println!("  Protocol: {}", result.get("protocol_version").and_then(|v| v.as_str()).unwrap_or("?"));
             return Ok(());
         }
     };
@@ -1019,7 +1066,7 @@ async fn run_info_mode(po: &PipeOverride) -> Result<()> {
     println!("  Source: {}", source_str);
     println!();
 
-    let channel = match PipeChannel::connect_with(&info.pipe_name, &info.token).await {
+    let channel: Box<dyn WtChannel> = match connect_channel(po).await {
         Ok(ch) => ch,
         Err(e) => {
             println!("  Connection failed: {}", e);
@@ -1138,16 +1185,23 @@ fn write_wta_mcp_config(po: &PipeOverride) -> Result<std::path::PathBuf> {
         ),
     };
 
+    let com_clsid = std::env::var("WT_COM_CLSID").unwrap_or_default();
+
+    let mut env = serde_json::json!({
+        "WT_PIPE_NAME": pipe_name,
+        "WT_MCP_TOKEN": token
+    });
+    if !com_clsid.is_empty() {
+        env["WT_COM_CLSID"] = serde_json::Value::String(com_clsid);
+    }
+
     let config = serde_json::json!({
         "mcpServers": {
             "windows-terminal": {
                 "type": "stdio",
                 "command": wta_exe,
                 "args": ["--mcp"],
-                "env": {
-                    "WT_PIPE_NAME": pipe_name,
-                    "WT_MCP_TOKEN": token
-                }
+                "env": env
             }
         }
     });

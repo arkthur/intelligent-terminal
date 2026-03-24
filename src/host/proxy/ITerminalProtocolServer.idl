@@ -1,0 +1,17 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "unknwn.idl";
+
+// ITerminalProtocolServer — COM interface for IPC between wta and Windows Terminal.
+// Single method: passes JSON request, returns JSON response.
+// Phase 1 uses BSTR (JSON strings); Phase 2 will add typed methods.
+
+[
+    object,
+    uuid(7B3F8A1E-5C2D-4E6F-9A8B-1D3E5F7A9B0C)
+]
+interface ITerminalProtocolServer : IUnknown
+{
+    HRESULT HandleRequest([in] BSTR requestJson, [out, retval] BSTR* responseJson);
+};
