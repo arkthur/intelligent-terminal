@@ -24,14 +24,14 @@ pub struct DelegateAgentRuntime {
     pub command: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RecommendationSet {
     #[serde(default)]
     pub recommended_choice: Option<usize>,
     pub choices: Vec<RecommendationChoice>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RecommendationChoice {
     pub choice: usize,
     pub title: String,
@@ -40,7 +40,7 @@ pub struct RecommendationChoice {
     pub actions: Vec<RecommendedAction>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RecommendedAction {
     RunCommand {

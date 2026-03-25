@@ -1,6 +1,8 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::prelude::*;
+use ratatui::backend::CrosstermBackend;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,7 +12,9 @@ use tokio::sync::mpsc;
 use crate::coordinator::{
     parse_recommendation_set, recommended_choice_index, RecommendationChoice, RecommendationSet,
 };
+use crate::shared_host::SharedStateSnapshot;
 use crate::ui;
+use crate::ui_trace;
 
 // --- Debug types ---
 
@@ -29,7 +33,7 @@ pub struct DebugMessage {
 
 // --- State types ---
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConnectionState {
     Disconnected,
     Connecting(String),
@@ -37,7 +41,7 @@ pub enum ConnectionState {
     Failed(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ChatMessage {
     User(String),
     Agent(String),
@@ -51,20 +55,20 @@ pub enum ChatMessage {
     Error(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlanEntry {
     pub content: String,
     pub status: PlanEntryStatus,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PlanEntryStatus {
     Pending,
     InProgress,
     Completed,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PermOption {
     pub id: String,
     pub name: String,
@@ -75,7 +79,7 @@ pub struct PermissionState {
     pub description: String,
     pub options: Vec<PermOption>,
     pub selected: usize,
-    pub responder: tokio::sync::oneshot::Sender<String>,
+    pub responder: Option<tokio::sync::oneshot::Sender<String>>,
 }
 
 // --- Events ---
@@ -84,6 +88,7 @@ pub enum AppEvent {
     Key(KeyEvent),
     Resize(u16, u16), // terminal resize (handled by ratatui)
     ConnectionStage(String),
+    UserMessage(String),
     AgentConnected {
         name: String,
         session_id: String,
@@ -106,8 +111,14 @@ pub enum AppEvent {
         options: Vec<PermOption>,
         responder: tokio::sync::oneshot::Sender<String>,
     },
+    SharedPermissionRequest {
+        description: String,
+        options: Vec<PermOption>,
+    },
+    PermissionCleared,
     SystemMessage(String),
     DebugPipeMessage(DebugMessage),
+    SharedStateSnapshot(SharedStateSnapshot),
 }
 
 // --- App ---
@@ -127,9 +138,12 @@ pub struct App {
     pub recommendations: Option<RecommendationSet>,
     pub selected_recommendation: usize,
     pub should_quit: bool,
+    pub prompt_in_flight: bool,
+    pub shared_mode: bool,
     prompt_tx: mpsc::UnboundedSender<String>,
     recommendation_tx: mpsc::UnboundedSender<RecommendationChoice>,
-    pending_agent_response: String,
+    permission_tx: mpsc::UnboundedSender<String>,
+    pub pending_agent_response: String,
     debug_capture_enabled: Arc<AtomicBool>,
     // Debug panel
     pub debug_messages: Vec<DebugMessage>,
@@ -145,8 +159,10 @@ impl App {
     pub fn new(
         prompt_tx: mpsc::UnboundedSender<String>,
         recommendation_tx: mpsc::UnboundedSender<RecommendationChoice>,
+        permission_tx: mpsc::UnboundedSender<String>,
         debug_capture_enabled: Arc<AtomicBool>,
         wt_connected: bool,
+        shared_mode: bool,
     ) -> Self {
         Self {
             state: ConnectionState::Connecting("Starting agent...".to_string()),
@@ -163,8 +179,11 @@ impl App {
             recommendations: None,
             selected_recommendation: 0,
             should_quit: false,
+            prompt_in_flight: false,
+            shared_mode,
             prompt_tx,
             recommendation_tx,
+            permission_tx,
             pending_agent_response: String::new(),
             debug_capture_enabled,
             debug_messages: Vec::new(),
@@ -184,18 +203,35 @@ impl App {
     ) -> Result<()> {
         const MAX_EVENTS_PER_FRAME: usize = 64;
 
-        terminal.draw(|frame| ui::render(frame, self))?;
+        let initial_draw_started = std::time::Instant::now();
+        self.draw_frame(terminal)?;
+        ui_trace::log_slow("initial_draw", initial_draw_started.elapsed(), || {
+            self.trace_state()
+        });
 
         loop {
             tokio::select! {
                 biased;
 
                 Some(event) = ui_rx.recv() => {
+                    let event_name = Self::event_name(&event);
+                    self.apply_resize_if_needed(terminal, &event)?;
+                    let handle_started = std::time::Instant::now();
                     self.handle_event(event);
-                    terminal.draw(|frame| ui::render(frame, self))?;
+                    ui_trace::log_slow("ui_event_handle", handle_started.elapsed(), || {
+                        format!("event={} {}", event_name, self.trace_state())
+                    });
+                    let draw_started = std::time::Instant::now();
+                    self.draw_frame(terminal)?;
+                    ui_trace::log_slow("ui_event_draw", draw_started.elapsed(), || {
+                        format!("event={} {}", event_name, self.trace_state())
+                    });
                 }
 
                 Some(event) = event_rx.recv() => {
+                    let first_event_name = Self::event_name(&event);
+                    self.apply_resize_if_needed(terminal, &event)?;
+                    let batch_started = std::time::Instant::now();
                     let mut processed = 0usize;
 
                     let mut should_redraw_now = self.event_requires_redraw(&event);
@@ -205,6 +241,7 @@ impl App {
                     while processed < MAX_EVENTS_PER_FRAME {
                         match event_rx.try_recv() {
                             Ok(event) => {
+                                self.apply_resize_if_needed(terminal, &event)?;
                                 if self.event_requires_redraw(&event) {
                                     should_redraw_now = true;
                                 }
@@ -216,8 +253,27 @@ impl App {
                         }
                     }
 
+                    ui_trace::log_slow("event_batch_handle", batch_started.elapsed(), || {
+                        format!(
+                            "first_event={} processed={} redraw={} {}",
+                            first_event_name,
+                            processed,
+                            should_redraw_now,
+                            self.trace_state()
+                        )
+                    });
+
                     if should_redraw_now {
-                        terminal.draw(|frame| ui::render(frame, self))?;
+                        let draw_started = std::time::Instant::now();
+                        self.draw_frame(terminal)?;
+                        ui_trace::log_slow("event_batch_draw", draw_started.elapsed(), || {
+                            format!(
+                                "first_event={} processed={} {}",
+                                first_event_name,
+                                processed,
+                                self.trace_state()
+                            )
+                        });
                     }
                 }
 
@@ -233,12 +289,124 @@ impl App {
         Ok(())
     }
 
+    fn apply_resize_if_needed(
+        &self,
+        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+        event: &AppEvent,
+    ) -> Result<()> {
+        let AppEvent::Resize(width, height) = event else {
+            return Ok(());
+        };
+
+        let resize_started = std::time::Instant::now();
+        terminal.resize(Rect::new(0, 0, *width, *height))?;
+        ui_trace::log_slow("terminal_resize", resize_started.elapsed(), || {
+            format!("width={} height={}", width, height)
+        });
+        Ok(())
+    }
+
+    fn draw_frame(
+        &self,
+        terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    ) -> Result<()> {
+        let total_started = std::time::Instant::now();
+
+        let mut frame = terminal.get_frame();
+        let area = frame.area();
+
+        let render_started = std::time::Instant::now();
+        ui::render(&mut frame, self);
+        ui_trace::log_slow("ui_render", render_started.elapsed(), || self.trace_state());
+
+        let flush_started = std::time::Instant::now();
+        terminal.flush()?;
+        ui_trace::log_slow("terminal_flush", flush_started.elapsed(), || {
+            self.trace_state()
+        });
+
+        let cursor_started = std::time::Instant::now();
+        match ui::input_cursor_position(self, area) {
+            Some(position) => {
+                terminal.show_cursor()?;
+                terminal.set_cursor_position(position)?;
+            }
+            None => {
+                terminal.hide_cursor()?;
+            }
+        }
+        ui_trace::log_slow("terminal_cursor", cursor_started.elapsed(), || {
+            self.trace_state()
+        });
+
+        terminal.swap_buffers();
+
+        let backend_flush_started = std::time::Instant::now();
+        terminal.backend_mut().flush()?;
+        ui_trace::log_slow("terminal_backend_flush", backend_flush_started.elapsed(), || {
+            self.trace_state()
+        });
+
+        ui_trace::log_slow("draw_frame_total", total_started.elapsed(), || {
+            self.trace_state()
+        });
+
+        Ok(())
+    }
+
+    fn event_name(event: &AppEvent) -> &'static str {
+        match event {
+            AppEvent::Key(_) => "key",
+            AppEvent::Resize(_, _) => "resize",
+            AppEvent::ConnectionStage(_) => "connection_stage",
+            AppEvent::UserMessage(_) => "user_message",
+            AppEvent::AgentConnected { .. } => "agent_connected",
+            AppEvent::AgentError(_) => "agent_error",
+            AppEvent::AgentMessageChunk(_) => "agent_message_chunk",
+            AppEvent::AgentMessageEnd => "agent_message_end",
+            AppEvent::ToolCall { .. } => "tool_call",
+            AppEvent::ToolCallUpdate { .. } => "tool_call_update",
+            AppEvent::Plan(_) => "plan",
+            AppEvent::PermissionRequest { .. } => "permission_request",
+            AppEvent::SharedPermissionRequest { .. } => "shared_permission_request",
+            AppEvent::PermissionCleared => "permission_cleared",
+            AppEvent::SystemMessage(_) => "system_message",
+            AppEvent::DebugPipeMessage(_) => "debug_pipe_message",
+            AppEvent::SharedStateSnapshot(_) => "shared_state_snapshot",
+        }
+    }
+
+    fn trace_state(&self) -> String {
+        format!(
+            "state={:?} messages={} input_chars={} pending_chars={} scroll={} streaming={} recommendations={} permission={}",
+            self.state,
+            self.messages.len(),
+            self.input.chars().count(),
+            self.pending_agent_response.chars().count(),
+            self.scroll_offset,
+            self.agent_streaming,
+            self.recommendations
+                .as_ref()
+                .map(|recs| recs.choices.len())
+                .unwrap_or(0),
+            self.permission.is_some()
+        )
+    }
+
     fn handle_event(&mut self, event: AppEvent) {
         match event {
             AppEvent::Key(key) => self.handle_key(key),
             AppEvent::Resize(_, _) => {} // ratatui handles resize
             AppEvent::ConnectionStage(stage) => {
                 self.state = ConnectionState::Connecting(stage);
+            }
+            AppEvent::UserMessage(text) => {
+                self.recommendations = None;
+                self.selected_recommendation = 0;
+                self.pending_agent_response.clear();
+                self.prompt_in_flight = true;
+                self.messages.push(ChatMessage::User(text));
+                self.scroll_to_bottom();
             }
             AppEvent::AgentConnected { name, session_id } => {
                 self.agent_name = name;
@@ -247,16 +415,20 @@ impl App {
             }
             AppEvent::AgentError(msg) => {
                 self.state = ConnectionState::Failed(msg.clone());
+                self.prompt_in_flight = false;
+                self.agent_streaming = false;
                 self.pending_agent_response.clear();
                 self.messages.push(ChatMessage::Error(msg));
             }
             AppEvent::AgentMessageChunk(text) => {
                 self.agent_streaming = true;
+                self.prompt_in_flight = true;
                 self.pending_agent_response.push_str(&text);
                 self.scroll_to_bottom();
             }
             AppEvent::AgentMessageEnd => {
                 self.agent_streaming = false;
+                self.prompt_in_flight = false;
                 self.finalize_agent_response();
             }
             AppEvent::ToolCall { id, title, status } => {
@@ -297,8 +469,22 @@ impl App {
                     description,
                     options,
                     selected: 0,
-                    responder,
+                    responder: Some(responder),
                 });
+            }
+            AppEvent::SharedPermissionRequest {
+                description,
+                options,
+            } => {
+                self.permission = Some(PermissionState {
+                    description,
+                    options,
+                    selected: 0,
+                    responder: None,
+                });
+            }
+            AppEvent::PermissionCleared => {
+                self.permission = None;
             }
             AppEvent::SystemMessage(message) => {
                 self.messages.push(ChatMessage::System(message));
@@ -310,6 +496,9 @@ impl App {
                 if self.debug_messages.len() > 500 {
                     self.debug_messages.remove(0);
                 }
+            }
+            AppEvent::SharedStateSnapshot(snapshot) => {
+                self.apply_shared_snapshot(snapshot);
             }
         }
     }
@@ -340,7 +529,11 @@ impl App {
                     let option_id = perm.options[perm.selected].id.clone();
                     // Take ownership to send
                     if let Some(perm) = self.permission.take() {
-                        let _ = perm.responder.send(option_id);
+                        if let Some(responder) = perm.responder {
+                            let _ = responder.send(option_id);
+                        } else {
+                            let _ = self.permission_tx.send(option_id);
+                        }
                     }
                 }
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
@@ -348,7 +541,11 @@ impl App {
                     if let Some(idx) = perm.options.iter().position(|o| o.kind.contains("allow")) {
                         let option_id = perm.options[idx].id.clone();
                         if let Some(perm) = self.permission.take() {
-                            let _ = perm.responder.send(option_id);
+                            if let Some(responder) = perm.responder {
+                                let _ = responder.send(option_id);
+                            } else {
+                                let _ = self.permission_tx.send(option_id);
+                            }
                         }
                     }
                 }
@@ -357,7 +554,11 @@ impl App {
                     if let Some(idx) = perm.options.iter().position(|o| o.kind.contains("reject")) {
                         let option_id = perm.options[idx].id.clone();
                         if let Some(perm) = self.permission.take() {
-                            let _ = perm.responder.send(option_id);
+                            if let Some(responder) = perm.responder {
+                                let _ = responder.send(option_id);
+                            } else {
+                                let _ = self.permission_tx.send(option_id);
+                            }
                         }
                     }
                 }
@@ -418,11 +619,14 @@ impl App {
                     let text = self.input.clone();
                     self.input.clear();
                     self.cursor_pos = 0;
-                    self.recommendations = None;
-                    self.selected_recommendation = 0;
-                    self.pending_agent_response.clear();
-                    self.messages.push(ChatMessage::User(text.clone()));
-                    self.scroll_to_bottom();
+                    if !self.shared_mode {
+                        self.recommendations = None;
+                        self.selected_recommendation = 0;
+                        self.pending_agent_response.clear();
+                        self.prompt_in_flight = true;
+                        self.messages.push(ChatMessage::User(text.clone()));
+                        self.scroll_to_bottom();
+                    }
                     let _ = self.prompt_tx.send(text);
                 }
             }
@@ -495,6 +699,56 @@ impl App {
                 self.messages.push(ChatMessage::Agent(text));
                 self.scroll_to_bottom();
             }
+        }
+    }
+
+    fn apply_shared_snapshot(&mut self, snapshot: SharedStateSnapshot) {
+        let recommendations_changed = self.recommendations != snapshot.recommendations;
+        let permission_changed = self
+            .permission
+            .as_ref()
+            .map(|perm| (&perm.description, &perm.options))
+            != snapshot
+                .permission
+                .as_ref()
+                .map(|perm| (&perm.description, &perm.options));
+
+        self.state = snapshot.state;
+        self.agent_name = snapshot.agent_name;
+        self.session_id = snapshot.session_id;
+        self.wt_connected = snapshot.wt_connected;
+        self.messages = snapshot.messages;
+        self.recommendations = snapshot.recommendations;
+        self.agent_streaming = snapshot.agent_streaming;
+        self.pending_agent_response = snapshot.pending_agent_response;
+        self.prompt_in_flight = snapshot.prompt_in_flight;
+
+        if recommendations_changed {
+            self.selected_recommendation = self
+                .recommendations
+                .as_ref()
+                .map(recommended_choice_index)
+                .unwrap_or(0);
+        }
+
+        if let Some(permission) = snapshot.permission {
+            let selected = if permission_changed {
+                0
+            } else {
+                self.permission
+                    .as_ref()
+                    .map(|current| current.selected)
+                    .unwrap_or(0)
+            };
+            let max_selected = permission.options.len().saturating_sub(1);
+            self.permission = Some(PermissionState {
+                description: permission.description,
+                options: permission.options,
+                selected: selected.min(max_selected),
+                responder: None,
+            });
+        } else {
+            self.permission = None;
         }
     }
 }

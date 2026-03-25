@@ -10,10 +10,17 @@ use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 use crate::app::{AppEvent, PermOption, PlanEntry, PlanEntryStatus};
 use crate::coordinator::default_supported_delegate_agents;
+use crate::shared_host::PaneContext;
 use crate::shell::{ActivePaneSnapshot, ShellManager, TerminalConfig};
 
 const ACTIVE_PANE_CONTEXT_MAX_LINES: u32 = 80;
 const ACTIVE_PANE_CONTEXT_MAX_CHARS: usize = 4000;
+
+#[derive(Debug, Clone)]
+pub struct PromptSubmission {
+    pub text: String,
+    pub pane_context: Option<PaneContext>,
+}
 
 fn truncate_for_prompt(text: &str, max_chars: usize) -> String {
     if text.chars().count() <= max_chars {
@@ -65,20 +72,6 @@ async fn live_active_pane_context(shell_mgr: &ShellManager) -> Option<String> {
         .await
         .ok()?;
     Some(format_active_pane_context(&snapshot))
-}
-
-fn source_pane_values() -> (
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-) {
-    (
-        std::env::var("WTA_SOURCE_PANE_ID").ok(),
-        std::env::var("WTA_SOURCE_TAB_ID").ok(),
-        std::env::var("WTA_SOURCE_WINDOW_ID").ok(),
-        std::env::var("WTA_SOURCE_CWD").ok(),
-    )
 }
 
 fn planner_prompt_rules() -> String {
@@ -172,9 +165,14 @@ fn json_str_or_num(value: Option<&serde_json::Value>) -> Option<String> {
 
 async fn build_terminal_context_json(
     shell_mgr: &ShellManager,
-    pane_identity: Option<&(String, String, String)>,
+    pane_context: Option<&PaneContext>,
 ) -> Option<String> {
-    let (source_pane_id, source_tab_id, source_window_id, source_cwd) = source_pane_values();
+    let source_pane_id = pane_context
+        .and_then(|context| context.effective_source_pane_id())
+        .map(str::to_string);
+    let source_tab_id = pane_context.and_then(|context| context.tab_id.clone());
+    let source_window_id = pane_context.and_then(|context| context.window_id.clone());
+    let source_cwd = pane_context.and_then(|context| context.cwd.clone());
     let active = shell_mgr.wt_get_active_pane().await.ok();
     let active_pane_id = active
         .as_ref()
@@ -185,9 +183,6 @@ async fn build_terminal_context_json(
         highlighted_panes.insert(pane_id.clone());
     }
     if let Some(pane_id) = &active_pane_id {
-        highlighted_panes.insert(pane_id.clone());
-    }
-    if let Some((pane_id, _, _)) = pane_identity {
         highlighted_panes.insert(pane_id.clone());
     }
 
@@ -238,10 +233,6 @@ async fn build_terminal_context_json(
 
                 let pane_role = if source_pane_id.as_deref() == Some(pane_id.as_str()) {
                     Some("source")
-                } else if pane_identity.map(|identity| identity.0.as_str())
-                    == Some(pane_id.as_str())
-                {
-                    Some("assistant")
                 } else if active_pane_id.as_deref() == Some(pane_id.as_str()) {
                     Some("active")
                 } else {
@@ -278,9 +269,7 @@ async fn build_terminal_context_json(
         "sourceTarget": source_pane_id,
         "sourceTabId": source_tab_id,
         "sourceWindowId": source_window_id,
-        "assistantPaneId": pane_identity.map(|identity| identity.0.clone()),
-        "assistantTabId": pane_identity.map(|identity| identity.1.clone()),
-        "assistantWindowId": pane_identity.map(|identity| identity.2.clone()),
+        "sourceCwd": source_cwd,
         "tabs": tabs_json,
     }))
     .ok()
@@ -290,7 +279,7 @@ async fn build_prompt_text(
     user_text: &str,
     shell_mgr: &ShellManager,
     wt_connected: bool,
-    pane_identity: Option<&(String, String, String)>,
+    pane_context: Option<&PaneContext>,
 ) -> String {
     let mut context_parts = Vec::new();
     context_parts.push(planner_prompt_rules());
@@ -304,7 +293,7 @@ async fn build_prompt_text(
 
     if wt_connected {
         if let Some(terminal_context_json) =
-            build_terminal_context_json(shell_mgr, pane_identity).await
+            build_terminal_context_json(shell_mgr, pane_context).await
         {
             context_parts.push(format!(
                 "Terminal context JSON:\n```json\n{}\n```",
@@ -629,27 +618,23 @@ impl acp::Client for WtaClient {
 /// Top-level ACP client task: spawn agent, handshake, prompt loop.
 pub async fn run_acp_client(
     agent_cmd: String,
-    initial_prompt: Option<String>,
     event_tx: mpsc::UnboundedSender<AppEvent>,
-    mut prompt_rx: mpsc::UnboundedReceiver<String>,
+    mut prompt_rx: mpsc::UnboundedReceiver<PromptSubmission>,
     shell_mgr: Arc<ShellManager>,
     wt_connected: bool,
-    pane_identity: Option<(String, String, String)>,
 ) {
     let startup_probe = StartupProbe::new();
     startup_probe.log(&format!(
-        "run_acp_client task start agent_cmd={} wt_connected={} pane_identity={:?}",
-        agent_cmd, wt_connected, pane_identity
+        "run_acp_client task start agent_cmd={} wt_connected={}",
+        agent_cmd, wt_connected
     ));
     startup_probe.log("run_acp_client entering run_inner");
     if let Err(e) = run_inner(
         agent_cmd,
-        initial_prompt,
         event_tx.clone(),
         &mut prompt_rx,
         shell_mgr,
         wt_connected,
-        pane_identity,
     )
     .await
     {
@@ -662,12 +647,10 @@ pub async fn run_acp_client(
 
 async fn run_inner(
     agent_cmd: String,
-    initial_prompt: Option<String>,
     event_tx: mpsc::UnboundedSender<AppEvent>,
-    prompt_rx: &mut mpsc::UnboundedReceiver<String>,
+    prompt_rx: &mut mpsc::UnboundedReceiver<PromptSubmission>,
     shell_mgr: Arc<ShellManager>,
     wt_connected: bool,
-    pane_identity: Option<(String, String, String)>,
 ) -> Result<()> {
     let startup_probe = StartupProbe::new();
 
@@ -798,31 +781,15 @@ async fn run_inner(
         session_id: session_id.to_string(),
     });
 
-    // Send initial prompt if provided
-    if let Some(prompt_text) = initial_prompt {
-        let _ = event_tx.send(AppEvent::AgentMessageChunk(String::new())); // trigger streaming state
-        let prompt_text = build_prompt_text(
-            &prompt_text,
+    // Prompt loop: wait for user input, send to agent
+    while let Some(prompt) = prompt_rx.recv().await {
+        let text = build_prompt_text(
+            &prompt.text,
             &shell_mgr,
             wt_connected,
-            pane_identity.as_ref(),
+            prompt.pane_context.as_ref(),
         )
         .await;
-        let result = conn
-            .prompt(acp::PromptRequest::new(
-                session_id.clone(),
-                vec![prompt_text.into()],
-            ))
-            .await;
-        let _ = event_tx.send(AppEvent::AgentMessageEnd);
-        if let Err(e) = result {
-            let _ = event_tx.send(AppEvent::AgentError(format!("prompt error: {}", e)));
-        }
-    }
-
-    // Prompt loop: wait for user input, send to agent
-    while let Some(text) = prompt_rx.recv().await {
-        let text = build_prompt_text(&text, &shell_mgr, wt_connected, pane_identity.as_ref()).await;
         let result = conn
             .prompt(acp::PromptRequest::new(
                 session_id.clone(),

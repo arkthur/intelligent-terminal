@@ -57,10 +57,18 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         ""
     };
+    let inflight_hint = if app.prompt_in_flight { " | busy" } else { "" };
 
     let text = format!(
-        "[wta] {} | {}{}{}{}{}{}",
-        name, status_text, session_info, wt_info, pane_info, recommendation_hint, debug_hint
+        "[wta] {} | {}{}{}{}{}{}{}",
+        name,
+        status_text,
+        session_info,
+        wt_info,
+        pane_info,
+        inflight_hint,
+        recommendation_hint,
+        debug_hint
     );
     let p = Paragraph::new(text).style(status_style);
     frame.render_widget(p, area);

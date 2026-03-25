@@ -50,3 +50,39 @@ pub fn render(frame: &mut Frame, app: &App) {
         permission::render(frame, app, area);
     }
 }
+
+pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
+    let main_area = if app.show_debug_panel {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
+            .split(area)[0]
+    } else {
+        area
+    };
+
+    let recommendations_height = if app.recommendations.is_some() {
+        Constraint::Length(8)
+    } else {
+        Constraint::Length(0)
+    };
+
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1),
+            recommendations_height,
+            Constraint::Min(1),
+            Constraint::Length(3),
+        ])
+        .split(main_area);
+
+    let input_area = chunks[3];
+    let inner_x = input_area.x + 1 + app.cursor_pos as u16;
+    let inner_y = input_area.y + 1;
+    if inner_x < input_area.x + input_area.width.saturating_sub(1) {
+        Some(Position::new(inner_x, inner_y))
+    } else {
+        None
+    }
+}
