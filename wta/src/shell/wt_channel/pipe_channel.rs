@@ -120,7 +120,33 @@ impl PipeChannel {
         }
     }
 
+    /// Read a single line from the pipe. Returns the raw string (without newline).
+    /// Used by the `listen` subcommand to receive push events.
+    pub async fn read_line(&self) -> anyhow::Result<String> {
+        let mut pipe = self.pipe.lock().await;
+        let buf = Self::read_line_raw(&mut pipe).await?;
+        let line = String::from_utf8(buf)?;
+        self.log(&format!("<<< {}", line)).await;
+        Ok(line)
+    }
+
+    /// Read a single newline-terminated line from the pipe (caller must hold lock).
+    async fn read_line_raw(
+        pipe: &mut tokio::net::windows::named_pipe::NamedPipeClient,
+    ) -> anyhow::Result<Vec<u8>> {
+        let mut buf = Vec::with_capacity(4096);
+        loop {
+            let byte = pipe.read_u8().await?;
+            if byte == b'\n' {
+                break;
+            }
+            buf.push(byte);
+        }
+        Ok(buf)
+    }
+
     /// Core request implementation with full logging.
+    /// Skips interleaved event messages and only returns the matching response.
     async fn request_inner(
         &self,
         method: &str,
@@ -145,28 +171,36 @@ impl PipeChannel {
         // Write request
         pipe.write_all(json.as_bytes()).await?;
 
-        // Read response line (byte-by-byte until \n)
-        let mut buf = Vec::with_capacity(4096);
+        // Read lines until we get a response (skip interleaved events).
         loop {
-            let byte = pipe.read_u8().await?;
-            if byte == b'\n' {
-                break;
+            let buf = Self::read_line_raw(&mut pipe).await?;
+
+            let line_str = String::from_utf8_lossy(&buf);
+            self.log(&format!("<<< {}", line_str)).await;
+            self.emit_debug(crate::app::DebugDir::Received, line_str.to_string());
+
+            // Skip empty lines
+            if buf.is_empty() {
+                continue;
             }
-            buf.push(byte);
+
+            // Try to parse as a generic JSON to check the type field.
+            if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&buf) {
+                if v.get("type").and_then(|t| t.as_str()) == Some("event") {
+                    // This is a push event, not our response. Skip it.
+                    continue;
+                }
+            }
+
+            let resp: WireResponse = serde_json::from_slice(&buf)
+                .context("Failed to parse response from Windows Terminal")?;
+
+            if let Some(err) = resp.error {
+                bail!("WT protocol error [{}]: {}", err.code, err.message);
+            }
+
+            return Ok(resp.result.unwrap_or(serde_json::Value::Null));
         }
-
-        let resp_str = String::from_utf8_lossy(&buf);
-        self.log(&format!("<<< {}", resp_str)).await;
-        self.emit_debug(crate::app::DebugDir::Received, resp_str.to_string());
-
-        let resp: WireResponse = serde_json::from_slice(&buf)
-            .context("Failed to parse response from Windows Terminal")?;
-
-        if let Some(err) = resp.error {
-            bail!("WT protocol error [{}]: {}", err.code, err.message);
-        }
-
-        Ok(resp.result.unwrap_or(serde_json::Value::Null))
     }
 }
 

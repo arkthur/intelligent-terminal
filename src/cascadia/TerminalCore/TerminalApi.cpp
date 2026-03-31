@@ -364,6 +364,14 @@ void Terminal::SearchMissingCommand(const std::wstring_view command)
     }
 }
 
+void Terminal::NotifyVtSequence(const std::wstring_view sequence)
+{
+    if (_pfnVtSequence)
+    {
+        _pfnVtSequence(sequence);
+    }
+}
+
 void Terminal::NotifyBufferRotation(const int delta)
 {
     // Update our selection, so it doesn't move as the buffer is cycled

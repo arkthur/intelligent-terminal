@@ -4816,3 +4816,8 @@ void AdaptDispatch::SetOptionalFeatures(const til::enumset<OptionalFeature> feat
 {
     _optionalFeatures = features;
 }
+
+void AdaptDispatch::NotifyVtSequence(const std::wstring_view sequence)
+{
+    _api.NotifyVtSequence(sequence);
+}

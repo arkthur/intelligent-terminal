@@ -21,6 +21,7 @@ struct ProtocolClientConnection
     std::string lineBuffer;
     bool authenticated = false;
     DWORD clientPid = 0;
+    std::mutex writeMutex; // Protects pipe writes from concurrent threads
 
     ProtocolClientConnection();
 };
@@ -48,11 +49,15 @@ public:
     // Returns the pipe name for this server instance.
     const std::wstring& PipeName() const noexcept { return _pipeName; }
 
+    // Broadcast an event JSON string to all authenticated clients.
+    void BroadcastEvent(const std::string& eventJson);
+
 private:
     void _listenerThread();
     void _clientThread(std::shared_ptr<ProtocolClientConnection> client);
     void _processLine(ProtocolClientConnection& client, const std::string& line);
     void _sendResponse(ProtocolClientConnection& client, const Json::Value& response);
+    void _writeRaw(ProtocolClientConnection& client, const std::string& data);
     bool _validateClientProcess(DWORD pid) const;
 
     std::wstring _pipeName;
@@ -62,6 +67,7 @@ private:
     wil::unique_event _stopEvent;
     std::thread _listenerThread_;
     std::vector<std::thread> _clientThreads;
+    std::vector<std::weak_ptr<ProtocolClientConnection>> _connectedClients;
     std::mutex _clientLock;
     bool _running = false;
 };

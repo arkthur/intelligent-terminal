@@ -194,6 +194,8 @@ namespace Microsoft::Console::VirtualTerminal
 
         void SetOptionalFeatures(const til::enumset<OptionalFeature> features) noexcept override;
 
+        void NotifyVtSequence(const std::wstring_view sequence) override;
+
     private:
         enum class Mode
         {

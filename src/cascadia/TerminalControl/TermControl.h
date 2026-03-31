@@ -216,6 +216,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         til::typed_event<IInspectable, Control::CharSentEventArgs> CharSent;
         til::typed_event<IInspectable, Control::StringSentEventArgs> StringSent;
         til::typed_event<IInspectable, Control::SearchMissingCommandEventArgs> SearchMissingCommand;
+        til::typed_event<IInspectable, winrt::hstring> VtSequenceReceived;
         til::typed_event<IInspectable, Control::WindowSizeChangedEventArgs> WindowSizeChanged;
 
         // UNDER NO CIRCUMSTANCES SHOULD YOU ADD A (PROJECTED_)FORWARDED_TYPED_EVENT HERE
@@ -436,6 +437,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         void _showContextMenuAt(const winrt::Windows::Foundation::Point& controlRelativePos);
 
         void _bubbleSearchMissingCommand(const IInspectable& sender, const Control::SearchMissingCommandEventArgs& args);
+        void _bubbleVtSequenceReceived(const IInspectable& sender, const winrt::hstring& seq);
         winrt::fire_and_forget _bubbleWindowSizeChanged(const IInspectable& sender, Control::WindowSizeChangedEventArgs args);
         til::CoordType _calculateSearchScrollOffset() const;
 
@@ -469,6 +471,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
             Control::ControlCore::CompletionsChanged_revoker CompletionsChanged;
             Control::ControlCore::RestartTerminalRequested_revoker RestartTerminalRequested;
             Control::ControlCore::SearchMissingCommand_revoker SearchMissingCommand;
+            Control::ControlCore::VtSequenceReceived_revoker VtSequenceReceived;
             Control::ControlCore::RefreshQuickFixUI_revoker RefreshQuickFixUI;
             Control::ControlCore::WindowSizeChanged_revoker WindowSizeChanged;
 

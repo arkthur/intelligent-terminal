@@ -154,6 +154,7 @@ void TerminalProtocolServer::_listenerThread()
         client->clientPid = clientPid;
 
         std::lock_guard lock{ _clientLock };
+        _connectedClients.emplace_back(client);
         _clientThreads.emplace_back([this, client]() { _clientThread(client); });
     }
 }
@@ -276,13 +277,20 @@ void TerminalProtocolServer::_sendResponse(ProtocolClientConnection& client, con
     writerBuilder["indentation"] = ""; // Compact output (no pretty-print)
     const auto responseStr = Json::writeString(writerBuilder, response) + "\n";
 
+    _writeRaw(client, responseStr);
+}
+
+void TerminalProtocolServer::_writeRaw(ProtocolClientConnection& client, const std::string& data)
+{
+    std::lock_guard lock{ client.writeMutex };
+
     DWORD bytesWritten = 0;
     client.writeEvent.ResetEvent();
 
     const auto writeResult = WriteFile(
         client.pipe.get(),
-        responseStr.data(),
-        static_cast<DWORD>(responseStr.size()),
+        data.data(),
+        static_cast<DWORD>(data.size()),
         nullptr,
         &client.writeOverlapped);
 
@@ -301,6 +309,40 @@ void TerminalProtocolServer::_sendResponse(ProtocolClientConnection& client, con
         else
         {
             LOG_WIN32(err);
+        }
+    }
+}
+
+void TerminalProtocolServer::BroadcastEvent(const std::string& eventJson)
+{
+    // Strip any trailing whitespace/newlines from Json::writeString, then add exactly one \n.
+    auto trimmed = eventJson;
+    while (!trimmed.empty() && (trimmed.back() == '\n' || trimmed.back() == '\r' || trimmed.back() == ' '))
+    {
+        trimmed.pop_back();
+    }
+    const auto data = trimmed + "\n";
+
+    std::lock_guard lock{ _clientLock };
+
+    // Remove expired weak_ptrs and broadcast to authenticated clients.
+    std::erase_if(_connectedClients, [](const auto& wp) { return wp.expired(); });
+
+    for (auto& wp : _connectedClients)
+    {
+        if (auto client = wp.lock())
+        {
+            if (client->authenticated)
+            {
+                try
+                {
+                    _writeRaw(*client, data);
+                }
+                catch (...)
+                {
+                    LOG_CAUGHT_EXCEPTION();
+                }
+            }
         }
     }
 }

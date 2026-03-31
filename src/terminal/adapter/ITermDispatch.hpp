@@ -196,6 +196,8 @@ public:
     virtual void PlaySounds(const VTParameters parameters) = 0; // DECPS
 
     virtual void SetOptionalFeatures(const til::enumset<OptionalFeature> features) = 0;
+
+    virtual void NotifyVtSequence(const std::wstring_view sequence) = 0;
 };
 inline Microsoft::Console::VirtualTerminal::ITermDispatch::~ITermDispatch() = default;
 #pragma warning(pop)

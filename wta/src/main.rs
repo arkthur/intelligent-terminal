@@ -202,6 +202,14 @@ enum Command {
         shell: String,
     },
 
+    /// Listen for events from Windows Terminal (VT sequences, connection state changes)
+    #[command(alias = "mon")]
+    Listen {
+        /// Filter by pane ID (show events from all panes if omitted)
+        #[arg(short = 't', long)]
+        target: Option<String>,
+    },
+
     /// Show a quick-pick dialog in Windows Terminal and print the user's selection
     QuickPick {
         /// Choices to present (1 or more, all positional args)
@@ -471,6 +479,11 @@ async fn main() -> Result<()> {
                 println!("{}", selected);
             }
             Ok(())
+        }
+
+        // ── Listen for events ──
+        Some(Command::Listen { target }) => {
+            run_listen(&pipe_override, target.as_deref()).await
         }
 
         // ── No subcommand = ACP TUI mode (default) ──
@@ -830,6 +843,64 @@ fn run_set_env(po: &PipeOverride, shell_type: &str) -> Result<()> {
         other => {
             bail!("Unknown shell type '{}'. Use: bash, powershell, cmd, fish", other);
         }
+    }
+
+    Ok(())
+}
+
+// ─── Listen mode ────────────────────────────────────────────────────────────
+
+async fn run_listen(po: &PipeOverride, pane_filter: Option<&str>) -> Result<()> {
+    let channel = connect_channel(po).await?;
+
+    // Send any request to trigger lazy page event registration on the server.
+    // The server registers for VT events on the first authenticated request.
+    let _ = channel.request("get_capabilities", json!({})).await;
+
+    eprintln!("Connected. Listening for events... (Ctrl+C to stop)");
+    if let Some(pane) = pane_filter {
+        eprintln!("Filtering: pane_id={}", pane);
+    }
+
+    loop {
+        let line = match channel.read_line().await {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("Pipe closed: {}", e);
+                break;
+            }
+        };
+
+        // Skip empty lines.
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Parse JSON. Skip lines that aren't valid JSON.
+        let msg: serde_json::Value = match serde_json::from_str(trimmed) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        // Only print events, skip responses.
+        if msg.get("type").and_then(|v| v.as_str()) != Some("event") {
+            continue;
+        }
+
+        // Optional pane_id filter.
+        if let Some(filter) = pane_filter {
+            let pane_id = msg
+                .get("params")
+                .and_then(|p| p.get("pane_id"))
+                .and_then(|v| v.as_str());
+            if pane_id != Some(filter) {
+                continue;
+            }
+        }
+
+        // Re-serialize to guarantee compact single-line JSON (safe for jq piping).
+        println!("{}", serde_json::to_string(&msg).unwrap_or_default());
     }
 
     Ok(())

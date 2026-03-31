@@ -200,6 +200,7 @@ namespace winrt::TerminalApp::implementation
         til::property_changed_event PropertyChanged;
 
         // -------------------------------- WinRT Events ---------------------------------
+        til::typed_event<IInspectable, winrt::hstring> ProtocolVtSequenceReceived;
         til::typed_event<IInspectable, IInspectable> TitleChanged;
         til::typed_event<IInspectable, IInspectable> CloseWindowRequested;
         til::typed_event<IInspectable, winrt::Windows::UI::Xaml::UIElement> SetTitleBarContent;

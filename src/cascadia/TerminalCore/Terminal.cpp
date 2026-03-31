@@ -1260,6 +1260,11 @@ void Microsoft::Terminal::Core::Terminal::SetSearchMissingCommandCallback(std::f
     _pfnSearchMissingCommand.swap(pfn);
 }
 
+void Microsoft::Terminal::Core::Terminal::SetVtSequenceCallback(std::function<void(std::wstring_view)> pfn) noexcept
+{
+    _pfnVtSequence.swap(pfn);
+}
+
 void Microsoft::Terminal::Core::Terminal::SetClearQuickFixCallback(std::function<void()> pfn) noexcept
 {
     _pfnClearQuickFix.swap(pfn);

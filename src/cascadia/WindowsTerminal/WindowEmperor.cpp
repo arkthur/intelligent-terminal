@@ -1507,6 +1507,7 @@ void WindowEmperor::_initializeProtocolServer()
     _protocolHandler->SetAuthToken(_mcpToken);
 
     _protocolServer = std::make_unique<TerminalProtocolServer>(_protocolPipeName, _mcpToken, *_protocolHandler);
+    _protocolHandler->SetServer(_protocolServer.get());
     _protocolServer->Start();
 
     // Debug: print credentials so dev builds can manually set WT_PIPE_NAME / WT_MCP_TOKEN.

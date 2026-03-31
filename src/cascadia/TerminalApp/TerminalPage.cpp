@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "TerminalPage.h"
 
+#include <json/json.h>
 #include <TerminalCore/ControlKeyStates.hpp>
 #include <TerminalThemeHelpers.h>
 #include <til/hash.h>
@@ -2305,6 +2306,69 @@ namespace winrt::TerminalApp::implementation
         term.ShowWindowChanged({ get_weak(), &TerminalPage::_ShowWindowChangedHandler });
         term.SearchMissingCommand({ get_weak(), &TerminalPage::_SearchMissingCommandHandler });
         term.WindowSizeChanged({ get_weak(), &TerminalPage::_WindowSizeChanged });
+
+        // Forward VT sequences and connection state changes to protocol clients.
+        // This is unconditional — if no pipe client is listening, the event raise is a noop.
+        {
+            const auto paneIdStr = std::to_string(term.ContentId());
+
+            term.VtSequenceReceived(
+                [weakThis = get_weak(), paneIdStr](auto&&, const winrt::hstring& seq) {
+                    if (auto strongThis = weakThis.get())
+                    {
+                        Json::Value evt;
+                        evt["type"] = "event";
+                        evt["method"] = "vt_sequence";
+                        Json::Value params;
+                        params["pane_id"] = paneIdStr;
+                        params["sequence"] = winrt::to_string(seq);
+                        evt["params"] = params;
+                        Json::StreamWriterBuilder wb;
+                        wb["indentation"] = "";
+                        strongThis->ProtocolVtSequenceReceived.raise(
+                            *strongThis,
+                            winrt::to_hstring(Json::writeString(wb, evt)));
+                    }
+                });
+
+            term.ConnectionStateChanged(
+                [weakThis = get_weak(), paneIdStr](const auto& sender, auto&&) {
+                    if (auto strongThis = weakThis.get())
+                    {
+                        std::string stateStr = "unknown";
+                        if (const auto control = sender.try_as<winrt::Microsoft::Terminal::Control::TermControl>())
+                        {
+                            switch (control.ConnectionState())
+                            {
+                            case ConnectionState::Connected:
+                                stateStr = "connected";
+                                break;
+                            case ConnectionState::Closed:
+                                stateStr = "closed";
+                                break;
+                            case ConnectionState::Failed:
+                                stateStr = "failed";
+                                break;
+                            default:
+                                return;
+                            }
+                        }
+
+                        Json::Value evt;
+                        evt["type"] = "event";
+                        evt["method"] = "connection_state";
+                        Json::Value params;
+                        params["pane_id"] = paneIdStr;
+                        params["state"] = stateStr;
+                        evt["params"] = params;
+                        Json::StreamWriterBuilder wb;
+                        wb["indentation"] = "";
+                        strongThis->ProtocolVtSequenceReceived.raise(
+                            *strongThis,
+                            winrt::to_hstring(Json::writeString(wb, evt)));
+                    }
+                });
+        }
 
         // Don't even register for the event if the feature is compiled off.
         if constexpr (Feature_ShellCompletions::IsEnabled())

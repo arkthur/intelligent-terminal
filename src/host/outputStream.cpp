@@ -437,3 +437,13 @@ void ConhostInternalGetSet::SearchMissingCommand(std::wstring_view /*missingComm
 {
     // Not implemented for conhost.
 }
+
+void ConhostInternalGetSet::NotifyVtSequence(std::wstring_view /*sequence*/)
+{
+    // Not implemented for conhost.
+    // ConPTY's classic renderer consumes known OSC sequences (e.g. OSC 133
+    // shell integration marks) without re-emitting them. Writing to the VtIo
+    // pipe from the parsing thread corrupts the render stream.
+    // Unknown OSCs (not handled in the switch) still pass through to the
+    // terminal and are captured by the terminal-side hook.
+}

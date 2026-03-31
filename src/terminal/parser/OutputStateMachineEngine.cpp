@@ -756,6 +756,17 @@ IStateMachineEngine::StringHandler OutputStateMachineEngine::ActionDcsDispatch(c
 // - true if we handled the dispatch.
 bool OutputStateMachineEngine::ActionOscDispatch(const size_t parameter, const std::wstring_view string)
 {
+    // Forward raw OSC to protocol clients for terminal context streaming.
+    // Format: "osc:<param>;<payload>" — fired before the switch so even
+    // unrecognized OSC numbers (default: break) are captured.
+    {
+        std::wstring fwd = L"osc:";
+        fwd += std::to_wstring(parameter);
+        fwd += L';';
+        fwd += string;
+        _dispatch->NotifyVtSequence(fwd);
+    }
+
     switch (parameter)
     {
     case OscActionCodes::SetIconAndWindowTitle:

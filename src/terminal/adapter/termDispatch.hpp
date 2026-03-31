@@ -183,6 +183,8 @@ public:
     void PlaySounds(const VTParameters /*parameters*/) override {}; // DECPS
 
     void SetOptionalFeatures(const til::enumset<OptionalFeature> /*features*/) override {};
+
+    void NotifyVtSequence(const std::wstring_view /*sequence*/) override {};
 };
 
 #pragma warning(default : 26440) // Restore "can be declared noexcept" warning

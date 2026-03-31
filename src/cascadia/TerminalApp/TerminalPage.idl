@@ -121,6 +121,7 @@ namespace TerminalApp
         Boolean CloseProtocolPane(String paneId);
         Boolean SendProtocolInput(String paneId, String text);
         String ShowProtocolQuickPick(String title, String choicesJson, Boolean allowFreeInput);
+        event Windows.Foundation.TypedEventHandler<Object, String> ProtocolVtSequenceReceived;
         void InitializeCoordinator(Microsoft.Terminal.Settings.Model.NewTerminalArgs args);
         void ToggleCoordinator();
         Boolean CoordinatorVisible { get; };

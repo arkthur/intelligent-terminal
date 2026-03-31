@@ -8,6 +8,7 @@
 
 class WindowEmperor;
 class AppHost;
+class TerminalProtocolServer;
 
 // Handles dispatching and executing protocol requests.
 // Each method handler receives the parsed params and returns a result or error.
@@ -25,6 +26,9 @@ public:
 
     // Set the auth token for validation.
     void SetAuthToken(const std::string& token);
+
+    // Set server reference for broadcasting events.
+    void SetServer(TerminalProtocolServer* server);
 
 private:
     // Method handlers - each returns a Json::Value result or throws
@@ -79,7 +83,11 @@ private:
     bool _checkConfirmation(const std::string& method, const Json::Value& params);
 
     WindowEmperor& _emperor;
+    void _ensurePageEventsRegistered();
+
+    TerminalProtocolServer* _server = nullptr;
     std::string _authToken;
+    bool _pageEventsRegistered = false;
 
     // Confirmation policy: auto-approve all for development.
     // Set to false to require user confirmation for create/input operations.

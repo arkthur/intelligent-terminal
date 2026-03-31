@@ -139,6 +139,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         auto pfnSearchMissingCommand = [this](auto&& PH1, auto&& PH2) { _terminalSearchMissingCommand(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2)); };
         _terminal->SetSearchMissingCommandCallback(pfnSearchMissingCommand);
 
+        _terminal->SetVtSequenceCallback([this](std::wstring_view seq) {
+            VtSequenceReceived.raise(*this, winrt::hstring{ seq });
+        });
+
         auto pfnClearQuickFix = [this] { ClearQuickFix(); };
         _terminal->SetClearQuickFixCallback(pfnClearQuickFix);
 

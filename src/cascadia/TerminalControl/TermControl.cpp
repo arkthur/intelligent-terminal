@@ -328,6 +328,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         _revokers.CompletionsChanged = _core.CompletionsChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleCompletionsChanged });
         _revokers.RestartTerminalRequested = _core.RestartTerminalRequested(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleRestartTerminalRequested });
         _revokers.SearchMissingCommand = _core.SearchMissingCommand(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleSearchMissingCommand });
+        _revokers.VtSequenceReceived = _core.VtSequenceReceived(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleVtSequenceReceived });
         _revokers.WindowSizeChanged = _core.WindowSizeChanged(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleWindowSizeChanged });
         _revokers.WriteToClipboard = _core.WriteToClipboard(winrt::auto_revoke, { get_weak(), &TermControl::_bubbleWriteToClipboard });
 
@@ -4037,6 +4038,11 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         _quickFixBufferPos = args.BufferRow();
         SearchMissingCommand.raise(*this, args);
+    }
+
+    void TermControl::_bubbleVtSequenceReceived(const IInspectable& /*sender*/, const winrt::hstring& seq)
+    {
+        VtSequenceReceived.raise(*this, seq);
     }
 
     winrt::fire_and_forget TermControl::_bubbleWindowSizeChanged(const IInspectable& /*sender*/, Control::WindowSizeChangedEventArgs args)
