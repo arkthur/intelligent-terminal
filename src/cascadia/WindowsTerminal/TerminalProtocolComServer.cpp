@@ -170,6 +170,66 @@ static winrt::TerminalApp::TerminalPage _getPage(AppHost* host)
     return root.try_as<winrt::TerminalApp::TerminalPage>();
 }
 
+// ============================================================================
+// Helper: dispatch a function to the XAML UI thread, blocking until complete.
+//
+// All WinRT/XAML object access from COM methods MUST happen on the UI thread.
+// COM server methods run on MTA worker threads; accessing non-agile
+// DependencyObject-derived types (TerminalPage, TerminalWindow, etc.) from
+// MTA corrupts XAML internal state and freezes the UI.
+//
+// This helper obtains a CoreDispatcher from any available TerminalPage
+// (Dispatcher() and HasThreadAccess() are documented safe from any thread),
+// then dispatches the supplied function to the UI thread and blocks.
+// ============================================================================
+
+template<typename F>
+static HRESULT _dispatchToUI(F&& func)
+{
+    auto* emperor = TerminalProtocolComServer::s_getEmperor();
+    if (!emperor)
+        return E_NOT_VALID_STATE;
+
+    auto* anyHost = emperor->GetMostRecentWindow();
+    if (!anyHost)
+        return E_FAIL;
+
+    const auto anyPage = _getPage(anyHost);
+    if (!anyPage)
+        return E_FAIL;
+
+    auto dispatcher = anyPage.Dispatcher();
+    if (dispatcher.HasThreadAccess())
+    {
+        return func();
+    }
+
+    HRESULT innerHr = S_OK;
+    HANDLE completedEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+
+    dispatcher.RunAsync(
+        winrt::Windows::UI::Core::CoreDispatcherPriority::Normal,
+        [&]() {
+            try
+            {
+                innerHr = func();
+            }
+            catch (const winrt::hresult_error& e)
+            {
+                innerHr = e.code();
+            }
+            catch (...)
+            {
+                innerHr = E_FAIL;
+            }
+            SetEvent(completedEvent);
+        });
+
+    WaitForSingleObject(completedEvent, INFINITE);
+    CloseHandle(completedEvent);
+    return innerHr;
+}
+
 // Helper: parse a JSON string into Json::Value
 static bool _parseJson(const std::string& str, Json::Value& out)
 {
@@ -292,36 +352,37 @@ STDMETHODIMP TerminalProtocolComServer::GetActivePane(PROTOCOL_PANE_INFO* result
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, result);
-    RETURN_HR_IF_NULL(E_NOT_VALID_STATE, s_emperor);
     memset(result, 0, sizeof(*result));
 
-    const auto host = s_emperor->GetMostRecentWindow();
-    RETURN_HR_IF_NULL(E_FAIL, host);
+    return _dispatchToUI([&]() -> HRESULT {
+        const auto host = s_emperor->GetMostRecentWindow();
+        RETURN_HR_IF_NULL(E_FAIL, host);
 
-    const auto page = _getPage(host);
-    RETURN_HR_IF_NULL(E_FAIL, page);
+        const auto page = _getPage(host);
+        RETURN_HR_IF_NULL(E_FAIL, page);
 
-    const auto jsonStr = winrt::to_string(page.GetProtocolActivePaneJson());
-    if (jsonStr.empty())
-        return E_FAIL;
+        const auto jsonStr = winrt::to_string(page.GetProtocolActivePaneJson());
+        if (jsonStr.empty())
+            return E_FAIL;
 
-    Json::Value v;
-    if (!_parseJson(jsonStr, v))
-        return E_FAIL;
+        Json::Value v;
+        if (!_parseJson(jsonStr, v))
+            return E_FAIL;
 
-    const auto& props = host->Logic().WindowProperties();
-    const auto windowId = std::to_string(props.WindowId());
+        const auto& props = host->Logic().WindowProperties();
+        const auto windowId = std::to_string(props.WindowId());
 
-    result->PaneId = SysAllocString(winrt::to_hstring(v.get("pane_id", "").asString()).c_str());
-    result->TabId = SysAllocString(winrt::to_hstring(v.get("tab_id", "").asString()).c_str());
-    result->WindowId = SysAllocString(winrt::to_hstring(windowId).c_str());
-    result->Title = SysAllocString(winrt::to_hstring(v.get("title", "").asString()).c_str());
-    result->Profile = SysAllocString(winrt::to_hstring(v.get("profile", "").asString()).c_str());
-    result->IsActive = TRUE;
-    result->Pid = v.get("pid", 0u).asUInt();
-    result->Rows = 0;
-    result->Columns = 0;
-    return S_OK;
+        result->PaneId = SysAllocString(winrt::to_hstring(v.get("pane_id", "").asString()).c_str());
+        result->TabId = SysAllocString(winrt::to_hstring(v.get("tab_id", "").asString()).c_str());
+        result->WindowId = SysAllocString(winrt::to_hstring(windowId).c_str());
+        result->Title = SysAllocString(winrt::to_hstring(v.get("title", "").asString()).c_str());
+        result->Profile = SysAllocString(winrt::to_hstring(v.get("profile", "").asString()).c_str());
+        result->IsActive = TRUE;
+        result->Pid = v.get("pid", 0u).asUInt();
+        result->Rows = 0;
+        result->Columns = 0;
+        return S_OK;
+    });
 }
 CATCH_RETURN()
 
@@ -330,42 +391,42 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, count);
     RETURN_HR_IF_NULL(E_POINTER, results);
-    RETURN_HR_IF_NULL(E_NOT_VALID_STATE, s_emperor);
     *count = 0;
     *results = nullptr;
 
-    const auto mostRecent = s_emperor->GetMostRecentWindow();
+    return _dispatchToUI([&]() -> HRESULT {
+        const auto mostRecent = s_emperor->GetMostRecentWindow();
 
-    // Count windows first.
-    std::vector<PROTOCOL_WINDOW_INFO> items;
-    auto cleanupItems = wil::scope_exit([&]() {
-        for (auto& i : items) { SysFreeString(i.WindowId); SysFreeString(i.Title); }
-    });
+        std::vector<PROTOCOL_WINDOW_INFO> items;
+        auto cleanupItems = wil::scope_exit([&]() {
+            for (auto& i : items) { SysFreeString(i.WindowId); SysFreeString(i.Title); }
+        });
 
-    for (const auto& host : s_emperor->GetWindows())
-    {
-        const auto logic = host->Logic();
-        if (!logic)
-            continue;
+        for (const auto& host : s_emperor->GetWindows())
+        {
+            const auto logic = host->Logic();
+            if (!logic)
+                continue;
 
-        const auto& props = logic.WindowProperties();
-        PROTOCOL_WINDOW_INFO info{};
-        info.WindowId = SysAllocString(winrt::to_hstring(std::to_string(props.WindowId())).c_str());
-        info.Title = SysAllocString(props.WindowNameForDisplay().c_str());
-        info.IsFocused = (host.get() == mostRecent) ? TRUE : FALSE;
-        info.TabCount = logic.TabCount();
-        items.push_back(info);
-    }
+            const auto& props = logic.WindowProperties();
+            PROTOCOL_WINDOW_INFO info{};
+            info.WindowId = SysAllocString(winrt::to_hstring(std::to_string(props.WindowId())).c_str());
+            info.Title = SysAllocString(props.WindowNameForDisplay().c_str());
+            info.IsFocused = (host.get() == mostRecent) ? TRUE : FALSE;
+            info.TabCount = logic.TabCount();
+            items.push_back(info);
+        }
 
-    if (items.empty())
+        if (items.empty())
+            return S_OK;
+
+        *count = static_cast<UINT32>(items.size());
+        *results = static_cast<PROTOCOL_WINDOW_INFO*>(CoTaskMemAlloc(items.size() * sizeof(PROTOCOL_WINDOW_INFO)));
+        RETURN_HR_IF_NULL(E_OUTOFMEMORY, *results);
+        memcpy(*results, items.data(), items.size() * sizeof(PROTOCOL_WINDOW_INFO));
+        cleanupItems.release();
         return S_OK;
-
-    *count = static_cast<UINT32>(items.size());
-    *results = static_cast<PROTOCOL_WINDOW_INFO*>(CoTaskMemAlloc(items.size() * sizeof(PROTOCOL_WINDOW_INFO)));
-    RETURN_HR_IF_NULL(E_OUTOFMEMORY, *results);
-    memcpy(*results, items.data(), items.size() * sizeof(PROTOCOL_WINDOW_INFO));
-    cleanupItems.release();
-    return S_OK;
+    });
 }
 CATCH_RETURN()
 
@@ -374,58 +435,59 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, count);
     RETURN_HR_IF_NULL(E_POINTER, results);
-    RETURN_HR_IF_NULL(E_NOT_VALID_STATE, s_emperor);
     *count = 0;
     *results = nullptr;
 
     const auto filter = windowIdFilter ? winrt::to_string(std::wstring_view(windowIdFilter, SysStringLen(windowIdFilter))) : std::string{};
 
-    std::vector<PROTOCOL_TAB_INFO> items;
-    auto cleanupItems = wil::scope_exit([&]() {
-        for (auto& i : items) { SysFreeString(i.TabId); SysFreeString(i.WindowId); SysFreeString(i.Title); }
-    });
+    return _dispatchToUI([&]() -> HRESULT {
+        std::vector<PROTOCOL_TAB_INFO> items;
+        auto cleanupItems = wil::scope_exit([&]() {
+            for (auto& i : items) { SysFreeString(i.TabId); SysFreeString(i.WindowId); SysFreeString(i.Title); }
+        });
 
-    for (const auto& host : s_emperor->GetWindows())
-    {
-        const auto logic = host->Logic();
-        if (!logic)
-            continue;
-
-        const auto& props = logic.WindowProperties();
-        const auto windowIdStr = std::to_string(props.WindowId());
-        if (!filter.empty() && windowIdStr != filter)
-            continue;
-
-        const auto page = _getPage(host.get());
-        if (!page)
-            continue;
-
-        const auto tabsJson = winrt::to_string(page.GetProtocolTabsJson());
-        Json::Value tabs;
-        if (!_parseJson(tabsJson, tabs) || !tabs.isArray())
-            continue;
-
-        for (const auto& t : tabs)
+        for (const auto& host : s_emperor->GetWindows())
         {
-            PROTOCOL_TAB_INFO info{};
-            info.TabId = SysAllocString(winrt::to_hstring(t.get("tab_id", "").asString()).c_str());
-            info.WindowId = SysAllocString(winrt::to_hstring(windowIdStr).c_str());
-            info.Title = SysAllocString(winrt::to_hstring(t.get("title", "").asString()).c_str());
-            info.IsActive = t.get("is_active", false).asBool() ? TRUE : FALSE;
-            info.PaneCount = t.get("pane_count", 0u).asUInt();
-            items.push_back(info);
+            const auto logic = host->Logic();
+            if (!logic)
+                continue;
+
+            const auto& props = logic.WindowProperties();
+            const auto windowIdStr = std::to_string(props.WindowId());
+            if (!filter.empty() && windowIdStr != filter)
+                continue;
+
+            const auto page = _getPage(host.get());
+            if (!page)
+                continue;
+
+            const auto tabsJson = winrt::to_string(page.GetProtocolTabsJson());
+            Json::Value tabs;
+            if (!_parseJson(tabsJson, tabs) || !tabs.isArray())
+                continue;
+
+            for (const auto& t : tabs)
+            {
+                PROTOCOL_TAB_INFO info{};
+                info.TabId = SysAllocString(winrt::to_hstring(t.get("tab_id", "").asString()).c_str());
+                info.WindowId = SysAllocString(winrt::to_hstring(windowIdStr).c_str());
+                info.Title = SysAllocString(winrt::to_hstring(t.get("title", "").asString()).c_str());
+                info.IsActive = t.get("is_active", false).asBool() ? TRUE : FALSE;
+                info.PaneCount = t.get("pane_count", 0u).asUInt();
+                items.push_back(info);
+            }
         }
-    }
 
-    if (items.empty())
+        if (items.empty())
+            return S_OK;
+
+        *count = static_cast<UINT32>(items.size());
+        *results = static_cast<PROTOCOL_TAB_INFO*>(CoTaskMemAlloc(items.size() * sizeof(PROTOCOL_TAB_INFO)));
+        RETURN_HR_IF_NULL(E_OUTOFMEMORY, *results);
+        memcpy(*results, items.data(), items.size() * sizeof(PROTOCOL_TAB_INFO));
+        cleanupItems.release();
         return S_OK;
-
-    *count = static_cast<UINT32>(items.size());
-    *results = static_cast<PROTOCOL_TAB_INFO*>(CoTaskMemAlloc(items.size() * sizeof(PROTOCOL_TAB_INFO)));
-    RETURN_HR_IF_NULL(E_OUTOFMEMORY, *results);
-    memcpy(*results, items.data(), items.size() * sizeof(PROTOCOL_TAB_INFO));
-    cleanupItems.release();
-    return S_OK;
+    });
 }
 CATCH_RETURN()
 
@@ -434,67 +496,68 @@ try
 {
     RETURN_HR_IF_NULL(E_POINTER, count);
     RETURN_HR_IF_NULL(E_POINTER, results);
-    RETURN_HR_IF_NULL(E_NOT_VALID_STATE, s_emperor);
     *count = 0;
     *results = nullptr;
 
     const auto winFilter = windowIdFilter ? winrt::to_string(std::wstring_view(windowIdFilter, SysStringLen(windowIdFilter))) : std::string{};
     const auto tabFilter = tabIdFilter ? winrt::to_string(std::wstring_view(tabIdFilter, SysStringLen(tabIdFilter))) : std::string{};
 
-    std::vector<PROTOCOL_PANE_INFO> items;
-    auto cleanupItems = wil::scope_exit([&]() {
-        for (auto& i : items)
+    return _dispatchToUI([&]() -> HRESULT {
+        std::vector<PROTOCOL_PANE_INFO> items;
+        auto cleanupItems = wil::scope_exit([&]() {
+            for (auto& i : items)
+            {
+                SysFreeString(i.PaneId); SysFreeString(i.TabId); SysFreeString(i.WindowId);
+                SysFreeString(i.Title); SysFreeString(i.Profile);
+            }
+        });
+
+        for (const auto& host : s_emperor->GetWindows())
         {
-            SysFreeString(i.PaneId); SysFreeString(i.TabId); SysFreeString(i.WindowId);
-            SysFreeString(i.Title); SysFreeString(i.Profile);
+            const auto logic = host->Logic();
+            if (!logic)
+                continue;
+
+            const auto& props = logic.WindowProperties();
+            const auto windowIdStr = std::to_string(props.WindowId());
+            if (!winFilter.empty() && windowIdStr != winFilter)
+                continue;
+
+            const auto page = _getPage(host.get());
+            if (!page)
+                continue;
+
+            const auto panesJson = winrt::to_string(page.GetProtocolPanesJson(winrt::to_hstring(tabFilter)));
+            Json::Value panes;
+            if (!_parseJson(panesJson, panes) || !panes.isArray())
+                continue;
+
+            for (const auto& p : panes)
+            {
+                PROTOCOL_PANE_INFO info{};
+                info.PaneId = SysAllocString(winrt::to_hstring(p.get("pane_id", "").asString()).c_str());
+                info.TabId = SysAllocString(winrt::to_hstring(p.get("tab_id", "").asString()).c_str());
+                info.WindowId = SysAllocString(winrt::to_hstring(windowIdStr).c_str());
+                info.Title = SysAllocString(winrt::to_hstring(p.get("title", "").asString()).c_str());
+                info.Profile = SysAllocString(winrt::to_hstring(p.get("profile", "").asString()).c_str());
+                info.IsActive = p.get("is_active", false).asBool() ? TRUE : FALSE;
+                info.Pid = p.get("pid", 0u).asUInt();
+                info.Rows = p.isMember("size") ? p["size"].get("rows", 0).asInt() : 0;
+                info.Columns = p.isMember("size") ? p["size"].get("columns", 0).asInt() : 0;
+                items.push_back(info);
+            }
         }
-    });
 
-    for (const auto& host : s_emperor->GetWindows())
-    {
-        const auto logic = host->Logic();
-        if (!logic)
-            continue;
+        if (items.empty())
+            return S_OK;
 
-        const auto& props = logic.WindowProperties();
-        const auto windowIdStr = std::to_string(props.WindowId());
-        if (!winFilter.empty() && windowIdStr != winFilter)
-            continue;
-
-        const auto page = _getPage(host.get());
-        if (!page)
-            continue;
-
-        const auto panesJson = winrt::to_string(page.GetProtocolPanesJson(winrt::to_hstring(tabFilter)));
-        Json::Value panes;
-        if (!_parseJson(panesJson, panes) || !panes.isArray())
-            continue;
-
-        for (const auto& p : panes)
-        {
-            PROTOCOL_PANE_INFO info{};
-            info.PaneId = SysAllocString(winrt::to_hstring(p.get("pane_id", "").asString()).c_str());
-            info.TabId = SysAllocString(winrt::to_hstring(p.get("tab_id", "").asString()).c_str());
-            info.WindowId = SysAllocString(winrt::to_hstring(windowIdStr).c_str());
-            info.Title = SysAllocString(winrt::to_hstring(p.get("title", "").asString()).c_str());
-            info.Profile = SysAllocString(winrt::to_hstring(p.get("profile", "").asString()).c_str());
-            info.IsActive = p.get("is_active", false).asBool() ? TRUE : FALSE;
-            info.Pid = p.get("pid", 0u).asUInt();
-            info.Rows = p.isMember("size") ? p["size"].get("rows", 0).asInt() : 0;
-            info.Columns = p.isMember("size") ? p["size"].get("columns", 0).asInt() : 0;
-            items.push_back(info);
-        }
-    }
-
-    if (items.empty())
+        *count = static_cast<UINT32>(items.size());
+        *results = static_cast<PROTOCOL_PANE_INFO*>(CoTaskMemAlloc(items.size() * sizeof(PROTOCOL_PANE_INFO)));
+        RETURN_HR_IF_NULL(E_OUTOFMEMORY, *results);
+        memcpy(*results, items.data(), items.size() * sizeof(PROTOCOL_PANE_INFO));
+        cleanupItems.release();
         return S_OK;
-
-    *count = static_cast<UINT32>(items.size());
-    *results = static_cast<PROTOCOL_PANE_INFO*>(CoTaskMemAlloc(items.size() * sizeof(PROTOCOL_PANE_INFO)));
-    RETURN_HR_IF_NULL(E_OUTOFMEMORY, *results);
-    memcpy(*results, items.data(), items.size() * sizeof(PROTOCOL_PANE_INFO));
-    cleanupItems.release();
-    return S_OK;
+    });
 }
 CATCH_RETURN()
 
@@ -502,35 +565,35 @@ STDMETHODIMP TerminalProtocolComServer::ReadPaneOutput(BSTR paneId, BSTR source,
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, result);
-    RETURN_HR_IF_NULL(E_NOT_VALID_STATE, s_emperor);
     memset(result, 0, sizeof(*result));
 
     const auto paneIdStr = paneId ? winrt::to_string(std::wstring_view(paneId, SysStringLen(paneId))) : std::string{};
     const auto sourceStr = source ? winrt::to_string(std::wstring_view(source, SysStringLen(source))) : std::string("scrollback");
 
-    for (const auto& host : s_emperor->GetWindows())
-    {
-        const auto page = _getPage(host.get());
-        if (!page)
-            continue;
+    return _dispatchToUI([&]() -> HRESULT {
+        for (const auto& host : s_emperor->GetWindows())
+        {
+            const auto page = _getPage(host.get());
+            if (!page)
+                continue;
 
-        const auto jsonStr = winrt::to_string(page.ReadProtocolPaneOutput(
-            winrt::to_hstring(paneIdStr), winrt::to_hstring(sourceStr), maxLines));
-        if (jsonStr.empty())
-            continue;
+            const auto jsonStr = winrt::to_string(page.ReadProtocolPaneOutput(
+                winrt::to_hstring(paneIdStr), winrt::to_hstring(sourceStr), maxLines));
+            if (jsonStr.empty())
+                continue;
 
-        Json::Value v;
-        if (!_parseJson(jsonStr, v))
-            continue;
+            Json::Value v;
+            if (!_parseJson(jsonStr, v))
+                continue;
 
-        result->PaneId = SysAllocString(winrt::to_hstring(v.get("pane_id", "").asString()).c_str());
-        result->Content = SysAllocString(winrt::to_hstring(v.get("content", "").asString()).c_str());
-        result->LineCount = v.get("line_count", 0).asInt();
-        result->Truncated = v.get("truncated", false).asBool() ? TRUE : FALSE;
-        return S_OK;
-    }
-
-    return E_FAIL; // Pane not found
+            result->PaneId = SysAllocString(winrt::to_hstring(v.get("pane_id", "").asString()).c_str());
+            result->Content = SysAllocString(winrt::to_hstring(v.get("content", "").asString()).c_str());
+            result->LineCount = v.get("line_count", 0).asInt();
+            result->Truncated = v.get("truncated", false).asBool() ? TRUE : FALSE;
+            return S_OK;
+        }
+        return E_FAIL;
+    });
 }
 CATCH_RETURN()
 
@@ -538,34 +601,34 @@ STDMETHODIMP TerminalProtocolComServer::GetProcessStatus(BSTR paneId, PROTOCOL_P
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, result);
-    RETURN_HR_IF_NULL(E_NOT_VALID_STATE, s_emperor);
     memset(result, 0, sizeof(*result));
 
     const auto paneIdStr = paneId ? winrt::to_string(std::wstring_view(paneId, SysStringLen(paneId))) : std::string{};
 
-    for (const auto& host : s_emperor->GetWindows())
-    {
-        const auto page = _getPage(host.get());
-        if (!page)
-            continue;
+    return _dispatchToUI([&]() -> HRESULT {
+        for (const auto& host : s_emperor->GetWindows())
+        {
+            const auto page = _getPage(host.get());
+            if (!page)
+                continue;
 
-        const auto jsonStr = winrt::to_string(page.GetProtocolProcessStatus(winrt::to_hstring(paneIdStr)));
-        if (jsonStr.empty())
-            continue;
+            const auto jsonStr = winrt::to_string(page.GetProtocolProcessStatus(winrt::to_hstring(paneIdStr)));
+            if (jsonStr.empty())
+                continue;
 
-        Json::Value v;
-        if (!_parseJson(jsonStr, v))
-            continue;
+            Json::Value v;
+            if (!_parseJson(jsonStr, v))
+                continue;
 
-        result->PaneId = SysAllocString(winrt::to_hstring(v.get("pane_id", "").asString()).c_str());
-        result->State = SysAllocString(winrt::to_hstring(v.get("state", "unknown").asString()).c_str());
-        result->Pid = v.get("pid", 0u).asUInt();
-        result->ExitCode = v.get("exit_code", 0).asInt();
-        result->HasExitCode = v.isMember("exit_code") && !v["exit_code"].isNull() ? TRUE : FALSE;
-        return S_OK;
-    }
-
-    return E_FAIL;
+            result->PaneId = SysAllocString(winrt::to_hstring(v.get("pane_id", "").asString()).c_str());
+            result->State = SysAllocString(winrt::to_hstring(v.get("state", "unknown").asString()).c_str());
+            result->Pid = v.get("pid", 0u).asUInt();
+            result->ExitCode = v.get("exit_code", 0).asInt();
+            result->HasExitCode = v.isMember("exit_code") && !v["exit_code"].isNull() ? TRUE : FALSE;
+            return S_OK;
+        }
+        return E_FAIL;
+    });
 }
 CATCH_RETURN()
 
@@ -573,35 +636,35 @@ STDMETHODIMP TerminalProtocolComServer::GetSessionVariable(BSTR paneId, BSTR nam
 try
 {
     RETURN_HR_IF_NULL(E_POINTER, result);
-    RETURN_HR_IF_NULL(E_NOT_VALID_STATE, s_emperor);
     memset(result, 0, sizeof(*result));
 
     const auto paneIdStr = paneId ? winrt::to_string(std::wstring_view(paneId, SysStringLen(paneId))) : std::string{};
     const auto nameStr = name ? winrt::to_string(std::wstring_view(name, SysStringLen(name))) : std::string{};
 
-    for (const auto& host : s_emperor->GetWindows())
-    {
-        const auto page = _getPage(host.get());
-        if (!page)
-            continue;
+    return _dispatchToUI([&]() -> HRESULT {
+        for (const auto& host : s_emperor->GetWindows())
+        {
+            const auto page = _getPage(host.get());
+            if (!page)
+                continue;
 
-        const auto jsonStr = winrt::to_string(page.GetProtocolSessionVariable(
-            winrt::to_hstring(paneIdStr), winrt::to_hstring(nameStr)));
-        if (jsonStr.empty())
-            continue;
+            const auto jsonStr = winrt::to_string(page.GetProtocolSessionVariable(
+                winrt::to_hstring(paneIdStr), winrt::to_hstring(nameStr)));
+            if (jsonStr.empty())
+                continue;
 
-        Json::Value v;
-        if (!_parseJson(jsonStr, v))
-            continue;
+            Json::Value v;
+            if (!_parseJson(jsonStr, v))
+                continue;
 
-        result->PaneId = SysAllocString(winrt::to_hstring(v.get("pane_id", "").asString()).c_str());
-        result->Name = SysAllocString(winrt::to_hstring(v.get("name", "").asString()).c_str());
-        result->Value = SysAllocString(winrt::to_hstring(v.get("value", "").asString()).c_str());
-        result->Exists = v.get("exists", false).asBool() ? TRUE : FALSE;
-        return S_OK;
-    }
-
-    return E_FAIL;
+            result->PaneId = SysAllocString(winrt::to_hstring(v.get("pane_id", "").asString()).c_str());
+            result->Name = SysAllocString(winrt::to_hstring(v.get("name", "").asString()).c_str());
+            result->Value = SysAllocString(winrt::to_hstring(v.get("value", "").asString()).c_str());
+            result->Exists = v.get("exists", false).asBool() ? TRUE : FALSE;
+            return S_OK;
+        }
+        return E_FAIL;
+    });
 }
 CATCH_RETURN()
 

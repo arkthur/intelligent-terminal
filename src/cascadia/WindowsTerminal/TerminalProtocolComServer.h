@@ -63,6 +63,7 @@ TerminalProtocolComServer : public Microsoft::WRL::RuntimeClass<Microsoft::WRL::
     // Static setup — must be called before s_StartListening().
     static void s_setEmperor(WindowEmperor* emperor) noexcept;
     static void s_setHandler(ProtocolRequestHandler* handler) noexcept;
+    static WindowEmperor* s_getEmperor() noexcept { return s_emperor; }
 
     static HRESULT s_StartListening();
     static HRESULT s_StopListening();

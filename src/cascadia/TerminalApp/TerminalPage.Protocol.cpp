@@ -33,6 +33,29 @@ namespace winrt::TerminalApp::implementation
         winrt::hstring result;
     };
 
+    // Helper: wait for a manual-reset event, pumping Win32/XAML messages
+    // while blocked.  This prevents deadlocks when a protocol call is
+    // inadvertently dispatched on the UI thread (e.g. COM STA marshaling
+    // of a non-agile WinRT object).
+    static void _waitWithMessagePump(HANDLE event)
+    {
+        DWORD waitResult;
+        do
+        {
+            waitResult = MsgWaitForMultipleObjectsEx(
+                1, &event, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+            if (waitResult == WAIT_OBJECT_0 + 1)
+            {
+                MSG msg;
+                while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                }
+            }
+        } while (waitResult == WAIT_OBJECT_0 + 1);
+    }
+
     // Helper: run a function on the UI thread and block until it completes.
     // If already on the UI thread, runs directly.
     template<typename F>
@@ -61,7 +84,7 @@ namespace winrt::TerminalApp::implementation
             SetEvent(completedEvent);
         });
 
-        WaitForSingleObject(completedEvent, INFINITE);
+        _waitWithMessagePump(completedEvent);
         CloseHandle(completedEvent);
 
         if (exPtr)
@@ -96,7 +119,7 @@ namespace winrt::TerminalApp::implementation
             SetEvent(completedEvent);
         });
 
-        WaitForSingleObject(completedEvent, INFINITE);
+        _waitWithMessagePump(completedEvent);
         CloseHandle(completedEvent);
 
         if (exPtr)
@@ -945,8 +968,9 @@ namespace winrt::TerminalApp::implementation
                 palette.Visibility(winrt::Windows::UI::Xaml::Visibility::Visible);
             });
 
-        // Block the pipe I/O thread until the palette completes.
-        WaitForSingleObject(state->completedEvent, INFINITE);
+        // Wait for the palette to complete, pumping messages to avoid
+        // deadlocking if we happen to be on the UI thread.
+        _waitWithMessagePump(state->completedEvent);
         CloseHandle(state->completedEvent);
         return state->result;
     }
