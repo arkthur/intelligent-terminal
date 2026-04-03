@@ -175,6 +175,11 @@ pub enum SharedUiEvent {
     SystemMessage {
         message: String,
     },
+    WtEvent {
+        method: String,
+        pane_id: String,
+        params: serde_json::Value,
+    },
 }
 
 impl SharedUiEvent {
@@ -237,6 +242,15 @@ impl SharedUiEvent {
             AppEvent::SystemMessage(message) => Some(Self::SystemMessage {
                 message: message.clone(),
             }),
+            AppEvent::WtEvent {
+                method,
+                pane_id,
+                params,
+            } => Some(Self::WtEvent {
+                method: method.clone(),
+                pane_id: pane_id.clone(),
+                params: params.clone(),
+            }),
             AppEvent::Tick
             | AppEvent::Key(_)
             | AppEvent::Resize(_, _)
@@ -281,6 +295,15 @@ impl SharedUiEvent {
             },
             Self::PermissionCleared => AppEvent::PermissionCleared,
             Self::SystemMessage { message } => AppEvent::SystemMessage(message),
+            Self::WtEvent {
+                method,
+                pane_id,
+                params,
+            } => AppEvent::WtEvent {
+                method,
+                pane_id,
+                params,
+            },
         }
     }
 }
@@ -1482,7 +1505,8 @@ impl HostSessionState {
             AppEvent::SystemMessage(message) => {
                 self.push_system_message(message);
             }
-            AppEvent::UserMessage(_)
+            AppEvent::WtEvent { .. }
+            | AppEvent::UserMessage(_)
             | AppEvent::SharedPermissionRequest { .. }
             | AppEvent::PermissionCleared
             | AppEvent::Tick

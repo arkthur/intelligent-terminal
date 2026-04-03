@@ -18,7 +18,17 @@
       "Bash(powershell:*)",
       "Bash(pwsh --version)",
       "Bash(pwsh:*)",
-      "Bash(wait:*)"
+      "Bash(wait:*)",
+      "Bash(cargo test:*)",
+      "Bash(tasklist)",
+      "Bash(wmic process:*)",
+      "Bash(taskkill /IM wta.exe /F)",
+      "Bash(cp /c/Users/kaitao/codes/agentic-terminal/wta/target/debug/wta.exe \"/c/Users/kaitao/AppData/Local/Programs/AgenticTerminal/wta.exe\")",
+      "Bash(taskkill:*)",
+      "Bash(/c/Users/kaitao/codes/agentic-terminal/wta/target/debug/wta.exe --help)",
+      "Bash(powershell.exe:*)",
+      "Read(//c//**)",
+      "Bash(where wta:*)"
     ]
   }
 }

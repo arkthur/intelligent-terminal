@@ -215,6 +215,18 @@ enum Command {
         target: Option<String>,
     },
 
+    /// Pre-warm the shared host (called by Windows Terminal on startup)
+    #[command(name = "ensure-host")]
+    EnsureHost {
+        /// Agent CLI command
+        #[arg(long)]
+        agent: Option<String>,
+
+        /// Delegate agent CLI command
+        #[arg(long)]
+        delegate_agent: Option<String>,
+    },
+
     /// Show a quick-pick dialog in Windows Terminal and print the user's selection
     QuickPick {
         /// Choices to present (1 or more, all positional args)
@@ -455,6 +467,12 @@ async fn main() -> Result<()> {
         // ── Set environment variables ──
         Some(Command::SetEnv { shell }) => {
             run_set_env(&pipe_override, &shell)
+        }
+
+        // ── Ensure host (called by WT on startup, stub for now) ──
+        Some(Command::EnsureHost { .. }) => {
+            // No-op: host prewarm not yet implemented in this build.
+            Ok(())
         }
 
         // ── Quick pick ──
@@ -914,19 +932,36 @@ async fn run_listen(po: &PipeOverride, pane_filter: Option<&str>) -> Result<()> 
 // ─── Default ACP TUI mode ───────────────────────────────────────────────────
 
 async fn run_default_tui(cli: Cli, po: PipeOverride) -> Result<()> {
+    // Early diagnostic log — written to a fixed path so we can always find it.
+    fn early_log(msg: &str) {
+        use std::io::Write;
+        let path = std::env::temp_dir().join("wta-event-diag.log");
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+            let _ = writeln!(f, "[{:.3}] {}", std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs_f64(), msg);
+        }
+    }
+    early_log("=== run_default_tui started ===");
+
     // Debug channel for TUI debug panel (pipe traffic viewer)
     let (debug_tx, debug_rx) = tokio::sync::mpsc::unbounded_channel::<app::DebugMessage>();
 
     // Try to connect to the Windows Terminal pipe.
     let mut shell_mgr = ShellManager::new();
+    let mut wt_event_rx = None;
+    let mut wt_pipe_channel: Option<Arc<PipeChannel>> = None;
     let wt_connected = match connect_to_wt_pipe(&po, debug_tx.clone()).await {
         Ok(channel) => {
-            eprintln!("[wta] Connected to Windows Terminal pipe");
-            shell_mgr = shell_mgr.with_wt_channel(Arc::new(channel));
+            early_log("Connected to WT pipe OK — subscribing to events");
+            // Subscribe to push events before wrapping in Arc.
+            wt_event_rx = Some(channel.subscribe_events());
+            let arc_channel = Arc::new(channel);
+            wt_pipe_channel = Some(Arc::clone(&arc_channel));
+            shell_mgr = shell_mgr.with_wt_channel(arc_channel as Arc<dyn shell::wt_channel::WtChannel>);
             true
         }
         Err(e) => {
-            eprintln!("[wta] No WT pipe (local-only mode): {}", e);
+            early_log(&format!("NO WT pipe: {}", e));
             false
         }
     };
@@ -939,7 +974,7 @@ async fn run_default_tui(cli: Cli, po: PipeOverride) -> Result<()> {
         None
     };
 
-    run_acp_tui_mode(cli, shell_mgr, wt_connected, debug_rx, pane_identity).await
+    run_acp_tui_mode(cli, shell_mgr, wt_connected, debug_rx, pane_identity, wt_event_rx, wt_pipe_channel).await
 }
 
 async fn run_mcp_mode(po: &PipeOverride) -> Result<()> {
@@ -1002,6 +1037,8 @@ async fn run_acp_tui_mode(
     wt_connected: bool,
     debug_rx: tokio::sync::mpsc::UnboundedReceiver<app::DebugMessage>,
     pane_identity: Option<(String, String, String)>,
+    wt_event_rx: Option<tokio::sync::mpsc::UnboundedReceiver<serde_json::Value>>,
+    wt_pipe_channel: Option<Arc<PipeChannel>>,
 ) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -1010,7 +1047,7 @@ async fn run_acp_tui_mode(
     let mut terminal = Terminal::new(backend)?;
 
     let result =
-        run_acp_app(&mut terminal, cli, shell_mgr, wt_connected, debug_rx, pane_identity).await;
+        run_acp_app(&mut terminal, cli, shell_mgr, wt_connected, debug_rx, pane_identity, wt_event_rx, wt_pipe_channel).await;
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -1240,6 +1277,8 @@ async fn run_acp_app(
     wt_connected: bool,
     mut debug_rx: tokio::sync::mpsc::UnboundedReceiver<app::DebugMessage>,
     pane_identity: Option<(String, String, String)>,
+    wt_event_rx: Option<tokio::sync::mpsc::UnboundedReceiver<serde_json::Value>>,
+    wt_pipe_channel: Option<Arc<PipeChannel>>,
 ) -> Result<()> {
     let po = PipeOverride {
         pipe_name: cli.pipe_name.clone(),
@@ -1283,7 +1322,66 @@ async fn run_acp_app(
                 }
             });
 
+            // Diagnostic log for event pipeline debugging.
+            fn diag_log(msg: &str) {
+                use std::io::Write;
+                let path = std::env::temp_dir().join("wta-event-diag.log");
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true).append(true).open(&path)
+                {
+                    let _ = writeln!(f, "[{:.3}] {}", std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs_f64(), msg);
+                }
+            }
+
+            // Start the background pipe reader and trigger lazy event registration.
+            // start_reader() splits the pipe and must complete before any requests.
+            // get_capabilities triggers _ensurePageEventsRegistered() on the WT server.
+            if let Some(ref pipe_ch) = wt_pipe_channel {
+                diag_log("start_reader: starting...");
+                pipe_ch.start_reader().await;
+                diag_log("start_reader: done, sending get_capabilities...");
+                match pipe_ch.request("get_capabilities", serde_json::json!({})).await {
+                    Ok(v) => diag_log(&format!("get_capabilities: OK, result={}", v)),
+                    Err(e) => diag_log(&format!("get_capabilities: FAILED: {}", e)),
+                }
+            } else {
+                diag_log("no wt_pipe_channel — events won't work");
+            }
+
+            // Background WT event reader: forwards push events from the pipe to the TUI.
+            if let Some(mut wt_rx) = wt_event_rx {
+                diag_log("wt_event_rx: starting background reader task");
+                let wt_event_tx = event_tx.clone();
+                tokio::task::spawn_local(async move {
+                    while let Some(event_json) = wt_rx.recv().await {
+                        diag_log(&format!("wt_event_rx: received event: {}", event_json));
+                        let method = event_json
+                            .get("method")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let pane_id = event_json
+                            .get("params")
+                            .and_then(|p| p.get("pane_id"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let params = event_json
+                            .get("params")
+                            .cloned()
+                            .unwrap_or(serde_json::Value::Null);
+                        let _ = wt_event_tx.send(app::AppEvent::WtEvent {
+                            method,
+                            pane_id,
+                            params,
+                        });
+                    }
+                });
+            }
+
             let acp_event_tx = event_tx.clone();
+            let shell_mgr_for_recs = Arc::clone(&shell_mgr);
             tokio::task::spawn_local(protocol::acp::client::run_acp_client(
                 agent_cmd,
                 acp_event_tx,
@@ -1292,10 +1390,23 @@ async fn run_acp_app(
                 wt_connected,
             ));
 
-            let (recommendation_tx, _recommendation_rx) = tokio::sync::mpsc::unbounded_channel();
+            let (recommendation_tx, recommendation_rx) = tokio::sync::mpsc::unbounded_channel();
             let (permission_tx, _permission_rx) = tokio::sync::mpsc::unbounded_channel();
             let debug_capture_enabled = Arc::new(AtomicBool::new(false));
             let (ui_event_tx, ui_event_rx) = tokio::sync::mpsc::unbounded_channel();
+
+            // Spawn the recommendation executor so selected choices actually run.
+            let rec_event_tx = event_tx.clone();
+            let delegate_agents = crate::coordinator::default_delegate_agent_runtimes(
+                None,
+                Some(cli.agent.as_str()),
+            );
+            tokio::spawn(crate::coordinator::run_recommendation_executor(
+                recommendation_rx,
+                rec_event_tx,
+                shell_mgr_for_recs,
+                delegate_agents,
+            ));
 
             let mut app_state = app::App::new(prompt_tx, recommendation_tx, permission_tx, debug_capture_enabled, wt_connected, false);
             if let Some((pane_id, tab_id, window_id)) = pane_identity {

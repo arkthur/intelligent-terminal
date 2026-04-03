@@ -26,3 +26,8 @@ pub const DEBUG_SENT: Style = Style::new().fg(Color::Green);
 pub const DEBUG_RECEIVED: Style = Style::new().fg(Color::Cyan);
 pub const RECOMMENDATION_TITLE: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
 pub const RECOMMENDATION_DETAIL: Style = Style::new().fg(Color::Gray);
+// Notification badge/banner styles
+pub const BADGE_CRITICAL: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
+pub const BADGE_ACTIONABLE: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+pub const BADGE_INFO: Style = Style::new().fg(Color::DarkGray);
+pub const BANNER_HINT: Style = Style::new().fg(Color::DarkGray);

@@ -3,7 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::backend::CrosstermBackend;
 use ratatui::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use crate::coordinator::{
     validate_recommendation_set_for_coordinator_target, RecommendationChoice, RecommendationSet,
 };
 use crate::protocol::acp::client::{prompt_timing_log, PromptSubmission};
-use crate::shared_host::SharedStateSnapshot;
+use crate::shared_host::{PaneContext, SharedStateSnapshot};
 use crate::ui;
 use crate::ui_trace;
 
@@ -91,6 +91,134 @@ pub struct PermissionState {
     pub responder: Option<tokio::sync::oneshot::Sender<String>>,
 }
 
+// --- WT Event Notification ---
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum WtEventSeverity {
+    Critical,
+    Actionable,
+    Informational,
+}
+
+#[derive(Debug, Clone)]
+pub struct WtNotification {
+    pub severity: WtEventSeverity,
+    pub pane_id: String,
+    pub summary: String,
+    pub acknowledged: bool,
+    pub age_ticks: u32,
+}
+
+impl WtNotification {
+    /// Auto-collapse informational notifications after ~5s (42 ticks at 120ms).
+    /// Actionable/critical persist until dismissed.
+    pub fn should_auto_dismiss(&self) -> bool {
+        self.severity == WtEventSeverity::Informational && self.age_ticks > 42
+    }
+}
+
+/// Classify a WT protocol event into a notification.
+fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value) -> WtNotification {
+    match method {
+        "connection_state" => {
+            let state = params
+                .get("state")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unknown");
+            match state {
+                "failed" => WtNotification {
+                    severity: WtEventSeverity::Critical,
+                    pane_id: pane_id.to_string(),
+                    summary: format!("Pane {}: connection failed", pane_id),
+                    acknowledged: false,
+                    age_ticks: 0,
+                },
+                "closed" => WtNotification {
+                    severity: WtEventSeverity::Actionable,
+                    pane_id: pane_id.to_string(),
+                    summary: format!("Pane {}: process exited", pane_id),
+                    acknowledged: false,
+                    age_ticks: 0,
+                },
+                "connected" => WtNotification {
+                    severity: WtEventSeverity::Informational,
+                    pane_id: pane_id.to_string(),
+                    summary: format!("Pane {}: connected", pane_id),
+                    acknowledged: false,
+                    age_ticks: 0,
+                },
+                // "unknown" is sent when the C++ try_as cast fails — ignore it.
+                "unknown" => return WtNotification {
+                    severity: WtEventSeverity::Informational,
+                    pane_id: pane_id.to_string(),
+                    summary: String::new(),
+                    acknowledged: true, // auto-acknowledge so it never shows
+                    age_ticks: 100,     // will be auto-dismissed immediately
+                },
+                _ => WtNotification {
+                    severity: WtEventSeverity::Informational,
+                    pane_id: pane_id.to_string(),
+                    summary: format!("Pane {}: {}", pane_id, state),
+                    acknowledged: false,
+                    age_ticks: 0,
+                },
+            }
+        }
+        "vt_sequence" => {
+            let seq = params
+                .get("sequence")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+
+            // OSC 133;D;<exit_code> — FinalTerm "command finished" marker.
+            // Emitted by PowerShell/bash shell integration after every command.
+            // Format: "osc:133;D;0" (success) or "osc:133;D;1" (failure)
+            if let Some(rest) = seq.strip_prefix("osc:133;") {
+                let parts: Vec<&str> = rest.splitn(2, ';').collect();
+                if parts.first() == Some(&"D") {
+                    let exit_code = parts.get(1)
+                        .and_then(|s| s.trim().parse::<i32>().ok())
+                        .unwrap_or(-1);
+                    if exit_code != 0 {
+                        return WtNotification {
+                            severity: WtEventSeverity::Actionable,
+                            pane_id: pane_id.to_string(),
+                            summary: format!("Pane {}: command failed (exit {})", pane_id, exit_code),
+                            acknowledged: false,
+                            age_ticks: 0,
+                        };
+                    } else {
+                        // exit code 0 = success, not interesting
+                        return WtNotification {
+                            severity: WtEventSeverity::Informational,
+                            pane_id: pane_id.to_string(),
+                            summary: String::new(),
+                            acknowledged: true,
+                            age_ticks: 100,
+                        };
+                    }
+                }
+            }
+
+            // All other VT sequences — not interesting, suppress.
+            WtNotification {
+                severity: WtEventSeverity::Informational,
+                pane_id: pane_id.to_string(),
+                summary: String::new(),
+                acknowledged: true,
+                age_ticks: 100,
+            }
+        }
+        _ => WtNotification {
+            severity: WtEventSeverity::Informational,
+            pane_id: pane_id.to_string(),
+            summary: format!("Pane {}: {}", pane_id, method),
+            acknowledged: false,
+            age_ticks: 0,
+        },
+    }
+}
+
 enum FinalizeOutcome {
     None,
     SelectionReady,
@@ -142,6 +270,12 @@ pub enum AppEvent {
     SystemMessage(String),
     DebugPipeMessage(DebugMessage),
     SharedStateSnapshot(SharedStateSnapshot),
+    /// Push event from Windows Terminal protocol (VT sequence or connection state).
+    WtEvent {
+        method: String,
+        pane_id: String,
+        params: serde_json::Value,
+    },
 }
 
 // --- App ---
@@ -190,6 +324,13 @@ pub struct App {
     pub window_id: Option<String>,
     current_prompt_text: Option<String>,
     pending_completed_turn: Option<CompletedTurn>,
+    // WT event notifications
+    pub wt_notifications: std::collections::VecDeque<WtNotification>,
+    pub show_notification_banner: bool,
+    // Auto-fix: timestamp of last auto-fix prompt to debounce rapid errors
+    last_autofix_unix_s: f64,
+    // Auto-fix: true while an auto-fix prompt is in flight (hides intermediate UI)
+    autofix_in_flight: bool,
 }
 
 impl App {
@@ -243,6 +384,10 @@ impl App {
             window_id: None,
             current_prompt_text: None,
             pending_completed_turn: None,
+            wt_notifications: VecDeque::new(),
+            show_notification_banner: false,
+            last_autofix_unix_s: 0.0,
+            autofix_in_flight: false,
         }
     }
 
@@ -434,6 +579,7 @@ impl App {
             AppEvent::SystemMessage(_) => "system_message",
             AppEvent::DebugPipeMessage(_) => "debug_pipe_message",
             AppEvent::SharedStateSnapshot(_) => "shared_state_snapshot",
+            AppEvent::WtEvent { .. } => "wt_event",
         }
     }
 
@@ -464,6 +610,16 @@ impl App {
             AppEvent::Tick => {
                 if self.has_activity_indicator() {
                     self.activity_frame = (self.activity_frame + 1) % 9;
+                }
+                // Age and auto-dismiss notifications
+                for n in self.wt_notifications.iter_mut() {
+                    n.age_ticks = n.age_ticks.saturating_add(1);
+                }
+                self.wt_notifications.retain(|n| !n.should_auto_dismiss());
+                if self.wt_notifications.is_empty()
+                    || self.wt_notifications.iter().all(|n| n.acknowledged)
+                {
+                    self.show_notification_banner = false;
                 }
             }
             AppEvent::Resize(_, _) => {} // ratatui handles resize
@@ -510,6 +666,10 @@ impl App {
             }
             AppEvent::AgentThoughtChunk(text) => {
                 self.prompt_in_flight = true;
+                if self.autofix_in_flight {
+                    // Suppress thinking UI during auto-fix
+                    return;
+                }
                 if self.progress_status.is_none() {
                     self.progress_status = Some("Thinking...".to_string());
                 }
@@ -522,11 +682,14 @@ impl App {
                 self.progress_status = None;
                 self.pending_thought_response.clear();
                 self.pending_agent_response.push_str(&text);
-                self.scroll_to_bottom();
+                if !self.autofix_in_flight {
+                    self.scroll_to_bottom();
+                }
             }
             AppEvent::AgentMessageEnd => {
                 self.agent_streaming = false;
                 self.prompt_in_flight = false;
+                self.autofix_in_flight = false;
                 self.progress_status = None;
                 self.pending_thought_response.clear();
                 self.activity_frame = 0;
@@ -548,31 +711,37 @@ impl App {
             AppEvent::ToolCall { id, title, status } => {
                 self.tool_calls
                     .insert(id.clone(), (title.clone(), status.clone()));
-                self.messages
-                    .push(ChatMessage::ToolCall { id, title, status });
-                self.scroll_to_bottom();
+                if !self.autofix_in_flight {
+                    self.messages
+                        .push(ChatMessage::ToolCall { id, title, status });
+                    self.scroll_to_bottom();
+                }
             }
             AppEvent::ToolCallUpdate { id, status } => {
                 if let Some(entry) = self.tool_calls.get_mut(&id) {
                     entry.1 = status.clone();
                 }
-                // Update in-place in messages
-                for msg in &mut self.messages {
-                    if let ChatMessage::ToolCall {
-                        id: ref mid,
-                        status: ref mut s,
-                        ..
-                    } = msg
-                    {
-                        if mid == &id {
-                            *s = status.clone();
+                if !self.autofix_in_flight {
+                    // Update in-place in messages
+                    for msg in &mut self.messages {
+                        if let ChatMessage::ToolCall {
+                            id: ref mid,
+                            status: ref mut s,
+                            ..
+                        } = msg
+                        {
+                            if mid == &id {
+                                *s = status.clone();
+                            }
                         }
                     }
                 }
             }
             AppEvent::Plan(entries) => {
-                self.messages.push(ChatMessage::Plan(entries));
-                self.scroll_to_bottom();
+                if !self.autofix_in_flight {
+                    self.messages.push(ChatMessage::Plan(entries));
+                    self.scroll_to_bottom();
+                }
             }
             AppEvent::PermissionRequest {
                 description,
@@ -614,12 +783,63 @@ impl App {
             AppEvent::SharedStateSnapshot(snapshot) => {
                 self.apply_shared_snapshot(snapshot);
             }
+            AppEvent::WtEvent {
+                method,
+                pane_id,
+                params,
+            } => {
+                autofix_log(&format!(
+                    "WtEvent: method={} pane_id={} self.pane_id={:?}",
+                    method, pane_id, self.pane_id
+                ));
+
+                // Skip events from our own pane
+                if self.pane_id.as_deref() == Some(pane_id.as_str()) {
+                    autofix_log("skipped: own pane");
+                    return;
+                }
+
+                let notification = classify_wt_event(&method, &pane_id, &params);
+                autofix_log(&format!(
+                    "classified: severity={:?} summary={}",
+                    notification.severity, notification.summary
+                ));
+
+                // Always log to chat for critical/actionable events
+                match notification.severity {
+                    WtEventSeverity::Critical => {
+                        self.messages
+                            .push(ChatMessage::Error(notification.summary.clone()));
+                        self.show_notification_banner = true;
+                        self.scroll_to_bottom();
+                    }
+                    WtEventSeverity::Actionable => {
+                        self.messages
+                            .push(ChatMessage::System(notification.summary.clone()));
+                        self.show_notification_banner = true;
+                        self.scroll_to_bottom();
+
+                        // Auto-fix: when a command fails, automatically ask the agent
+                        // to diagnose and suggest a fix. Debounce to avoid spamming.
+                        self.maybe_trigger_autofix(&notification);
+                    }
+                    WtEventSeverity::Informational => {
+                        // Informational events only show in status bar, no chat message
+                    }
+                }
+
+                // Queue the notification (cap at 20)
+                self.wt_notifications.push_back(notification);
+                if self.wt_notifications.len() > 20 {
+                    self.wt_notifications.pop_front();
+                }
+            }
         }
     }
 
     fn event_requires_redraw(&self, event: &AppEvent) -> bool {
         match event {
-            AppEvent::Tick => self.has_activity_indicator(),
+            AppEvent::Tick => self.has_activity_indicator() || self.show_notification_banner,
             AppEvent::AgentMessageChunk(_) => true,
             AppEvent::DebugPipeMessage(_) => self.show_debug_panel,
             _ => true,
@@ -728,6 +948,9 @@ impl App {
                     self.should_quit = true;
                 }
             }
+            KeyCode::Esc if self.show_notification_banner => {
+                self.dismiss_notifications();
+            }
             KeyCode::Esc if self.input.is_empty() => {
                 self.collapse_selected_history_turn();
             }
@@ -803,6 +1026,40 @@ impl App {
 
     fn has_activity_indicator(&self) -> bool {
         self.prompt_in_flight || self.agent_streaming || self.progress_status.is_some()
+    }
+
+    /// Get the most recent unacknowledged notification (for the banner).
+    pub fn active_notification(&self) -> Option<&WtNotification> {
+        self.wt_notifications
+            .iter()
+            .rev()
+            .find(|n| !n.acknowledged)
+    }
+
+    /// Count of unacknowledged actionable/critical notifications.
+    pub fn unacknowledged_count(&self) -> usize {
+        self.wt_notifications
+            .iter()
+            .filter(|n| !n.acknowledged && n.severity != WtEventSeverity::Informational)
+            .count()
+    }
+
+    /// Dismiss the notification banner and mark all current notifications as acknowledged.
+    pub fn dismiss_notifications(&mut self) {
+        self.show_notification_banner = false;
+        for n in self.wt_notifications.iter_mut() {
+            n.acknowledged = true;
+        }
+    }
+
+    /// Get the latest status-bar badge text (if any unacknowledged notification exists).
+    pub fn notification_badge(&self) -> Option<(&str, &WtEventSeverity)> {
+        // Show the most severe unacknowledged notification
+        self.wt_notifications
+            .iter()
+            .rev()
+            .find(|n| !n.acknowledged)
+            .map(|n| (n.summary.as_str(), &n.severity))
     }
 
     fn insert_input_char(&mut self, ch: char) {
@@ -915,6 +1172,63 @@ impl App {
         } else {
             Some(format!("Latency: {}", parts.join(" | ")))
         }
+    }
+
+    /// Auto-fix: when a command fails in another pane, automatically send a
+    /// prompt to the ACP agent so it can diagnose the error and suggest a fix.
+    fn maybe_trigger_autofix(&mut self, notification: &WtNotification) {
+        // Only trigger when the agent is connected and idle
+        if self.state != ConnectionState::Connected || self.agent_streaming || self.prompt_in_flight
+        {
+            autofix_log(&format!(
+                "skipped: state={:?} streaming={} in_flight={}",
+                self.state, self.agent_streaming, self.prompt_in_flight
+            ));
+            return;
+        }
+
+        // Debounce: at most one auto-fix every 5 seconds
+        let now = now_unix_s();
+        if now - self.last_autofix_unix_s < 5.0 {
+            return;
+        }
+        self.last_autofix_unix_s = now;
+
+        let pane_id = notification.pane_id.clone();
+        let summary = notification.summary.clone();
+
+        // Build auto-fix prompt with the failing pane as context source
+        let prompt_text = format!(
+            "[auto-fix] {}\nRead the terminal output from pane {} to see what command failed and why. \
+             Diagnose the error and suggest a fix as actionable recommendations.",
+            summary, pane_id
+        );
+
+        let pane_context = PaneContext {
+            pane_id: self.pane_id.clone(),
+            tab_id: self.tab_id.clone(),
+            window_id: self.window_id.clone(),
+            cwd: None,
+            source_pane_id: Some(pane_id),
+        };
+
+        self.autofix_in_flight = true;
+        self.prepare_for_new_prompt(&prompt_text);
+        self.messages
+            .push(ChatMessage::System(format!("Analyzing failure — asking agent for a fix...")));
+        self.scroll_to_bottom();
+
+        let prompt = PromptSubmission::new(prompt_text, Some(pane_context));
+        self.current_prompt_id = Some(prompt.id);
+        self.current_prompt_submitted_at_unix_s = Some(prompt.submitted_at_unix_s);
+        prompt_timing_log(
+            prompt.id,
+            prompt.submitted_at_unix_s,
+            "autofix_submit",
+            &format!("pane={}", notification.pane_id),
+        );
+        autofix_log(&format!("sending prompt for pane {}", notification.pane_id));
+        let _ = self.prompt_tx.send(prompt);
     }
 
     fn prepare_for_new_prompt(&mut self, prompt_text: &str) {
@@ -1203,6 +1517,26 @@ fn append_thought_preview(buffer: &mut String, chunk: &str) {
     *buffer = format!("...{tail}");
 }
 
+fn autofix_log(msg: &str) {
+    use std::io::Write;
+    let path = std::env::temp_dir().join("wta-event-diag.log");
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(
+            f,
+            "[{:.3}] autofix: {}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs_f64(),
+            msg
+        );
+    }
+}
+
 fn now_unix_s() -> f64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -1242,4 +1576,342 @@ fn next_char_boundary(input: &str, cursor_pos: usize) -> usize {
         .next()
         .map(|ch| cursor_pos + ch.len_utf8())
         .unwrap_or(input.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // Helper to create an App for testing (avoids needing real channels for simple state tests).
+    fn test_app() -> App {
+        let (prompt_tx, _prompt_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (recommendation_tx, _recommendation_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (permission_tx, _permission_rx) = tokio::sync::mpsc::unbounded_channel();
+        let debug_capture = Arc::new(AtomicBool::new(false));
+        App::new(prompt_tx, recommendation_tx, permission_tx, debug_capture, true, false)
+    }
+
+    // ─── classify_wt_event ──────────────────────────────────────────────────
+
+    #[test]
+    fn classify_connection_failed_is_critical() {
+        let params = json!({"pane_id": "3", "state": "failed"});
+        let n = classify_wt_event("connection_state", "3", &params);
+        assert_eq!(n.severity, WtEventSeverity::Critical);
+        assert!(n.summary.contains("failed"));
+        assert!(!n.acknowledged);
+    }
+
+    #[test]
+    fn classify_connection_closed_is_actionable() {
+        let params = json!({"pane_id": "5", "state": "closed"});
+        let n = classify_wt_event("connection_state", "5", &params);
+        assert_eq!(n.severity, WtEventSeverity::Actionable);
+        assert!(n.summary.contains("exited"));
+    }
+
+    #[test]
+    fn classify_connection_connected_is_informational() {
+        let params = json!({"pane_id": "1", "state": "connected"});
+        let n = classify_wt_event("connection_state", "1", &params);
+        assert_eq!(n.severity, WtEventSeverity::Informational);
+        assert!(n.summary.contains("connected"));
+    }
+
+    #[test]
+    fn classify_osc133_command_failed_is_actionable() {
+        let params = json!({"pane_id": "2", "sequence": "osc:133;D;1"});
+        let n = classify_wt_event("vt_sequence", "2", &params);
+        assert_eq!(n.severity, WtEventSeverity::Actionable);
+        assert!(n.summary.contains("command failed"));
+        assert!(n.summary.contains("exit 1"));
+    }
+
+    #[test]
+    fn classify_osc133_command_success_is_silent() {
+        let params = json!({"pane_id": "2", "sequence": "osc:133;D;0"});
+        let n = classify_wt_event("vt_sequence", "2", &params);
+        assert!(n.acknowledged); // auto-dismissed
+    }
+
+    #[test]
+    fn classify_osc133_high_exit_code() {
+        let params = json!({"pane_id": "2", "sequence": "osc:133;D;127"});
+        let n = classify_wt_event("vt_sequence", "2", &params);
+        assert_eq!(n.severity, WtEventSeverity::Actionable);
+        assert!(n.summary.contains("exit 127"));
+    }
+
+    #[test]
+    fn classify_osc133_prompt_marker_is_silent() {
+        // OSC 133;A is a prompt marker, not a command finish
+        let params = json!({"pane_id": "2", "sequence": "osc:133;A"});
+        let n = classify_wt_event("vt_sequence", "2", &params);
+        assert!(n.acknowledged); // silenced
+    }
+
+    #[test]
+    fn classify_normal_vt_sequence_is_silent() {
+        let params = json!({"pane_id": "7", "sequence": "osc:0;title"});
+        let n = classify_wt_event("vt_sequence", "7", &params);
+        assert!(n.acknowledged); // silenced
+    }
+
+    #[test]
+    fn classify_unknown_method_is_informational() {
+        let params = json!({"pane_id": "1"});
+        let n = classify_wt_event("something_new", "1", &params);
+        assert_eq!(n.severity, WtEventSeverity::Informational);
+    }
+
+    // ─── WtNotification auto-dismiss ────────────────────────────────────────
+
+    #[test]
+    fn informational_auto_dismisses_after_threshold() {
+        let mut n = WtNotification {
+            severity: WtEventSeverity::Informational,
+            pane_id: "1".to_string(),
+            summary: "test".to_string(),
+            acknowledged: false,
+            age_ticks: 0,
+        };
+        assert!(!n.should_auto_dismiss());
+        n.age_ticks = 42;
+        assert!(!n.should_auto_dismiss());
+        n.age_ticks = 43;
+        assert!(n.should_auto_dismiss());
+    }
+
+    #[test]
+    fn critical_never_auto_dismisses() {
+        let n = WtNotification {
+            severity: WtEventSeverity::Critical,
+            pane_id: "1".to_string(),
+            summary: "crash".to_string(),
+            acknowledged: false,
+            age_ticks: 1000,
+        };
+        assert!(!n.should_auto_dismiss());
+    }
+
+    #[test]
+    fn actionable_never_auto_dismisses() {
+        let n = WtNotification {
+            severity: WtEventSeverity::Actionable,
+            pane_id: "1".to_string(),
+            summary: "exited".to_string(),
+            acknowledged: false,
+            age_ticks: 1000,
+        };
+        assert!(!n.should_auto_dismiss());
+    }
+
+    // ─── App notification state ─────────────────────────────────────────────
+
+    #[test]
+    fn wt_event_critical_shows_banner_and_error_message() {
+        let mut app = test_app();
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "3".to_string(),
+            params: json!({"pane_id": "3", "state": "failed"}),
+        });
+        assert!(app.show_notification_banner);
+        assert_eq!(app.wt_notifications.len(), 1);
+        assert_eq!(app.wt_notifications[0].severity, WtEventSeverity::Critical);
+        // Should have an Error message in chat
+        assert!(app.messages.iter().any(|m| matches!(m, ChatMessage::Error(_))));
+    }
+
+    #[test]
+    fn wt_event_actionable_shows_banner_and_system_message() {
+        let mut app = test_app();
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "5".to_string(),
+            params: json!({"pane_id": "5", "state": "closed"}),
+        });
+        assert!(app.show_notification_banner);
+        assert!(app.messages.iter().any(|m| matches!(m, ChatMessage::System(_))));
+    }
+
+    #[test]
+    fn wt_event_informational_no_banner_no_chat_message() {
+        let mut app = test_app();
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "1".to_string(),
+            params: json!({"pane_id": "1", "state": "connected"}),
+        });
+        assert!(!app.show_notification_banner);
+        assert!(app.messages.is_empty());
+        assert_eq!(app.wt_notifications.len(), 1);
+    }
+
+    #[test]
+    fn wt_event_from_own_pane_is_ignored() {
+        let mut app = test_app();
+        app.pane_id = Some("42".to_string());
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "42".to_string(),
+            params: json!({"pane_id": "42", "state": "failed"}),
+        });
+        // Events from our own pane should be completely ignored
+        assert!(!app.show_notification_banner);
+        assert!(app.wt_notifications.is_empty());
+        assert!(app.messages.is_empty());
+    }
+
+    #[test]
+    fn dismiss_notifications_clears_banner_and_acknowledges() {
+        let mut app = test_app();
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "3".to_string(),
+            params: json!({"pane_id": "3", "state": "failed"}),
+        });
+        assert!(app.show_notification_banner);
+        assert_eq!(app.unacknowledged_count(), 1);
+
+        app.dismiss_notifications();
+        assert!(!app.show_notification_banner);
+        assert_eq!(app.unacknowledged_count(), 0);
+        assert!(app.wt_notifications[0].acknowledged);
+    }
+
+    #[test]
+    fn notification_badge_returns_most_recent_unacknowledged() {
+        let mut app = test_app();
+        // First event
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "1".to_string(),
+            params: json!({"pane_id": "1", "state": "closed"}),
+        });
+        // Second event (more recent)
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "2".to_string(),
+            params: json!({"pane_id": "2", "state": "failed"}),
+        });
+
+        let (summary, severity) = app.notification_badge().unwrap();
+        assert!(summary.contains("Pane 2"));
+        assert_eq!(*severity, WtEventSeverity::Critical);
+        assert_eq!(app.unacknowledged_count(), 2);
+    }
+
+    #[test]
+    fn notification_queue_caps_at_20() {
+        let mut app = test_app();
+        for i in 0..25 {
+            app.handle_event(AppEvent::WtEvent {
+                method: "connection_state".to_string(),
+                pane_id: format!("{}", i),
+                params: json!({"pane_id": format!("{}", i), "state": "connected"}),
+            });
+        }
+        assert_eq!(app.wt_notifications.len(), 20);
+    }
+
+    #[test]
+    fn tick_ages_and_auto_dismisses_informational() {
+        let mut app = test_app();
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "1".to_string(),
+            params: json!({"pane_id": "1", "state": "connected"}),
+        });
+        assert_eq!(app.wt_notifications.len(), 1);
+        assert_eq!(app.wt_notifications[0].age_ticks, 0);
+
+        // Simulate enough ticks to trigger auto-dismiss (43 ticks)
+        for _ in 0..43 {
+            app.handle_event(AppEvent::Tick);
+        }
+        // Informational notification should be auto-removed
+        assert_eq!(app.wt_notifications.len(), 0);
+    }
+
+    #[test]
+    fn tick_does_not_dismiss_critical_notifications() {
+        let mut app = test_app();
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "3".to_string(),
+            params: json!({"pane_id": "3", "state": "failed"}),
+        });
+        // Simulate many ticks
+        for _ in 0..200 {
+            app.handle_event(AppEvent::Tick);
+        }
+        // Critical notification should persist
+        assert_eq!(app.wt_notifications.len(), 1);
+        assert!(app.show_notification_banner);
+    }
+
+    #[test]
+    fn banner_hides_when_all_acknowledged() {
+        let mut app = test_app();
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "3".to_string(),
+            params: json!({"pane_id": "3", "state": "failed"}),
+        });
+        assert!(app.show_notification_banner);
+
+        // Acknowledge all
+        app.dismiss_notifications();
+
+        // One more tick to process the banner-hide logic
+        app.handle_event(AppEvent::Tick);
+        assert!(!app.show_notification_banner);
+    }
+
+    #[test]
+    fn active_notification_returns_none_when_all_acknowledged() {
+        let mut app = test_app();
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "3".to_string(),
+            params: json!({"pane_id": "3", "state": "closed"}),
+        });
+        assert!(app.active_notification().is_some());
+
+        app.dismiss_notifications();
+        assert!(app.active_notification().is_none());
+    }
+
+    #[test]
+    fn multiple_events_different_panes() {
+        let mut app = test_app();
+        // Informational from pane 1
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "1".to_string(),
+            params: json!({"pane_id": "1", "state": "connected"}),
+        });
+        // Critical from pane 2
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "2".to_string(),
+            params: json!({"pane_id": "2", "state": "failed"}),
+        });
+        // Actionable from pane 3
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "3".to_string(),
+            params: json!({"pane_id": "3", "state": "closed"}),
+        });
+
+        assert_eq!(app.wt_notifications.len(), 3);
+        // Unacknowledged count only counts actionable + critical
+        assert_eq!(app.unacknowledged_count(), 2);
+        // Banner should show (due to critical + actionable)
+        assert!(app.show_notification_banner);
+        // Chat should have 2 messages (critical error + actionable system msg)
+        assert_eq!(app.messages.len(), 2);
+    }
 }

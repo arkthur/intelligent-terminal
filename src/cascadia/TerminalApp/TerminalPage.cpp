@@ -2435,26 +2435,25 @@ namespace winrt::TerminalApp::implementation
                 });
 
             term.ConnectionStateChanged(
-                [weakThis = get_weak(), paneIdStr](const auto& sender, auto&&) {
-                    if (auto strongThis = weakThis.get())
+                [weakThis = get_weak(), paneIdStr, weakTerm = winrt::make_weak(term)](const auto& /*sender*/, auto&&) {
+                    auto strongThis = weakThis.get();
+                    auto control = weakTerm.get();
+                    if (strongThis && control)
                     {
-                        std::string stateStr = "unknown";
-                        if (const auto control = sender.try_as<winrt::Microsoft::Terminal::Control::TermControl>())
+                        std::string stateStr;
+                        switch (control.ConnectionState())
                         {
-                            switch (control.ConnectionState())
-                            {
-                            case ConnectionState::Connected:
-                                stateStr = "connected";
-                                break;
-                            case ConnectionState::Closed:
-                                stateStr = "closed";
-                                break;
-                            case ConnectionState::Failed:
-                                stateStr = "failed";
-                                break;
-                            default:
-                                return;
-                            }
+                        case ConnectionState::Connected:
+                            stateStr = "connected";
+                            break;
+                        case ConnectionState::Closed:
+                            stateStr = "closed";
+                            break;
+                        case ConnectionState::Failed:
+                            stateStr = "failed";
+                            break;
+                        default:
+                            return;
                         }
 
                         Json::Value evt;
