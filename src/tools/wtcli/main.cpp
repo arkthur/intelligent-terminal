@@ -36,7 +36,7 @@ private:
 
 // ── Helpers ──
 
-static Protocol::IProtocolServer ConnectToTerminal()
+static Protocol::IProtocolServer ConnectToTerminal(Protocol::AuthResult* outAuth = nullptr)
 {
     wchar_t clsid[128]{};
     if (!GetEnvironmentVariableW(L"WT_COM_CLSID", clsid, ARRAYSIZE(clsid)))
@@ -61,6 +61,8 @@ static Protocol::IProtocolServer ConnectToTerminal()
             fprintf(stderr, "[wtcli] Authentication failed\n");
             return nullptr;
         }
+        if (outAuth)
+            *outAuth = authResult;
         return server;
     }
     catch (const winrt::hresult_error& e)
@@ -474,34 +476,42 @@ int main()
 
         wchar_t clsid[128]{};
         if (GetEnvironmentVariableW(L"WT_COM_CLSID", clsid, ARRAYSIZE(clsid)))
-            printf("  COM CLSID: %ls\n", clsid);
+            printf("  COM CLSID:  %ls\n", clsid);
         else
-            printf("  COM CLSID: (not set)\n");
+            printf("  COM CLSID:  (not set)\n");
 
         printf("\n");
 
-        auto server = connect();
+        Protocol::AuthResult authResult{};
+        auto server = ConnectToTerminal(&authResult);
         if (!server)
         {
             printf("  Connection: FAILED\n");
+            exitCode = 1;
             return;
         }
-        printf("  Connection: OK\n\n");
+        printf("  Connection: OK\n");
+
+        auto version = winrt::to_string(authResult.ProtocolVersion);
+        if (!version.empty())
+            printf("  Protocol:   %s\n", version.c_str());
+
+        printf("\n");
 
         try
         {
             auto capsJson = server.GetCapabilities();
-            // GetCapabilities returns a JSON string; extract protocol_version if present
+            // GetCapabilities returns a JSON array of supported method names
             Json::Value cap;
             Json::CharReaderBuilder rb;
             std::string errs;
             auto capsStr = winrt::to_string(capsJson);
             std::istringstream ss(capsStr);
-            if (Json::parseFromStream(rb, ss, &cap, &errs))
+            if (Json::parseFromStream(rb, ss, &cap, &errs) && cap.isArray())
             {
-                auto version = cap.get("protocol_version", "").asString();
-                if (!version.empty())
-                    printf("  Protocol:  %s\n", version.c_str());
+                printf("  Methods:    %u supported\n", cap.size());
+                for (const auto& m : cap)
+                    printf("              - %s\n", m.asString().c_str());
             }
         }
         catch (const winrt::hresult_error&) {}
