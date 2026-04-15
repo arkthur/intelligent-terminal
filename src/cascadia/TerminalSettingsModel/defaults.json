@@ -547,6 +547,8 @@
         { "command": { "action": "showSuggestions", "source": "all"}, "id": "Terminal.Suggestions" },
         { "command": "openCWD", "id": "Terminal.OpenCWD" },
         { "command": "openAgentPane", "id": "Terminal.OpenAgentPane" },
+        { "command": { "action": "initShellIntegration", "target": "pwsh" }, "id": "Terminal.InitShellIntegrationPwsh" },
+        { "command": { "action": "initShellIntegration", "target": "windowsPowerShell" }, "id": "Terminal.InitShellIntegrationWindowsPowerShell" },
 
         // Tab Management
         // "command": "closeTab" is unbound by default.

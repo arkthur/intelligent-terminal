@@ -942,4 +942,22 @@
   <data name="InvalidRegex" xml:space="preserve">
     <value>An invalid regular expression was found.</value>
   </data>
+  <data name="InitShellIntegrationSuccessTitle" xml:space="preserve">
+    <value>Shell Integration Initialized</value>
+  </data>
+  <data name="InitShellIntegrationSuccessMessage" xml:space="preserve">
+    <value>Shell integration has been configured. Please restart your PowerShell session or open a new tab for the changes to take effect.</value>
+  </data>
+  <data name="InitShellIntegrationAlreadyConfiguredTitle" xml:space="preserve">
+    <value>Shell Integration Already Configured</value>
+  </data>
+  <data name="InitShellIntegrationAlreadyConfiguredMessage" xml:space="preserve">
+    <value>Shell integration is already configured in your PowerShell profile.</value>
+  </data>
+  <data name="InitShellIntegrationErrorTitle" xml:space="preserve">
+    <value>Shell Integration Error</value>
+  </data>
+  <data name="InitShellIntegrationErrorMessage" xml:space="preserve">
+    <value>Failed to initialize shell integration. Could not determine your PowerShell profile path. Make sure the target shell is installed.</value>
+  </data>
 </root>

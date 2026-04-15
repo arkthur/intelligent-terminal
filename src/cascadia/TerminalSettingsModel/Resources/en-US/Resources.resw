@@ -994,4 +994,13 @@
   <data name="AgentPromptActionArgumentLocalized" xml:space="preserve">
     <value>Agent prompt</value>
   </data>
+  <data name="InitShellIntegrationCommandKey" xml:space="preserve">
+    <value>Initialize shell integration</value>
+  </data>
+  <data name="InitShellIntegrationPwshCommandKey" xml:space="preserve">
+    <value>Initialize shell integration (PowerShell 7)</value>
+  </data>
+  <data name="InitShellIntegrationWindowsPowerShellCommandKey" xml:space="preserve">
+    <value>Initialize shell integration (Windows PowerShell)</value>
+  </data>
 </root>
