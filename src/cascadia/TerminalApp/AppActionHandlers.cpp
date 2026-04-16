@@ -1950,6 +1950,32 @@ if (-not $Global:__ShellInteg_Installed) {
             scriptOut.write(scriptUtf8.data(), scriptUtf8.size());
         }
 
+        // Back up existing $PROFILE before modifying it
+        if (std::filesystem::exists(profilePath))
+        {
+            // Generate timestamp + content hash for a unique backup name
+            const auto now = std::chrono::system_clock::now();
+            const auto tt = std::chrono::system_clock::to_time_t(now);
+            struct tm tm{};
+            localtime_s(&tm, &tt);
+            wchar_t timeBuf[32]{};
+            wcsftime(timeBuf, std::size(timeBuf), L"%Y%m%d-%H%M%S", &tm);
+
+            // Read existing content for hash
+            std::ifstream backupIn(profilePath, std::ios::binary);
+            std::string backupContent((std::istreambuf_iterator<char>(backupIn)),
+                                      std::istreambuf_iterator<char>());
+            backupIn.close();
+            const auto contentHash = std::hash<std::string>{}(backupContent);
+
+            const auto backupPath = fmt::format(FMT_COMPILE(L"{}.bak.{}.{:08x}"),
+                                                profilePath.wstring(),
+                                                timeBuf,
+                                                contentHash & 0xFFFFFFFF);
+            std::filesystem::copy_file(profilePath, backupPath, std::filesystem::copy_options::overwrite_existing, ec);
+            // Non-fatal if backup fails — proceed anyway
+        }
+
         // Append dot-source line to $PROFILE
         {
             std::ofstream profileOut(profilePath, std::ios::binary | std::ios::app);
