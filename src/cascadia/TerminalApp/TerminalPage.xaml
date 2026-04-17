@@ -19,6 +19,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <local:TabRowControl x:Name="TabRow"
@@ -56,6 +57,16 @@
             </mux:InfoBar>
         </StackPanel>
 
+        <!-- Solid filler behind TabContent so any transparent edge pixels
+             (pane border, padding rounding, etc.) between the pane and the
+             BottomBar read as a seamless continuation of the BottomBar
+             instead of showing the desktop behind the window. Uses the
+             BottomBar color so the gap — if any — visually merges into
+             the bar. Declared before TabContent so it sits behind. -->
+        <Border Grid.Row="2"
+                Background="#161616"
+                IsHitTestVisible="False" />
+
         <Grid x:Name="TabContent"
               Grid.Row="2"
               HorizontalAlignment="Stretch"
@@ -65,23 +76,18 @@
             </Grid.Background>
         </Grid>
 
-        <!-- Bottom Bar: AI agent toolbar
-             Figma: bg rgba(45,45,48,0.3), top border rgba(255,255,255,0.05) @ 0.667px -->
+        <!-- Bottom Bar: AI agent toolbar. VerticalAlignment="Top" is required
+             — without it, the Grid's default stretch-with-explicit-height
+             behavior leaves a transparent strip at the top of Row 3. -->
         <Grid x:Name="BottomBar"
-              Grid.Row="2"
+              Grid.Row="3"
               Height="31"
               Padding="12,0,12,0"
-              BorderThickness="0,0.667,0,0"
-              VerticalAlignment="Bottom"
-              HorizontalAlignment="Stretch">
+              HorizontalAlignment="Stretch"
+              VerticalAlignment="Top">
             <Grid.Background>
-                <SolidColorBrush Color="#2D2D30"
-                                 Opacity="0.3" />
+                <SolidColorBrush Color="#161616" />
             </Grid.Background>
-            <Grid.BorderBrush>
-                <SolidColorBrush Color="White"
-                                 Opacity="0.05" />
-            </Grid.BorderBrush>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
