@@ -224,11 +224,20 @@ fn build_message_lines<'a>(
             lines.push(Line::default());
         }
         ChatMessage::Agent(text) => {
-            for line_text in text.lines() {
-                lines.push(Line::from(Span::styled(
-                    truncate_render_text(line_text),
-                    theme::AGENT_TEXT,
-                )));
+            for (i, line_text) in text.lines().enumerate() {
+                if i == 0 {
+                    // First line gets green dot indicator
+                    lines.push(Line::from(vec![
+                        Span::styled("● ", theme::DOT_AGENT),
+                        Span::styled(truncate_render_text(line_text), theme::AGENT_TEXT),
+                    ]));
+                } else {
+                    // Subsequent lines indented to align with text after dot
+                    lines.push(Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled(truncate_render_text(line_text), theme::AGENT_TEXT),
+                    ]));
+                }
             }
             if !agent_streaming || !is_last_message {
                 lines.push(Line::default());
@@ -269,10 +278,13 @@ fn build_message_lines<'a>(
             lines.push(Line::default());
         }
         ChatMessage::Error(text) => {
-            lines.push(Line::from(Span::styled(
-                format!("Error: {}", truncate_render_text(text)),
-                theme::ERROR_STYLE,
-            )));
+            lines.push(Line::from(vec![
+                Span::styled("● ", theme::DOT_ERROR),
+                Span::styled(
+                    truncate_render_text(text),
+                    theme::ERROR_STYLE,
+                ),
+            ]));
             lines.push(Line::default());
         }
     }

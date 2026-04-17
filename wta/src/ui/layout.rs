@@ -2,7 +2,7 @@ use ratatui::prelude::*;
 
 use crate::app::App;
 
-use super::{chat, debug_panel, input, notification_banner, permission, recommendations, status_bar};
+use super::{chat, debug_panel, input, permission, recommendations};
 
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
@@ -18,8 +18,6 @@ pub fn render(frame: &mut Frame, app: &App) {
         (area, None)
     };
 
-    let banner_h = notification_banner::banner_height(app);
-
     let recommendations_height = if app.recommendations.is_some() {
         Constraint::Length(8)
     } else {
@@ -28,23 +26,19 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     let input_height = input::input_height(&app.input, app.cursor_pos, main_area.width);
 
-    // Layout: status bar | notification banner | recommendations | chat | input
+    // Layout: recommendations | chat | input
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),         // status bar
-            Constraint::Length(banner_h),  // notification banner
             recommendations_height,
             Constraint::Min(1),            // chat area
             Constraint::Length(input_height),
         ])
         .split(main_area);
 
-    status_bar::render(frame, app, chunks[0]);
-    notification_banner::render(frame, app, chunks[1]);
-    recommendations::render(frame, app, chunks[2]);
-    chat::render(frame, app, chunks[3]);
-    input::render(frame, app, chunks[4]);
+    recommendations::render(frame, app, chunks[0]);
+    chat::render(frame, app, chunks[1]);
+    input::render(frame, app, chunks[2]);
 
     // Debug panel (right side)
     if let Some(debug_area) = debug_area {
@@ -67,8 +61,6 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
         area
     };
 
-    let banner_h = notification_banner::banner_height(app);
-
     let recommendations_height = if app.recommendations.is_some() {
         Constraint::Length(8)
     } else {
@@ -80,13 +72,11 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
-            Constraint::Length(banner_h),
             recommendations_height,
             Constraint::Min(1),
             Constraint::Length(input_height),
         ])
         .split(main_area);
 
-    input::cursor_position(app, chunks[4])
+    input::cursor_position(app, chunks[2])
 }
