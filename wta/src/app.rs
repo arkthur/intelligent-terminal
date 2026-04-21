@@ -824,7 +824,14 @@ impl App {
                 // same-pane skip below. Ignore the event if we don't
                 // actually have a cached autofix for that pane.
                 if method == "autofix_execute" {
-                    self.handle_autofix_execute_request(&pane_id);
+                    // In shared mode the host owns the armed recommendations
+                    // and autofix_pane_id, so it handles Execute. The attach
+                    // TUI never calls maybe_trigger_autofix and therefore has
+                    // no autofix_pane_id — calling handle_autofix_execute_request
+                    // here would just immediately clear the armed bottom-bar state.
+                    if !self.shared_mode {
+                        self.handle_autofix_execute_request(&pane_id);
+                    }
                     return;
                 }
 
@@ -868,6 +875,14 @@ impl App {
                         // When auto-fix is disabled, skip notification display entirely —
                         // there's nothing actionable for the user.
                         if !self.autofix_enabled {
+                            return;
+                        }
+
+                        // In shared (attach) mode the host handles autofix: it
+                        // submits the prompt and owns autofix_pane_id.  The TUI
+                        // only shows the result via SharedStateSnapshot, so we
+                        // must NOT submit a duplicate prompt here.
+                        if self.shared_mode {
                             return;
                         }
 
@@ -1705,22 +1720,6 @@ impl App {
                 .unwrap_or(0);
             if self.recommendations.is_some() {
                 self.selection_visible_pending = true;
-                // Shared-mode counterpart to the finalize_turn armed emit:
-                // when the host shares a fresh recommendation and we're in
-                // an auto-fix flow, light up the bottom-bar icon as Armed.
-                if let Some(pane_id) = self.autofix_pane_id.clone() {
-                    if let Some(rec) = self.recommendations.as_ref() {
-                        let preview = Self::armed_fix_preview(rec);
-                        tracing::info!(target: "autofix", pane_id = %pane_id, "apply_shared_snapshot: recs ready, emitting armed");
-                        self.emit_autofix_state_armed(&pane_id, &preview);
-                    }
-                }
-            } else if self.autofix_pane_id.is_some() {
-                // Recommendations were cleared (agent retry / dismissal) —
-                // bring the bottom bar back to Idle so it doesn't stay armed.
-                let pane_id = self.autofix_pane_id.clone().unwrap();
-                tracing::info!(target: "autofix", pane_id = %pane_id, "apply_shared_snapshot: recs cleared, emitting cleared");
-                self.emit_autofix_state_cleared(&pane_id);
             }
         }
 

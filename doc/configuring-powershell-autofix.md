@@ -45,13 +45,20 @@ The key is `133;D` — it reports the previous command's exit code. WTA listens 
 
 ### Checking the Diagnostic Log
 
-WTA writes auto-fix diagnostic events to a temp file:
+Autofix events are logged by the shared host process. Find the log directory:
 
 ```powershell
-Get-Content "$env:TEMP\wta-event-diag.log" -Tail 20
+# Packaged install (F5 / MSIX):
+$pkg = Get-AppxPackage | Where-Object { $_.Name -like '*AgenticTerminal*' } | Select-Object -First 1
+$logDir = "$env:LOCALAPPDATA\Packages\$($pkg.PackageFamilyName)\LocalCache\Local\AgenticTerminal\logs"
+
+# Unpackaged:
+$logDir = "$env:LOCALAPPDATA\AgenticTerminal\logs"
+
+Get-Content "$logDir\wta-ensure-host.log" -Tail 20
 ```
 
-This shows received events, classification, and whether auto-fix was triggered.
+Look for `target: "autofix"` lines — they show received events, classification, and whether auto-fix was triggered.
 
 ## Behavior Notes
 

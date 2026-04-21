@@ -80,7 +80,7 @@ Detects command failures in other panes and auto-suggests fixes via the agent.
 
 **Key code**: `wta/src/app.rs` (`classify_wt_event`, `maybe_trigger_autofix`), `TerminalPage.cpp:2650-2740` (event handlers), `TerminalProtocolComServer.cpp` (`_ensurePageEventsRegistered`).
 
-**Diag log**: `%TEMP%\wta-event-diag.log` — shows event flow, classification, and autofix triggers.
+**Diag log**: `wta-ensure-host.log` in the WTA log directory — shows event flow, classification, and autofix triggers.
 
 ## Logs
 

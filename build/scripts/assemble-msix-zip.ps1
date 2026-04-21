@@ -16,16 +16,17 @@ if (-not (Test-Path $cerSrc)) {
     exit 1
 }
 
-if (Test-Path $outDir) { Remove-Item $outDir -Recurse -Force }
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 New-Item -ItemType Directory -Path "$outDir\Dependencies" -Force | Out-Null
+Get-ChildItem $outDir -File | Remove-Item -Force
+Get-ChildItem "$outDir\Dependencies" -File | Remove-Item -Force
 
 Copy-Item "$buildOut\CascadiaPackage_${Version}_${Arch}.msix" $outDir
 
 if (Test-Path $depSrc) {
     Copy-Item $depSrc "$outDir\Dependencies\"
 } else {
-    Write-Warning "XAML dependency not found at '$depSrc' — Dependencies\ will be empty."
+    Write-Warning "XAML dependency not found at '$depSrc' - Dependencies\ will be empty."
 }
 
 Copy-Item $cerSrc $outDir

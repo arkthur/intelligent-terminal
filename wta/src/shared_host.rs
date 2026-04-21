@@ -90,6 +90,8 @@ pub enum HostClientRequest {
     },
     SelectRecommendation {
         choice: usize,
+        #[serde(default)]
+        insert_only: bool,
     },
     /// Host-internal only (client_id == u64::MAX). Used when the user clicks
     /// the bottom-bar autofix icon / presses Ctrl+. while no attach TUI is
@@ -487,10 +489,10 @@ pub async fn run_host_server(
         host_command_tx.clone(),
     ));
 
-    // Shared attach-client count. Host-side autofix trigger skips when > 0 so
-    // the attach TUI (which has its own maybe_trigger_autofix) stays the
-    // single autofix initiator in that mode. Host only takes over when no
-    // attach is connected (agent pane closed or never opened).
+    // Shared attach-client count. Tracked so run_host_service can keep it in
+    // sync; the autofix trigger path no longer skips based on this — the host
+    // always handles Trigger so the attach TUI (shared_mode guard) and the
+    // host don't both ignore it.
     let attach_count = Arc::new(AtomicUsize::new(0));
 
     // Host-internal autofix bridge. Routes main.rs-originated commands
@@ -502,22 +504,19 @@ pub async fn run_host_server(
         tokio::spawn(async move {
             while let Some(cmd) = cmd_rx.recv().await {
                 let active_attaches = attach_count_trigger.load(Ordering::Relaxed);
-                if active_attaches > 0 {
-                    host_log(&format!(
-                        "autofix cmd skipped (attach_count={}): attach TUI will handle: {:?}",
-                        active_attaches, cmd
-                    ));
-                    continue;
-                }
                 match cmd {
                     HostAutofixCommand::Trigger {
                         pane_id,
                         summary,
                         source_cwd,
                     } => {
+                        // Always let the host handle Trigger regardless of attach count.
+                        // The attach TUI in shared mode defers to the host (shared_mode
+                        // guard in app.rs), so skipping here causes a deadlock where
+                        // neither side processes the trigger.
                         host_log(&format!(
-                            "autofix_trigger received: pane={} summary={}",
-                            pane_id, summary
+                            "autofix_trigger received: pane={} summary={} attach_count={}",
+                            pane_id, summary, active_attaches
                         ));
                         // Publish pending UI state right away.
                         let pending_evt = serde_json::json!({
@@ -556,7 +555,13 @@ pub async fn run_host_server(
                         });
                     }
                     HostAutofixCommand::Execute { pane_id } => {
-                        host_log(&format!("autofix_execute received: pane={}", pane_id));
+                        // Always let the host handle Execute. The attach TUI in shared
+                        // mode skips autofix_execute (it has no autofix_pane_id since
+                        // the host owns the armed state), so the host is the only handler.
+                        host_log(&format!(
+                            "autofix_execute received: pane={} attach_count={}",
+                            pane_id, active_attaches
+                        ));
                         // run_host_service will read state.recommendations,
                         // pick the recommended choice, run it against the
                         // failing pane, and emit autofix_state:cleared.
@@ -734,6 +739,7 @@ async fn run_attach_client_inner(
                     &mut writer,
                     &HostClientRequest::SelectRecommendation {
                         choice: exec.choice.choice,
+                        insert_only: exec.insert_only,
                     },
                 ).await?;
             }
@@ -1066,7 +1072,7 @@ fn handle_host_command(
                     );
                 }
             }
-            HostClientRequest::SelectRecommendation { choice } => {
+            HostClientRequest::SelectRecommendation { choice, insert_only } => {
                 let maybe_choice = state
                     .recommendations
                     .as_ref()
@@ -1074,12 +1080,21 @@ fn handle_host_command(
                     .cloned();
 
                 if let Some(mut selected) = maybe_choice {
-                    // Auto-fill empty `parent` on Send actions from the
-                    // submitting client's pane context (needed for auto-fix
-                    // where the failing pane ID is only known client-side).
-                    let source_pane = clients
-                        .get(&client_id)
-                        .and_then(|c| c.pane_context.source_pane_id.clone())
+                    // Auto-fill empty `parent` on Send actions.
+                    // Priority:
+                    //   1. current_prompt_pane_context.source_pane_id — the failing pane
+                    //      recorded when autofix submitted the prompt (most accurate).
+                    //   2. client's source_pane_id — the pane the agent is associated with.
+                    //   3. client's own pane_id — last resort.
+                    let source_pane = state
+                        .current_prompt_pane_context
+                        .as_ref()
+                        .and_then(|ctx| ctx.source_pane_id.clone())
+                        .or_else(|| {
+                            clients
+                                .get(&client_id)
+                                .and_then(|c| c.pane_context.source_pane_id.clone())
+                        })
                         .or_else(|| {
                             clients
                                 .get(&client_id)
@@ -1104,12 +1119,22 @@ fn handle_host_command(
                     broadcast_snapshot(clients, &state.snapshot());
                     if recommendation_tx.send(crate::coordinator::ChoiceExecution {
                         choice: selected,
-                        insert_only: false,
+                        insert_only,
                     }).is_err() {
                         state.push_system_message(
                             "recommendation executor is unavailable".to_string(),
                         );
                         broadcast_snapshot(clients, &state.snapshot());
+                    }
+
+                    // Clear the bottom-bar Armed badge, mirroring ExecuteArmedAutofix.
+                    if let Some(ref pane_id) = source_pane {
+                        let evt = serde_json::json!({
+                            "type": "event",
+                            "method": "autofix_state",
+                            "params": { "state": "cleared", "pane_id": pane_id }
+                        });
+                        crate::app::send_wt_protocol_event(evt.to_string());
                     }
                 } else {
                     send_to_client(
