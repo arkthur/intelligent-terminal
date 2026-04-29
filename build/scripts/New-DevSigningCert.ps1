@@ -1,7 +1,7 @@
 param(
-    [string]$PfxPath = 'cert\AgenticTerminalDev.pfx',
-    [string]$CerPath = 'artifacts\local-installer\AgenticTerminalDev.cer',
-    [string]$Subject = 'CN=Agentic Terminal Dev'
+    [string]$PfxPath = 'cert\IntelligentTerminalDev.pfx',
+    [string]$CerPath = 'artifacts\local-installer\IntelligentTerminalDev.cer',
+    [string]$Subject = 'CN=Intelligent Terminal Dev'
 )
 
 $ErrorActionPreference = 'Stop'

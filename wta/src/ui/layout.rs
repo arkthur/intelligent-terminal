@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 use crate::app::{App, AppMode};
 
-use super::{chat, debug_panel, input, permission, recommendations, setup, title_bar};
+use super::{chat, debug_panel, input, permission, recommendations, setup};
 
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
@@ -28,18 +28,8 @@ pub fn render(frame: &mut Frame, app: &App) {
     };
     let input_height = input::input_height(&app.input, app.cursor_pos, main_area.width);
 
-    // Outer vertical split: title bar (full width) | content below
-    let v_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(title_bar::HEIGHT),
-            Constraint::Min(0),
-        ])
-        .split(main_area);
-
-    title_bar::render(frame, app, v_chunks[0]);
-
-    // Vertical split: chat | recommendations | input (input is full width)
+    // The host (Windows Terminal) renders the agent bar in XAML above this
+    // pane, so wta uses the full pane area for chat / recommendations / input.
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -47,7 +37,7 @@ pub fn render(frame: &mut Frame, app: &App) {
             rec_height,
             Constraint::Length(input_height),
         ])
-        .split(v_chunks[1]);
+        .split(main_area);
 
     // Horizontal padding for chat and recommendations only
     let h_chat = Layout::default()
@@ -93,14 +83,6 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
     };
     let input_height = input::input_height(&app.input, app.cursor_pos, main_area.width);
 
-    let v_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(title_bar::HEIGHT),
-            Constraint::Min(0),
-        ])
-        .split(main_area);
-
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -108,7 +90,7 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
             rec_height,
             Constraint::Length(input_height),
         ])
-        .split(v_chunks[1]);
+        .split(main_area);
 
     input::cursor_position(app, chunks[2])
 }

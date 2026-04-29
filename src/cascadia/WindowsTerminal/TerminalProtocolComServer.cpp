@@ -779,6 +779,15 @@ void TerminalProtocolComServer::SendEvent(winrt::hstring const& eventJson)
         return;
     }
 
+    // agent_status carries name/version/model/state for the XAML AgentBar.
+    // Same dispatch shape as autofix_state — direct to TerminalPage, no broadcast.
+    if (evt.isMember("method") && evt["method"].isString() &&
+        evt["method"].asString() == "agent_status")
+    {
+        _dispatchAgentStatusToPage(eventJson);
+        return;
+    }
+
     // Legacy path: params.event is required for agent_event broadcasts.
     THROW_HR_IF(E_INVALIDARG, !evt.isMember("params") || !evt["params"].isMember("event"));
 
@@ -821,6 +830,41 @@ void TerminalProtocolComServer::_dispatchAutofixStateToPage(const winrt::hstring
                 try
                 {
                     page.OnAutofixStateChanged(eventJson);
+                }
+                catch (...)
+                {
+                    // Swallow: page may have been torn down during dispatch.
+                }
+            });
+    }
+}
+
+void TerminalProtocolComServer::_dispatchAgentStatusToPage(const winrt::hstring& eventJson)
+{
+    if (!s_emperor)
+    {
+        return;
+    }
+    // Same fan-out shape as autofix: every window gets the event so its
+    // AgentPaneContent (if any) can update. Per-window owns its own agent leaf.
+    for (const auto& host : s_emperor->GetWindows())
+    {
+        auto page = _getPage(host.get());
+        if (!page)
+        {
+            continue;
+        }
+        const auto dispatcher = page.Dispatcher();
+        if (!dispatcher)
+        {
+            continue;
+        }
+        dispatcher.RunAsync(
+            winrt::Windows::UI::Core::CoreDispatcherPriority::Normal,
+            [page, eventJson]() {
+                try
+                {
+                    page.OnAgentStatusChanged(eventJson);
                 }
                 catch (...)
                 {

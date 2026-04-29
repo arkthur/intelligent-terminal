@@ -130,5 +130,8 @@ private:
     // TerminalPage on its UI thread.
     static void _dispatchAutofixStateToPage(const winrt::hstring& eventJson);
 
+    // Same shape as _dispatchAutofixStateToPage, for {method:"agent_status"}.
+    static void _dispatchAgentStatusToPage(const winrt::hstring& eventJson);
+
     static WindowEmperor* s_emperor;
 };

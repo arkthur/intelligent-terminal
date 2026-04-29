@@ -463,7 +463,7 @@ $terminalZipRoot = Join-Path $stageRoot 'terminal-zip'
 $payloadExtractRoot = Join-Path $stageRoot 'payload-extracted'
 $installerSourceRoot = Join-Path $stageRoot 'installer-source'
 $payloadZip = Join-Path $stageRoot 'payload.zip'
-$setupExeName = "agentic-terminal-{0}-{1}-{2}-setup.exe" -f $installerVersion, $Platform.ToLowerInvariant(), $Configuration.ToLowerInvariant()
+$setupExeName = "intelligent-terminal-{0}-{1}-{2}-setup.exe" -f $installerVersion, $Platform.ToLowerInvariant(), $Configuration.ToLowerInvariant()
 $setupExePath = Join-Path $destinationRoot $setupExeName
 
 Ensure-Directory -Path $stageRoot
@@ -525,7 +525,7 @@ Write-Status "Injecting planner prompt template into the payload ..."
 Copy-Item -Path $plannerPromptTemplate -Destination (Join-Path $payloadPromptDir 'terminal-agent.default.md') -Force
 
 $payloadMetadata = [ordered]@{
-    productName = 'Agentic Terminal'
+    productName = 'Intelligent Terminal'
     version = $installerVersion
     packageName = $packageIdentity.Name
     publisher = $packageIdentity.Publisher
@@ -534,7 +534,7 @@ $payloadMetadata = [ordered]@{
     configuration = $Configuration
     createdAtUtc = (Get-Date).ToUniversalTime().ToString('o')
 }
-$payloadMetadataPath = Join-Path $payloadRoot 'agentic-terminal-install-metadata.json'
+$payloadMetadataPath = Join-Path $payloadRoot 'intelligent-terminal-install-metadata.json'
 Set-Content -Path $payloadMetadataPath -Value ($payloadMetadata | ConvertTo-Json -Depth 4) -Encoding utf8
 
 if (Test-Path $payloadZip -PathType Leaf) {
@@ -553,7 +553,7 @@ Copy-Item -Path $payloadZip -Destination (Join-Path $installerSourceRoot 'payloa
 
 Write-Status "Building installer bootstrap for $rustTarget ..."
 Invoke-RustBuild -CargoPath $cargoPath -ManifestPath $installerBootstrapManifest -RustTarget $rustTarget
-$bootstrapExePath = Join-Path $repoRoot ("installer\bootstrap\target\{0}\release\agentic-terminal-installer-bootstrap.exe" -f $rustTarget)
+$bootstrapExePath = Join-Path $repoRoot ("installer\bootstrap\target\{0}\release\intelligent-terminal-installer-bootstrap.exe" -f $rustTarget)
 if (-not (Test-Path $bootstrapExePath -PathType Leaf)) {
     throw "Installer bootstrap not found: $bootstrapExePath"
 }

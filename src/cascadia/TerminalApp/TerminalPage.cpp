@@ -20,6 +20,7 @@
 #include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
 #include "App.h"
 #include "DebugTapConnection.h"
+#include "AgentPaneContent.h"
 #include "MarkdownPaneContent.h"
 #include "Remoting.h"
 #include "ScratchpadContent.h"
@@ -859,7 +860,7 @@ namespace winrt::TerminalApp::implementation
         wchar_t localAppData[MAX_PATH];
         if (GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH) == 0)
             return;
-        const auto logDir = std::wstring(localAppData) + L"\\AgenticTerminal\\logs";
+        const auto logDir = std::wstring(localAppData) + L"\\IntelligentTerminal\\logs";
         std::filesystem::create_directories(logDir);
         const auto logPath = logDir + L"\\wta-agent-pane.log";
         if (auto f = std::ofstream(logPath, std::ios::app))
@@ -1191,11 +1192,42 @@ namespace winrt::TerminalApp::implementation
             args.StartingDirectory(startingDirectory);
         }
 
-        auto newPane = _MakeTerminalPane(args, nullptr, nullptr);
-        if (!newPane)
+        auto rawPane = _MakeTerminalPane(args, nullptr, nullptr);
+        if (!rawPane)
         {
             _agentPaneLog("_AutoCreateHiddenAgentPane: _MakeTerminalPane returned null");
             return;
+        }
+
+        // Wrap the raw terminal pane in an AgentPaneContent so the leaf
+        // renders the XAML agent bar above the wta TermControl. We construct
+        // a fresh Pane around the wrapper because Pane has no API to swap
+        // its content in place.
+        std::shared_ptr<Pane> newPane;
+        if (const auto innerTerm = rawPane->GetContent().try_as<winrt::TerminalApp::TerminalPaneContent>())
+        {
+            // The raw Pane's first border currently parents the TermControl;
+            // release it before AgentPaneContent re-parents it as the wrapper's
+            // ContentPresenter child. Without this, XAML throws because the
+            // TermControl would be in two visual trees at once.
+            if (const auto rootGrid = rawPane->GetRootElement())
+            {
+                if (rootGrid.Children().Size() > 0)
+                {
+                    if (const auto border = rootGrid.Children().GetAt(0).try_as<winrt::Windows::UI::Xaml::Controls::Border>())
+                    {
+                        border.Child(nullptr);
+                    }
+                }
+            }
+            auto agentContent = winrt::make<winrt::TerminalApp::implementation::AgentPaneContent>(innerTerm);
+            newPane = std::make_shared<Pane>(agentContent);
+        }
+        else
+        {
+            // Defensive fallback — shouldn't happen for a terminal-content pane.
+            _agentPaneLog("_AutoCreateHiddenAgentPane: rawPane content is not TerminalPaneContent — using unwrapped pane");
+            newPane = rawPane;
         }
 
         newPane->IsAgentPane(true);
@@ -2837,7 +2869,9 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_UpdateBottomBarState()
     {
         // Hide the bottom bar on non-terminal tabs (Settings, Scratchpad, etc.)
-        // by checking the active content type directly.
+        // by checking the active content type directly. AgentPaneContent counts
+        // as a terminal — it wraps a TerminalPaneContent — so the bottom bar
+        // stays visible when the agent pane is focused.
         if (auto bottomBar = BottomBar())
         {
             bool isTerminalTab = true;
@@ -2845,7 +2879,9 @@ namespace winrt::TerminalApp::implementation
             {
                 if (const auto content = tab->GetActiveContent())
                 {
-                    isTerminalTab = content.try_as<TerminalApp::TerminalPaneContent>() != nullptr;
+                    const bool isTerm = content.try_as<TerminalApp::TerminalPaneContent>() != nullptr;
+                    const bool isAgent = content.try_as<TerminalApp::AgentPaneContent>() != nullptr;
+                    isTerminalTab = isTerm || isAgent;
                 }
             }
             bottomBar.Visibility(isTerminalTab ? Visibility::Visible : Visibility::Collapsed);
@@ -3084,6 +3120,56 @@ namespace winrt::TerminalApp::implementation
             _diagnostics.suggestionTitle.assign(s.begin(), s.end());
         }
         _UpdateBottomBarState();
+    }
+
+    // Inbound event from WTA: {method:"agent_status", params:{name,version,model,state}}.
+    // Find the agent leaf and forward the values to AgentPaneContent so the
+    // XAML bar can refresh its label / future status indicator.
+    void TerminalPage::OnAgentStatusChanged(hstring eventJson)
+    {
+        Json::Value evt;
+        Json::CharReaderBuilder rb;
+        std::istringstream ss(winrt::to_string(eventJson));
+        std::string errs;
+        if (!Json::parseFromStream(rb, ss, &evt, &errs))
+        {
+            return;
+        }
+        const auto& params = evt["params"];
+        if (!params.isObject())
+        {
+            return;
+        }
+
+        const auto pickStr = [&](const char* key) -> winrt::hstring {
+            if (!params.isMember(key))
+            {
+                return {};
+            }
+            const auto& v = params[key];
+            if (v.isString())
+            {
+                return winrt::to_hstring(v.asString());
+            }
+            return {};
+        };
+        const auto name = pickStr("name");
+        const auto version = pickStr("version");
+        const auto model = pickStr("model");
+        const auto state = pickStr("state");
+
+        const auto agentPane = _FindAgentPane();
+        if (!agentPane)
+        {
+            return;
+        }
+        if (const auto content = agentPane->GetContent())
+        {
+            if (const auto agentContent = content.try_as<winrt::TerminalApp::AgentPaneContent>())
+            {
+                agentContent.UpdateAgentStatus(name, version, model, state);
+            }
+        }
     }
 
     // Send {method:"autofix_execute",params:{pane_id}} over the outbound

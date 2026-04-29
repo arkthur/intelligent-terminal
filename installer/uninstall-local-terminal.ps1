@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\AgenticTerminal",
-    [string]$StartMenuDir = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Agentic Terminal",
+    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\IntelligentTerminal",
+    [string]$StartMenuDir = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Intelligent Terminal",
     [switch]$RemoveDevMsix,
     [switch]$Quiet
 )
@@ -31,7 +31,7 @@ function Remove-InstallDirFromUserPath {
     [Environment]::SetEnvironmentVariable('Path', $updated, 'User')
 }
 
-Write-Status "Stopping Agentic Terminal processes from $InstallDir ..."
+Write-Status "Stopping Intelligent Terminal processes from $InstallDir ..."
 Get-Process |
     Where-Object { $_.Path -like "$InstallDir*" } |
     Stop-Process -Force -ErrorAction SilentlyContinue

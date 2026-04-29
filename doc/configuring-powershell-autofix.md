@@ -11,7 +11,7 @@ The WTA auto-fix feature automatically detects when a command fails in another p
 
 ## Requirements
 
-- **Windows Terminal** with the Agentic Terminal build (handles event forwarding)
+- **Windows Terminal** with the Intelligent Terminal build (handles event forwarding)
 - **PowerShell 7+** with shell integration enabled (emits OSC 133 sequences)
 
 ## Enabling Shell Integration
@@ -39,7 +39,7 @@ The key is `133;D` — it reports the previous command's exit code. WTA listens 
 
 ### Verifying It Works
 
-1. Open a pane in Agentic Terminal
+1. Open a pane in Intelligent Terminal
 2. Run a command that fails, e.g.: `Get-Item "C:\nonexistent-path"`
 3. The WTA agent pane should show a notification and automatically suggest a fix
 
@@ -49,11 +49,11 @@ Autofix events are logged by the shared host process. Find the log directory:
 
 ```powershell
 # Packaged install (F5 / MSIX):
-$pkg = Get-AppxPackage | Where-Object { $_.Name -like '*AgenticTerminal*' } | Select-Object -First 1
-$logDir = "$env:LOCALAPPDATA\Packages\$($pkg.PackageFamilyName)\LocalCache\Local\AgenticTerminal\logs"
+$pkg = Get-AppxPackage | Where-Object { $_.Name -like '*IntelligentTerminal*' } | Select-Object -First 1
+$logDir = "$env:LOCALAPPDATA\Packages\$($pkg.PackageFamilyName)\LocalCache\Local\IntelligentTerminal\logs"
 
 # Unpackaged:
-$logDir = "$env:LOCALAPPDATA\AgenticTerminal\logs"
+$logDir = "$env:LOCALAPPDATA\IntelligentTerminal\logs"
 
 Get-Content "$logDir\wta-ensure-host.log" -Tail 20
 ```

@@ -5,7 +5,6 @@ mod layout;
 mod permission;
 mod recommendations;
 pub mod setup;
-mod title_bar;
 
 pub use layout::input_cursor_position;
 pub use layout::render;

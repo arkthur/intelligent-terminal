@@ -1428,9 +1428,17 @@ namespace winrt::TerminalApp::implementation
         // If the new active pane is a terminal, tell other interested panes
         // what the new active pane is.
         const auto content{ pane->GetContent() };
+        TermControl termControl{ nullptr };
         if (const auto termContent{ content.try_as<winrt::TerminalApp::TerminalPaneContent>() })
         {
-            const auto& termControl{ termContent.GetTermControl() };
+            termControl = termContent.GetTermControl();
+        }
+        else if (const auto agentContent{ content.try_as<winrt::TerminalApp::AgentPaneContent>() })
+        {
+            termControl = agentContent.GetTermControl();
+        }
+        if (termControl)
+        {
             _rootPane->WalkTree([termControl](const auto& p) {
                 if (const auto& taskPane{ p->GetContent().try_as<SnippetsPaneContent>() })
                 {
@@ -2214,6 +2222,11 @@ namespace winrt::TerminalApp::implementation
             if (const auto termContent{ content.try_as<winrt::TerminalApp::TerminalPaneContent>() })
             {
                 return termContent.GetTermControl();
+            }
+            // Agent pane wraps a TerminalPaneContent — reach through.
+            if (const auto agentContent{ content.try_as<winrt::TerminalApp::AgentPaneContent>() })
+            {
+                return agentContent.GetTermControl();
             }
         }
         return nullptr;

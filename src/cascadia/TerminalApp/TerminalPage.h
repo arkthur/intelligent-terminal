@@ -194,6 +194,7 @@ namespace winrt::TerminalApp::implementation
         Windows::Foundation::IAsyncOperation<bool> SendProtocolInput(uint32_t paneId, hstring text);
         Windows::Foundation::IAsyncOperation<hstring> ShowProtocolQuickPick(hstring title, hstring choicesJson, bool allowFreeInput);
         void OnAutofixStateChanged(hstring eventJson);
+        void OnAgentStatusChanged(hstring eventJson);
 
         til::property_changed_event PropertyChanged;
 

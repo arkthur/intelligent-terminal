@@ -2784,7 +2784,23 @@ bool Pane::_HasChild(const std::shared_ptr<Pane> child)
 
 winrt::TerminalApp::TerminalPaneContent Pane::_getTerminalContent() const
 {
-    return _IsLeaf() ? _content.try_as<winrt::TerminalApp::TerminalPaneContent>() : nullptr;
+    if (!_IsLeaf())
+    {
+        return nullptr;
+    }
+    if (auto term = _content.try_as<winrt::TerminalApp::TerminalPaneContent>())
+    {
+        return term;
+    }
+    // The agent pane wraps a TerminalPaneContent inside an AgentPaneContent
+    // so the leaf can render an XAML agent bar above the term control.
+    // Unwrap it so all the existing Pane internals (focus, broadcast,
+    // resize, etc.) keep operating on the underlying TermControl.
+    if (auto agent = _content.try_as<winrt::TerminalApp::AgentPaneContent>())
+    {
+        return agent.GetTerminalContent();
+    }
+    return nullptr;
 }
 
 // Method Description:

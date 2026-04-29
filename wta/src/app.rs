@@ -750,6 +750,7 @@ impl App {
             }
             AppEvent::ConnectionStage(stage) => {
                 self.state = ConnectionState::Connecting(stage);
+                self.publish_agent_status();
             }
             AppEvent::ProgressStatus(status) => {
                 self.progress_status = Some(status);
@@ -771,6 +772,7 @@ impl App {
                 self.agent_version = version;
                 self.session_id = session_id;
                 self.state = ConnectionState::Connected;
+                self.publish_agent_status();
             }
             AppEvent::PromptTemplateLoaded { name } => {
                 self.prompt_name = Some(name);
@@ -822,6 +824,7 @@ impl App {
                         selected_index: 1, // select auth row
                     });
                     self.state = ConnectionState::Disconnected;
+                    self.publish_agent_status();
                     self.prompt_in_flight = false;
                     self.agent_streaming = false;
                     self.progress_status = None;
@@ -832,6 +835,7 @@ impl App {
                     self.pending_completed_turn = None;
                 } else {
                     self.state = ConnectionState::Failed(msg.clone());
+                    self.publish_agent_status();
                     self.prompt_in_flight = false;
                     self.agent_streaming = false;
                     self.progress_status = None;
@@ -2421,6 +2425,35 @@ pub fn armed_fix_preview(rec: &crate::coordinator::RecommendationSet) -> String 
         }
     }
     truncate(&choice.title, 80)
+}
+
+impl App {
+    /// Push the current agent status (name / version / model / connection state)
+    /// to the host so a XAML-rendered agent bar can update itself. The COM
+    /// server special-cases `method == "agent_status"` and dispatches it
+    /// straight to TerminalPage, parallel to the existing `autofix_state`
+    /// path. Cheap to call on every state change — the publisher serializes
+    /// `wtcli publish` invocations, and an extra one per state transition is
+    /// negligible compared to chat traffic.
+    fn publish_agent_status(&self) {
+        let state_str = match &self.state {
+            ConnectionState::Connecting(_) => "connecting",
+            ConnectionState::Connected => "connected",
+            ConnectionState::Failed(_) => "failed",
+            ConnectionState::Disconnected => "disconnected",
+        };
+        let evt = serde_json::json!({
+            "type": "event",
+            "method": "agent_status",
+            "params": {
+                "name": self.agent_name,
+                "version": self.agent_version,
+                "model": self.agent_model,
+                "state": state_str,
+            }
+        });
+        send_wt_protocol_event(evt.to_string());
+    }
 }
 
 /// Publish a raw JSON event via `wtcli publish`. The event flows through

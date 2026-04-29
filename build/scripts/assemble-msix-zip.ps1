@@ -6,9 +6,9 @@ $ErrorActionPreference = 'Stop'
 
 $buildOut = "src\cascadia\CascadiaPackage\AppPackages\CascadiaPackage_${Version}_${Arch}_Test"
 $archLower = $Arch.ToLower()
-$outDir = "artifacts\local-installer\agentic-terminal-${Version}-${archLower}-msix"
+$outDir = "artifacts\local-installer\intelligent-terminal-${Version}-${archLower}-msix"
 $depSrc = "$buildOut\Dependencies\${archLower}\Microsoft.UI.Xaml.2.8.appx"
-$cerSrc = "artifacts\local-installer\AgenticTerminalDev.cer"
+$cerSrc = "artifacts\local-installer\IntelligentTerminalDev.cer"
 $installSrc = "installer\Install-Msix.ps1"
 
 if (-not (Test-Path $cerSrc)) {
@@ -32,7 +32,7 @@ if (Test-Path $depSrc) {
 Copy-Item $cerSrc $outDir
 Copy-Item $installSrc $outDir
 
-$zip = "artifacts\local-installer\agentic-terminal-${Version}-${archLower}-msix.zip"
+$zip = "artifacts\local-installer\intelligent-terminal-${Version}-${archLower}-msix.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path "$outDir\*" -DestinationPath $zip -Force
 

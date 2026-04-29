@@ -1,6 +1,6 @@
 # Building Installers
 
-There are two installer types for distributing Agentic Terminal.
+There are two installer types for distributing Intelligent Terminal.
 
 ## 1. MSIX ZIP Installer (Packaged)
 
@@ -9,8 +9,8 @@ A ZIP containing a dev certificate, signed MSIX package, XAML dependency, and in
 ### Output structure
 
 ```
-agentic-terminal-<version>-<arch>-msix.zip
-├── AgenticTerminalDev.cer                     # Dev signing certificate
+intelligent-terminal-<version>-<arch>-msix.zip
+├── IntelligentTerminalDev.cer                     # Dev signing certificate
 ├── CascadiaPackage_<version>_<arch>.msix      # Signed Terminal MSIX
 ├── Dependencies/
 │   └── Microsoft.UI.Xaml.2.8.appx            # XAML framework dependency
@@ -28,7 +28,7 @@ agentic-terminal-<version>-<arch>-msix.zip
 Edit `src\cascadia\CascadiaPackage\Package-Dev.appxmanifest`:
 
 ```xml
-<Identity Name="AgenticTerminal" Publisher="CN=Agentic Terminal Dev" Version="0.0.X.X" />
+<Identity Name="IntelligentTerminal" Publisher="CN=Intelligent Terminal Dev" Version="0.0.X.X" />
 ```
 
 ### Step 1: Generate the dev signing certificate (one-time)
@@ -42,7 +42,7 @@ powershell -ExecutionPolicy Bypass -File build\scripts\New-DevSigningCert.ps1
 
 Creates:
 - `src\cascadia\CascadiaPackage\CascadiaPackage_TemporaryKey.pfx` — used by MSBuild to sign the MSIX
-- `artifacts\local-installer\AgenticTerminalDev.cer` — distributed in the ZIP for recipients
+- `artifacts\local-installer\IntelligentTerminalDev.cer` — distributed in the ZIP for recipients
 
 The script uses pure .NET and works in both Windows PowerShell and pwsh without needing
 the `Cert:` PSDrive or PKI module.
@@ -114,7 +114,7 @@ powershell -File build\scripts\assemble-msix-zip.ps1 -Version 0.0.X.X -Arch x64
 powershell -File build\scripts\assemble-msix-zip.ps1 -Version 0.0.X.X -Arch ARM64
 ```
 
-Output: `artifacts\local-installer\agentic-terminal-<version>-<arch>-msix.zip`
+Output: `artifacts\local-installer\intelligent-terminal-<version>-<arch>-msix.zip`
 
 ### Install on target machine
 
@@ -124,8 +124,8 @@ powershell -ExecutionPolicy Bypass -File .\Install-Msix.ps1
 ```
 
 `Install-Msix.ps1` does three things:
-1. Removes any old unpackaged install (`%LOCALAPPDATA%\Programs\AgenticTerminal`)
-2. Imports `AgenticTerminalDev.cer` into the Trusted People store — **only if not already trusted** (this step requires admin; subsequent installs skip it)
+1. Removes any old unpackaged install (`%LOCALAPPDATA%\Programs\IntelligentTerminal`)
+2. Imports `IntelligentTerminalDev.cer` into the Trusted People store — **only if not already trusted** (this step requires admin; subsequent installs skip it)
 3. Installs the XAML dependency and the Terminal MSIX via `Add-AppxPackage` (per-user, no elevation needed)
 
 ### Certificate notes
@@ -186,14 +186,14 @@ Built by `build\scripts\New-WtaLocalInstaller.ps1`. Creates a portable distribut
 ### Output
 
 ```
-artifacts\local-installer\agentic-terminal-<version>-<arch>-<config>-setup.exe
+artifacts\local-installer\intelligent-terminal-<version>-<arch>-<config>-setup.exe
 ```
 
 ### Install on target machine
 
 Just run the `.exe`. It self-extracts and launches `install.cmd`, which calls `install-local-terminal.ps1`.
 
-Install location: `%LOCALAPPDATA%\Programs\AgenticTerminal`
+Install location: `%LOCALAPPDATA%\Programs\IntelligentTerminal`
 
 Options (pass to `install.cmd`): `/quiet`, `/nopath`, `/noshortcuts`
 

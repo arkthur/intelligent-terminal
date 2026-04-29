@@ -3,23 +3,28 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$PayloadZip,
 
-    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\AgenticTerminal",
+    [string]$InstallDir = "$env:LOCALAPPDATA\Programs\IntelligentTerminal",
 
     [switch]$NoPathUpdate,
 
     [switch]$NoShortcuts,
 
-    [string]$StartMenuDir = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Agentic Terminal",
+    [string]$StartMenuDir = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Intelligent Terminal",
 
     [switch]$Quiet
 )
 
 $ErrorActionPreference = 'Stop'
 
-$PromptConfigDir = Join-Path $env:LOCALAPPDATA 'AgenticTerminal\prompts'
+$PromptConfigDir = Join-Path $env:LOCALAPPDATA 'IntelligentTerminal\prompts'
 $PromptUserPath = Join-Path $PromptConfigDir 'terminal-agent.md'
 $PromptDefaultPath = Join-Path $PromptConfigDir 'terminal-agent.default.md'
-$InstallMetadataFileName = 'agentic-terminal-install-metadata.json'
+$InstallMetadataFileName = 'intelligent-terminal-install-metadata.json'
+
+# Legacy paths from the prior "Agentic Terminal" name — cleaned up on install.
+$LegacyInstallDir = Join-Path $env:LOCALAPPDATA 'Programs\AgenticTerminal'
+$LegacyStartMenuDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Agentic Terminal'
+$LegacyPromptConfigDir = Join-Path $env:LOCALAPPDATA 'AgenticTerminal\prompts'
 
 function Write-Status {
     param([string]$Message)
@@ -60,6 +65,58 @@ function Add-InstallDirToUserPath {
 
     $updated = @($parts + $PathToAdd) -join ';'
     [Environment]::SetEnvironmentVariable('Path', $updated, 'User')
+}
+
+function Remove-PathFromUserPath {
+    param([string]$PathToRemove)
+
+    $current = [Environment]::GetEnvironmentVariable('Path', 'User')
+    if ([string]::IsNullOrWhiteSpace($current)) {
+        return
+    }
+
+    $remaining = @(
+        $current.Split(';') |
+            Where-Object { $_ -and ($_ -ne $PathToRemove) }
+    )
+    $updated = $remaining -join ';'
+    if ($updated -ne $current) {
+        [Environment]::SetEnvironmentVariable('Path', $updated, 'User')
+    }
+}
+
+function Migrate-LegacyPrompts {
+    $legacyUserPrompt = Join-Path $LegacyPromptConfigDir 'terminal-agent.md'
+    if (-not (Test-Path $legacyUserPrompt -PathType Leaf)) {
+        return
+    }
+
+    if (Test-Path $PromptUserPath -PathType Leaf) {
+        return
+    }
+
+    Ensure-Directory $PromptConfigDir
+    Copy-Item -Path $legacyUserPrompt -Destination $PromptUserPath -Force
+    Write-Status "Migrated customized planner prompt from $LegacyPromptConfigDir."
+}
+
+function Remove-LegacyAgenticInstall {
+    if (Test-Path $LegacyInstallDir -PathType Container) {
+        Write-Status "Removing legacy AgenticTerminal install at $LegacyInstallDir ..."
+        try {
+            Stop-RunningInstalledProcesses -InstallRoot $LegacyInstallDir
+        } catch {
+            Write-Status "  Warning: failed to stop legacy processes: $_"
+        }
+        Remove-Item $LegacyInstallDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if (Test-Path $LegacyStartMenuDir -PathType Container) {
+        Write-Status "Removing legacy Start menu folder $LegacyStartMenuDir ..."
+        Remove-Item $LegacyStartMenuDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    Remove-PathFromUserPath -PathToRemove $LegacyInstallDir
 }
 
 function Read-InstallMetadata {
@@ -154,7 +211,7 @@ function Stop-RunningInstalledProcesses {
         return
     }
 
-    Write-Status "Stopping running Agentic Terminal processes ..."
+    Write-Status "Stopping running Intelligent Terminal processes ..."
     foreach ($processInfo in $running) {
         Write-Status ("  Stopping {0} (PID {1})" -f $processInfo.Name, $processInfo.ProcessId)
         Stop-Process -Id $processInfo.ProcessId -Force -ErrorAction SilentlyContinue
@@ -170,7 +227,7 @@ function Stop-RunningInstalledProcesses {
     } while ((Get-Date) -lt $deadline)
 
     $remainingSummary = ($remaining | ForEach-Object { "{0} (PID {1})" -f $_.Name, $_.ProcessId }) -join ', '
-    throw "Timed out waiting for installed Agentic Terminal processes to exit: $remainingSummary"
+    throw "Timed out waiting for installed Intelligent Terminal processes to exit: $remainingSummary"
 }
 
 function New-Shortcut {
@@ -229,7 +286,7 @@ if (-not (Test-Path $PayloadZip -PathType Leaf)) {
     throw "Payload zip not found: $PayloadZip"
 }
 
-$payloadRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("agentic-terminal-install-" + [Guid]::NewGuid().ToString("N"))
+$payloadRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("intelligent-terminal-install-" + [Guid]::NewGuid().ToString("N"))
 $expandedRoot = Join-Path $payloadRoot 'expanded'
 
 try {
@@ -257,6 +314,8 @@ try {
         Write-Status "Existing install detected: $installedVersionLabel"
     }
 
+    Remove-LegacyAgenticInstall
+
     Ensure-Directory $InstallDir
     Stop-RunningInstalledProcesses -InstallRoot $InstallDir
     Write-Status "Installing to $InstallDir ..."
@@ -265,7 +324,7 @@ try {
     $settingsDir = Join-Path $InstallDir 'settings'
     $settingsBackup = $null
     if (Test-Path $settingsDir -PathType Container) {
-        $settingsBackup = Join-Path ([System.IO.Path]::GetTempPath()) "agentic-terminal-settings-backup-$([System.IO.Path]::GetRandomFileName())"
+        $settingsBackup = Join-Path ([System.IO.Path]::GetTempPath()) "intelligent-terminal-settings-backup-$([System.IO.Path]::GetRandomFileName())"
         Copy-Item -Path $settingsDir -Destination $settingsBackup -Recurse -Force
         Write-Status "Backed up settings to $settingsBackup"
     }
@@ -288,7 +347,7 @@ try {
         Ensure-Directory $StartMenuDir
 
         if (Test-Path $terminalExe -PathType Leaf) {
-            New-Shortcut -ShortcutPath (Join-Path $StartMenuDir 'Agentic Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir
+            New-Shortcut -ShortcutPath (Join-Path $StartMenuDir 'Intelligent Terminal.lnk') -TargetPath $terminalExe -WorkingDirectory $InstallDir
         }
         if (Test-Path $wtaExe -PathType Leaf) {
             New-Shortcut -ShortcutPath (Join-Path $StartMenuDir 'WTA.lnk') -TargetPath $wtaExe -WorkingDirectory $InstallDir
@@ -299,6 +358,8 @@ try {
         Write-Status "Adding install directory to user PATH ..."
         Add-InstallDirToUserPath -PathToAdd $InstallDir
     }
+
+    Migrate-LegacyPrompts
 
     Write-Status "Seeding planner prompt files in $PromptConfigDir ..."
     Seed-PlannerPromptFiles -InstallRoot $InstallDir

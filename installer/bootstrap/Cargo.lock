@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "agentic-terminal-installer-bootstrap"
+name = "intelligent-terminal-installer-bootstrap"
 version = "0.1.0"

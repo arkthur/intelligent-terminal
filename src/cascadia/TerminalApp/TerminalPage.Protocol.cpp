@@ -123,7 +123,16 @@ namespace winrt::TerminalApp::implementation
         result.IsActive = true;
         result.IsAgentPane = effectivePane->IsAgentPane();
 
-        if (const auto termContent = effectivePane->GetContent().try_as<TerminalApp::TerminalPaneContent>())
+        TerminalApp::TerminalPaneContent termContent{ nullptr };
+        if (const auto t = effectivePane->GetContent().try_as<TerminalApp::TerminalPaneContent>())
+        {
+            termContent = t;
+        }
+        else if (const auto a = effectivePane->GetContent().try_as<TerminalApp::AgentPaneContent>())
+        {
+            termContent = a.GetTerminalContent();
+        }
+        if (termContent)
         {
             result.Title = termContent.Title();
             const auto profile = termContent.GetProfile();
@@ -204,7 +213,16 @@ namespace winrt::TerminalApp::implementation
                     : (activePane == pane);
                 info.Pid = _getPidFromPane(pane);
 
-                if (const auto termContent = pane->GetContent().try_as<TerminalApp::TerminalPaneContent>())
+                TerminalApp::TerminalPaneContent termContent{ nullptr };
+                if (const auto t = pane->GetContent().try_as<TerminalApp::TerminalPaneContent>())
+                {
+                    termContent = t;
+                }
+                else if (const auto a = pane->GetContent().try_as<TerminalApp::AgentPaneContent>())
+                {
+                    termContent = a.GetTerminalContent();
+                }
+                if (termContent)
                 {
                     info.Title = termContent.Title();
                     const auto profile = termContent.GetProfile();

@@ -26,7 +26,7 @@ using namespace Microsoft::Console;
 
 namespace
 {
-    static constexpr std::wstring_view InstallMetadataFileName{ L"agentic-terminal-install-metadata.json" };
+    static constexpr std::wstring_view InstallMetadataFileName{ L"intelligent-terminal-install-metadata.json" };
 
     std::optional<winrt::hstring> _readInstalledVersionFromMetadata()
     {

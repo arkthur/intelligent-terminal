@@ -7,8 +7,8 @@ Edit `agentCliPath` in the Terminal settings file you are using.
 Packaged Windows Terminal:
 - `%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json`
 
-Portable/local AgenticTerminal:
-- `%LOCALAPPDATA%\Programs\AgenticTerminal\settings\settings.json`
+Portable/local IntelligentTerminal:
+- `%LOCALAPPDATA%\Programs\IntelligentTerminal\settings\settings.json`
 
 Example:
 
@@ -33,9 +33,9 @@ This is used for spawned delegate tabs and panels, separately from `agentCliPath
 ## Change Runtime Prompt
 
 Edit:
-- `%LOCALAPPDATA%\AgenticTerminal\prompts\terminal-agent.md`
+- `%LOCALAPPDATA%\IntelligentTerminal\prompts\terminal-agent.md`
 
 Reference copy:
-- `%LOCALAPPDATA%\AgenticTerminal\prompts\terminal-agent.default.md`
+- `%LOCALAPPDATA%\IntelligentTerminal\prompts\terminal-agent.default.md`
 
 WTA reloads `terminal-agent.md` on each prompt submission.

@@ -1,4 +1,4 @@
-# Agentic Terminal (Windows Terminal Fork)
+# Intelligent Terminal (Windows Terminal Fork)
 
 AI-native Windows Terminal — agents (Copilot, Claude, Gemini, custom) can understand, fix, and automate terminal workflows.
 
@@ -87,7 +87,7 @@ Detects command failures in other panes and auto-suggests fixes via the agent.
 WTA writes structured logs to the package-sandboxed LOCALAPPDATA:
 
 ```
-%LOCALAPPDATA%\AgenticTerminal\logs\
+%LOCALAPPDATA%\IntelligentTerminal\logs\
   wta-ensure-host.log   — background host startup / COM connection
   wta-attach.log        — agent pane TUI (attach mode)
   wta-agent-pane.log    — agent pane session
@@ -98,7 +98,7 @@ WTA writes structured logs to the package-sandboxed LOCALAPPDATA:
 When running packaged (F5 / installed), `%LOCALAPPDATA%` is redirected to the
 package sandbox:
 ```
-C:\Users\<user>\AppData\Local\Packages\AgenticTerminal_<id>\LocalCache\Local\AgenticTerminal\logs\
+C:\Users\<user>\AppData\Local\Packages\IntelligentTerminal_<id>\LocalCache\Local\IntelligentTerminal\logs\
 ```
 
 Log level is controlled by the `WTA_LOG` env var (default: `info`). Set

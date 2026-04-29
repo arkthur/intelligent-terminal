@@ -1,17 +1,5 @@
 use ratatui::style::{Color, Modifier, Style};
 
-/// Title bar background — noticeably lighter than the #0c0c0c pane background.
-pub const PANEL_BG: Color = Color::Rgb(30, 30, 30);
-pub const PANEL_STYLE: Style = Style::new().bg(PANEL_BG);
-
-/// Agent title bar — strict black fill, with a thin separator beneath that
-/// distinguishes the bar from the chat area instead of a colored band.
-pub const TITLE_BAR_BG: Color = Color::Black;
-pub const TITLE_BAR_STYLE: Style = Style::new().bg(TITLE_BAR_BG);
-pub const TITLE_BAR_SEPARATOR: Style = Style::new()
-    .fg(Color::Rgb(50, 50, 50))
-    .bg(TITLE_BAR_BG);
-
 // Colors matching AcpConnection.cpp ANSI codes
 pub const USER_PROMPT: Style = Style::new().fg(Color::DarkGray);
 pub const INPUT_TEXT: Style = Style::new().fg(Color::White);
@@ -25,10 +13,6 @@ pub const IN_PROGRESS: Style = Style::new()
     .fg(Color::Yellow)
     .add_modifier(Modifier::BOLD)
     .add_modifier(Modifier::ITALIC);
-pub const STATUS_CONNECTED: Style = Style::new().fg(Color::Green);
-pub const STATUS_CONNECTING: Style = Style::new().fg(Color::Yellow);
-pub const STATUS_DISCONNECTED: Style = Style::new().fg(Color::DarkGray);
-pub const STATUS_FAILED: Style = Style::new().fg(Color::Red);
 pub const DIM: Style = Style::new().fg(Color::DarkGray);
 pub const SELECTED: Style = Style::new()
     .fg(Color::Black)

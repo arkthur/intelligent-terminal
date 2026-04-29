@@ -77,7 +77,7 @@ fn create_temp_dir() -> io::Result<PathBuf> {
         .unwrap_or_default()
         .as_nanos();
     path.push(format!(
-        "agentic-terminal-installer-{}-{}",
+        "intelligent-terminal-installer-{}-{}",
         std::process::id(),
         stamp
     ));

@@ -18,13 +18,13 @@
   IgnorableNamespaces="uap mp rescap uap3 uap17 desktop6 virtualization">
 
   <Identity
-    Name="AgenticTerminal"
-    Publisher="CN=Agentic Terminal Dev"
-    Version="0.0.6.6" />
+    Name="IntelligentTerminal"
+    Publisher="CN=Intelligent Terminal Dev"
+    Version="0.0.6.8" />
 
   <Properties>
     <DisplayName>ms-resource:AppStoreNameDev</DisplayName>
-    <PublisherDisplayName>Agentic Terminal</PublisherDisplayName>
+    <PublisherDisplayName>Intelligent Terminal</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
     <!-- Older versions of Windows 10 respect this -->
     <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
@@ -89,7 +89,7 @@
             <uap3:AppExtension Name="com.microsoft.windows.console.host"
                 Id="OpenConsole-Dev"
                 DisplayName="OpenConsole"
-                Description="Console host for Agentic Terminal"
+                Description="Console host for Intelligent Terminal"
                 PublicFolder="Public">
                 <uap3:Properties>
                     <Clsid>{1F9F2BF5-5BC3-4F17-B0E6-912413F1F451}</Clsid>
@@ -99,7 +99,7 @@
         <uap3:Extension Category="windows.appExtension">
             <uap3:AppExtension Name="com.microsoft.windows.terminal.host"
                 Id="Terminal-Dev"
-                DisplayName="Agentic Terminal"
+                DisplayName="Intelligent Terminal"
                 Description="AI-native terminal host"
                 PublicFolder="Public">
                 <uap3:Properties>
