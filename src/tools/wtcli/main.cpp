@@ -416,13 +416,14 @@ int main()
     });
 
     // ── split-pane ──
-    std::string splitPaneTarget, splitPaneCommand;
+    std::string splitPaneTarget, splitPaneCommand, splitPaneDirection;
     bool splitHorizontal = false, splitVertical = false;
     double splitSize = 0.5;
     auto* splitPaneCmd = app.add_subcommand("split-pane", "Split a pane")->alias("splitw");
     splitPaneCmd->add_option("-t,--target", splitPaneTarget, "Pane ID");
-    splitPaneCmd->add_flag("-H,--horizontal", splitHorizontal, "Split horizontally");
-    splitPaneCmd->add_flag("-v,--vertical", splitVertical, "Split vertically");
+    splitPaneCmd->add_option("-d,--direction", splitPaneDirection, "Split direction: right|left|up|down|auto");
+    splitPaneCmd->add_flag("-H,--horizontal", splitHorizontal, "Split horizontally (legacy alias for --direction down)");
+    splitPaneCmd->add_flag("-v,--vertical", splitVertical, "Split vertically (legacy alias for --direction right)");
     splitPaneCmd->add_option("-s,--size", splitSize, "Size fraction");
     splitPaneCmd->add_option("-c,--command", splitPaneCommand, "Command to run");
     splitPaneCmd->callback([&]() {
@@ -431,9 +432,20 @@ int main()
         try
         {
             uint32_t paneId = ResolvePaneId(server, splitPaneTarget);
-            winrt::hstring dir = splitHorizontal ? L"horizontal" : (splitVertical ? L"vertical" : L"automatic");
+            // --direction wins over the legacy boolean flags. If neither is
+            // given, send "automatic" so the COM server picks the longer
+            // dimension (matches the WT default for `splitPane`).
+            std::wstring dir;
+            if (!splitPaneDirection.empty())
+                dir = winrt::to_hstring(splitPaneDirection).c_str();
+            else if (splitHorizontal)
+                dir = L"down";
+            else if (splitVertical)
+                dir = L"right";
+            else
+                dir = L"automatic";
             auto result = server.SplitPane(
-                paneId, dir, static_cast<float>(splitSize),
+                paneId, winrt::hstring{ dir }, static_cast<float>(splitSize),
                 L"", winrt::to_hstring(splitPaneCommand), true);
             if (jsonMode)
                 PrintJson(CreationResultToJson(result));

@@ -254,14 +254,18 @@ impl WtChannel for CliChannel {
                 let cmd = params.get("commandline").and_then(|v| v.as_str()).unwrap_or("");
                 let dir = params.get("direction").and_then(|v| v.as_str()).unwrap_or("");
                 let cmd_owned;
+                let dir_owned;
                 let mut args = vec!["split-pane"];
                 if !pane_id.is_empty() {
                     args.extend(["-t", &pane_id]);
                 }
-                if dir == "horizontal" || dir == "down" || dir == "up" {
-                    args.push("-H");
-                } else {
-                    args.push("-v");
+                // Pass the direction string straight through to wtcli, which
+                // forwards it verbatim to the COM SplitPane call. wtcli accepts
+                // "right" | "left" | "up" | "down" | "auto"|"automatic", and the
+                // COM server also tolerates the legacy "horizontal"/"vertical".
+                if !dir.is_empty() {
+                    dir_owned = dir.to_string();
+                    args.extend(["-d", &dir_owned]);
                 }
                 if !cmd.is_empty() {
                     cmd_owned = cmd.to_string();

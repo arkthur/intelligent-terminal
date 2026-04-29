@@ -116,6 +116,7 @@
     ON_ALL_ACTIONS(QuickFix)                \
     ON_ALL_ACTIONS(OpenCWD)                 \
     ON_ALL_ACTIONS(OpenAgentPane)           \
+    ON_ALL_ACTIONS(FocusAgentPane)          \
     ON_ALL_ACTIONS(TriggerAutofix)          \
     ON_ALL_ACTIONS(ShowProtocolInfo)
 

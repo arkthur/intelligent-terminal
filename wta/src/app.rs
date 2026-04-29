@@ -2354,6 +2354,21 @@ fn rec_card_height(choice: &RecommendationChoice, panel_width: u16) -> usize {
             let label = agent.as_deref().unwrap_or("agent");
             Some(format!("{}: {}", label, input))
         }
+        RecommendedAction::Open { target, cwd, title, .. } => {
+            use crate::coordinator::OpenTarget;
+            let kind = match target {
+                OpenTarget::Tab => "tab",
+                OpenTarget::Panel => "panel",
+            };
+            Some(match (title.as_deref(), cwd.as_deref()) {
+                (Some(t), Some(c)) if !t.is_empty() && !c.is_empty() => {
+                    format!("New {} ({}) in {}", kind, t, c)
+                }
+                (Some(t), _) if !t.is_empty() => format!("New {} ({})", kind, t),
+                (_, Some(c)) if !c.is_empty() => format!("New {} in {}", kind, c),
+                _ => format!("New {} (empty)", kind),
+            })
+        }
     }).unwrap_or_else(|| choice.title.clone());
 
     let content_lines: usize = text.lines()
@@ -2421,6 +2436,9 @@ pub fn armed_fix_preview(rec: &crate::coordinator::RecommendationSet) -> String 
             RecommendedAction::OpenAndSend { input, .. } => {
                 let cleaned = input.trim().replace(['\r', '\n'], " ");
                 return truncate(&cleaned, 80);
+            }
+            RecommendedAction::Open { .. } => {
+                return truncate(&choice.title, 80);
             }
         }
     }

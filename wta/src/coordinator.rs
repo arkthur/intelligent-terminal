@@ -76,6 +76,24 @@ pub enum RecommendedAction {
         cwd: Option<String>,
         #[serde(default)]
         title: Option<String>,
+        /// Split direction for panel target: "right" | "left" | "up" | "down" | "auto".
+        /// Ignored for tab target. None = COM default ("right" historically; the
+        /// fixed wtcli passes "automatic" when neither is set).
+        #[serde(default)]
+        direction: Option<String>,
+    },
+    Open {
+        target: OpenTarget,
+        #[serde(default)]
+        parent: Option<String>,
+        #[serde(default)]
+        cwd: Option<String>,
+        #[serde(default)]
+        title: Option<String>,
+        /// Split direction for panel target: "right" | "left" | "up" | "down" | "auto".
+        /// Ignored for tab target.
+        #[serde(default)]
+        direction: Option<String>,
     },
 }
 
@@ -372,6 +390,7 @@ async fn execute_choice(
                 agent,
                 cwd,
                 title,
+                direction,
             } => {
                 ensure_non_empty("input", input)?;
                 let runtime = match agent.as_deref() {
@@ -384,12 +403,13 @@ async fn execute_choice(
                     .unwrap_or(DelegatePromptDelivery::LaunchThenSend);
                 let target_label = open_target_label(target);
                 coordinator_log(&format!(
-                    "open_and_send begin target={} parent={:?} agent={:?} cwd={:?} title={:?} delivery_mode={} input_chars={} input_preview={:?}",
+                    "open_and_send begin target={} parent={:?} agent={:?} cwd={:?} title={:?} direction={:?} delivery_mode={} input_chars={} input_preview={:?}",
                     target_label,
                     parent,
                     agent,
                     cwd,
                     title,
+                    direction,
                     delegate_prompt_delivery_label(delivery_mode),
                     input.chars().count(),
                     truncate_for_log(input, 120)
@@ -425,14 +445,15 @@ async fn execute_choice(
                                 parent,
                                 commandline.as_deref(),
                                 cwd.as_deref(),
-                                None,
+                                direction.as_deref(),
                                 None,
                             )
                             .await
                             .with_context(|| format!("failed to split pane {}", parent))?;
                         coordinator_log(&format!(
-                            "open_and_send split_pane parent={} response={}",
+                            "open_and_send split_pane parent={} direction={:?} response={}",
                             parent,
+                            direction,
                             summarize_json_for_log(&result)
                         ));
                         resolve_created_pane_id(&result, "split_pane")?
@@ -460,6 +481,58 @@ async fn execute_choice(
                         pane_id
                     )));
                 }
+            }
+            RecommendedAction::Open {
+                target,
+                parent,
+                cwd,
+                title,
+                direction,
+            } => {
+                let target_label = open_target_label(target);
+                coordinator_log(&format!(
+                    "open begin target={} parent={:?} cwd={:?} title={:?} direction={:?}",
+                    target_label, parent, cwd, title, direction
+                ));
+                let _ = event_tx.send(AppEvent::ExecutionInfo(format!(
+                    "Opening {}.",
+                    target_label
+                )));
+                let pane_id = match target {
+                    OpenTarget::Tab => {
+                        let result = shell_mgr
+                            .wt_create_tab(None, cwd.as_deref(), title.as_deref())
+                            .await
+                            .context("failed to create tab")?;
+                        coordinator_log(&format!(
+                            "open create_tab response={}",
+                            summarize_json_for_log(&result)
+                        ));
+                        resolve_created_pane_id(&result, "create_tab")?
+                    }
+                    OpenTarget::Panel => {
+                        let parent = required_parent(parent.as_deref(), "open")?;
+                        let result = shell_mgr
+                            .wt_split_pane(parent, None, cwd.as_deref(), direction.as_deref(), None)
+                            .await
+                            .with_context(|| format!("failed to split pane {}", parent))?;
+                        coordinator_log(&format!(
+                            "open split_pane parent={} direction={:?} response={}",
+                            parent,
+                            direction,
+                            summarize_json_for_log(&result)
+                        ));
+                        resolve_created_pane_id(&result, "split_pane")?
+                    }
+                };
+                coordinator_log(&format!(
+                    "open resolved target={} pane_id={}",
+                    target_label, pane_id
+                ));
+                let _ = event_tx.send(AppEvent::ExecutionInfo(format!(
+                    "Opened {} pane {}.",
+                    target_label, pane_id
+                )));
             }
         }
     }
@@ -503,6 +576,7 @@ fn validate_action(action: &RecommendedAction) -> Result<()> {
             parent,
             input,
             agent,
+            direction,
             ..
         } => {
             ensure_non_empty("input", input)?;
@@ -515,10 +589,44 @@ fn validate_action(action: &RecommendedAction) -> Result<()> {
             if matches!(target, OpenTarget::Panel) {
                 required_parent(parent.as_deref(), "open_and_send")?;
             }
+            validate_direction(direction.as_deref(), target)?;
+        }
+        RecommendedAction::Open {
+            target,
+            parent,
+            direction,
+            ..
+        } => {
+            if let Some(parent) = parent.as_deref() {
+                ensure_non_empty("parent", parent)?;
+            }
+            if matches!(target, OpenTarget::Panel) {
+                required_parent(parent.as_deref(), "open")?;
+            }
+            validate_direction(direction.as_deref(), target)?;
         }
     }
 
     Ok(())
+}
+
+fn validate_direction(direction: Option<&str>, target: &OpenTarget) -> Result<()> {
+    let Some(value) = direction else {
+        return Ok(());
+    };
+    if value.is_empty() {
+        bail!("field 'direction' must not be empty");
+    }
+    if matches!(target, OpenTarget::Tab) {
+        bail!("field 'direction' is only valid when target is 'panel'");
+    }
+    match value {
+        "right" | "left" | "up" | "down" | "auto" | "automatic" => Ok(()),
+        other => bail!(
+            "invalid direction {:?}; expected right|left|up|down|auto",
+            other
+        ),
+    }
 }
 
 fn lookup_delegate_agent<'a>(
@@ -1120,6 +1228,158 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn parses_open_action_without_input() {
+        let text = r#"```json
+{
+  "recommended_choice": 1,
+  "choices": [
+    {
+      "choice": 1,
+      "title": "Open an empty tab",
+      "actions": [
+        {
+          "type": "open",
+          "target": "tab",
+          "cwd": "C:\\repo"
+        }
+      ]
+    },
+    {
+      "choice": 2,
+      "title": "Split a panel here",
+      "actions": [
+        {
+          "type": "open",
+          "target": "panel",
+          "parent": "12"
+        }
+      ]
+    }
+  ]
+}
+```"#;
+
+        let parsed = parse_recommendation_set(text).expect("open recommendation should parse");
+        assert!(matches!(
+            parsed.choices[0].actions[0],
+            RecommendedAction::Open {
+                target: OpenTarget::Tab,
+                ..
+            }
+        ));
+        assert!(matches!(
+            parsed.choices[1].actions[0],
+            RecommendedAction::Open {
+                target: OpenTarget::Panel,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn parses_open_panel_with_direction() {
+        let text = r#"```json
+{
+  "recommended_choice": 1,
+  "choices": [
+    {
+      "choice": 1,
+      "title": "Split right",
+      "actions": [
+        {
+          "type": "open",
+          "target": "panel",
+          "parent": "12",
+          "direction": "right"
+        }
+      ]
+    }
+  ]
+}
+```"#;
+
+        let parsed = parse_recommendation_set(text).expect("open with direction should parse");
+        match &parsed.choices[0].actions[0] {
+            RecommendedAction::Open { direction, .. } => {
+                assert_eq!(direction.as_deref(), Some("right"));
+            }
+            other => panic!("expected Open, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rejects_open_with_invalid_direction() {
+        let text = r#"```json
+{
+  "recommended_choice": 1,
+  "choices": [
+    {
+      "choice": 1,
+      "title": "Split sideways",
+      "actions": [
+        {
+          "type": "open",
+          "target": "panel",
+          "parent": "12",
+          "direction": "sideways"
+        }
+      ]
+    }
+  ]
+}
+```"#;
+
+        assert!(parse_recommendation_set(text).is_err());
+    }
+
+    #[test]
+    fn rejects_open_tab_with_direction() {
+        let text = r#"```json
+{
+  "recommended_choice": 1,
+  "choices": [
+    {
+      "choice": 1,
+      "title": "Open tab right?",
+      "actions": [
+        {
+          "type": "open",
+          "target": "tab",
+          "direction": "right"
+        }
+      ]
+    }
+  ]
+}
+```"#;
+
+        assert!(parse_recommendation_set(text).is_err());
+    }
+
+    #[test]
+    fn rejects_open_panel_without_parent() {
+        let text = r#"```json
+{
+  "recommended_choice": 1,
+  "choices": [
+    {
+      "choice": 1,
+      "title": "Open a panel",
+      "actions": [
+        {
+          "type": "open",
+          "target": "panel"
+        }
+      ]
+    }
+  ]
+}
+```"#;
+
+        assert!(parse_recommendation_set(text).is_err());
     }
 
     #[test]

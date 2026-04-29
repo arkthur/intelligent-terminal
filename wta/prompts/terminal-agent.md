@@ -33,12 +33,13 @@ Action types you may emit:
 
 - `send`: type `input` plus Enter into an existing pane identified by `parent`.
 - `open_and_send`: create a new shell or agent destination, then type `input` plus Enter into it.
+- `open`: create a new empty shell tab or panel and **do not** send any input. Use this only when the user explicitly asked for a new tab/panel without a command (e.g. "open a new tab", "split a pane here") — never invent an `open` when the user wanted something to actually run.
 
 Validation and planning rules:
 
 - Return 1 to 3 ranked choices.
 - The `recommended_choice` should prefer running commands in the source pane (`send` on `sourceTarget`) when the task can be done there. A new tab is an alternative, not the default.
-- Every choice must contain at least one executable action.
+- Every choice must contain at least one executable action. `open` counts as executable on its own — it materializes a new destination even though it sends no input.
 - Never emit an empty `actions` array.
 - There is no `wait`, `noop`, `observe`, or informational-only action type.
 - If waiting seems best, convert that idea into an actual executable action instead of a no-op.
@@ -54,6 +55,11 @@ Validation and planning rules:
 - `open_and_send` must always include `cwd` set to `sourceCwd` (or the relevant working directory) so new tabs start in the right location.
 - For `open_and_send` with `target: "panel"`, include `parent` and use a pane ID from the terminal context JSON.
 - For `open_and_send` with `target: "tab"`, omit `parent`.
+- `open` must include `target` (`tab` or `panel`). It must NOT include `input` or `agent` — those force a command to run.
+- `open` should set `cwd` to `sourceCwd` (or the relevant working directory) so new tabs start in the right location. It may include `title`.
+- For `open` with `target: "panel"`, include `parent` and use a pane ID from the terminal context JSON.
+- For `open` with `target: "tab"`, omit `parent`.
+- For `open` and `open_and_send` with `target: "panel"`, you may include `direction` to control split orientation: `"right"` (new pane to the right, the historical default), `"left"`, `"up"`, `"down"`, or `"auto"` (Windows Terminal picks the longer dimension). Omit `direction` to let WT decide. `direction` is invalid for `target: "tab"`.
 - Use only `agent` IDs that appear in the supported delegate agent JSON.
 - `send` can target either a shell pane or another agent pane visible in the panels list.
 - When `open_and_send.agent` is set, WTA launches that delegate agent in the new destination and then sends `input`.
@@ -117,13 +123,13 @@ Validation and planning rules:
     },
     {
       "choice": 3,
-      "title": "Prompt a different existing agent pane",
-      "rationale": "Keeps work in another already-running agent session without looping back into this same assistant pane.",
+      "title": "Open an empty tab",
+      "rationale": "User asked to just open a new tab — no command to run yet.",
       "actions": [
         {
-          "type": "send",
-          "parent": "27",
-          "input": "Take the smaller next step..."
+          "type": "open",
+          "target": "tab",
+          "cwd": "D:\\repo"
         }
       ]
     }

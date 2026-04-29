@@ -40,7 +40,11 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         }
 
         // Determine card content based on action type
-        let (command_text, buttons) = extract_card_content(choice, app, is_selected);
+        let (command_text, buttons, body_kind) = extract_card_content(choice, app, is_selected);
+        let body_style = match body_kind {
+            CardBodyKind::Code => theme::CARD_CODE,
+            CardBodyKind::Description => theme::CARD_DESCRIPTION,
+        };
         let divider_style = if is_selected {
             theme::CARD_BORDER_SELECTED
         } else {
@@ -72,7 +76,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
             let padded = format!("  {}  ", pad_right(&cmd_line, content_width));
             lines.push(Line::from(vec![
                 Span::raw("  "),
-                Span::styled(padded, theme::CARD_CODE),
+                Span::styled(padded, body_style),
             ]));
         }
 
@@ -112,12 +116,24 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-/// Extracts the display text and button labels from a choice's actions.
+/// Visual style hint for the card body.
+///
+/// `Code` renders the body as the literal command/input that will be executed
+/// (sharp, monospace-feeling). `Description` renders dimmed italic prose for
+/// actions that don't have a literal command to show — e.g. `Open`, where the
+/// body is metadata about the new destination, not something the user is about
+/// to type.
+enum CardBodyKind {
+    Code,
+    Description,
+}
+
+/// Extracts the display text, button labels, and body style from a choice's actions.
 fn extract_card_content(
     choice: &crate::coordinator::RecommendationChoice,
     _app: &App,
     _is_selected: bool,
-) -> (String, Vec<String>) {
+) -> (String, Vec<String>, CardBodyKind) {
     // Find the primary action
     for action in &choice.actions {
         match action {
@@ -129,6 +145,7 @@ fn extract_card_content(
                         "Insert in Terminal".into(),
                         "Run ↵".into(),
                     ],
+                    CardBodyKind::Code,
                 );
             }
             RecommendedAction::OpenAndSend {
@@ -143,13 +160,45 @@ fn extract_card_content(
                     OpenTarget::Tab => "Open in New Tab ↵",
                     OpenTarget::Panel => "Open in New Panel ↵",
                 };
-                return (display, vec![target_label.into()]);
+                return (display, vec![target_label.into()], CardBodyKind::Code);
+            }
+            RecommendedAction::Open {
+                target,
+                cwd,
+                title,
+                direction,
+                ..
+            } => {
+                let kind = match target {
+                    OpenTarget::Tab => "tab".to_string(),
+                    OpenTarget::Panel => match direction.as_deref() {
+                        Some(d) if !d.is_empty() => format!("panel ({})", d),
+                        _ => "panel".to_string(),
+                    },
+                };
+                let display = match (title.as_deref(), cwd.as_deref()) {
+                    (Some(t), Some(c)) if !t.is_empty() && !c.is_empty() => {
+                        format!("New {} ({}) in {}", kind, t, c)
+                    }
+                    (Some(t), _) if !t.is_empty() => format!("New {} ({})", kind, t),
+                    (_, Some(c)) if !c.is_empty() => format!("New {} in {}", kind, c),
+                    _ => format!("New empty {}", kind),
+                };
+                let button = match target {
+                    OpenTarget::Tab => "Open Tab ↵",
+                    OpenTarget::Panel => "Open Panel ↵",
+                };
+                return (display, vec![button.into()], CardBodyKind::Description);
             }
         }
     }
 
     // Fallback: just show the title
-    (choice.title.clone(), vec!["Execute ↵".into()])
+    (
+        choice.title.clone(),
+        vec!["Execute ↵".into()],
+        CardBodyKind::Description,
+    )
 }
 
 /// Builds styled spans for the button row inside a card.

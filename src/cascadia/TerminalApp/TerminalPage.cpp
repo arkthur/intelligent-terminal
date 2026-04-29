@@ -1729,6 +1729,78 @@ namespace winrt::TerminalApp::implementation
         _UpdateBottomBarState();
     }
 
+    // Focus toggle: ensure the agent pane is visible and cycle focus between it
+    // and the previously focused pane. Unlike _OpenOrReuseAgentPane, this never
+    // hides the agent pane — pressing while already focused on the agent
+    // returns focus to the prior pane, leaving the agent pane visible.
+    void TerminalPage::_FocusAgentPane()
+    {
+        _agentPaneLog("_FocusAgentPane called");
+
+        const auto existingPane = _FindAgentPane();
+
+        // No agent pane yet, or it's hidden — delegate to the create / restore
+        // path, which already focuses the agent pane after showing it.
+        if (!existingPane || existingPane->IsHidden())
+        {
+            _OpenOrReuseAgentPane(L"");
+            return;
+        }
+
+        const auto agentTab = _FindTabContainingAgentPane();
+        if (!agentTab)
+        {
+            return;
+        }
+
+        const auto activeTab = _GetFocusedTabImpl();
+
+        // On a different tab — let the existing logic move it to the active
+        // tab (which also focuses it).
+        if (agentTab != activeTab)
+        {
+            _OpenOrReuseAgentPane(L"");
+            return;
+        }
+
+        // Visible on the active tab. Toggle focus.
+        const auto agentId = existingPane->Id();
+        const auto activePane = activeTab->GetActivePane();
+        const auto activeId = activePane ? activePane->Id() : std::nullopt;
+
+        const bool agentIsFocused = agentId.has_value() &&
+                                    activeId.has_value() &&
+                                    agentId.value() == activeId.value();
+
+        if (agentIsFocused)
+        {
+            // Already on the agent pane — return focus to the prior pane.
+            _agentPaneLog("focus-toggle: returning focus to prior pane");
+            if (_priorPaneId.has_value())
+            {
+                activeTab->FocusPane(_priorPaneId.value());
+                _priorPaneId.reset();
+            }
+            return;
+        }
+
+        // Focus is elsewhere — remember it and move focus to the agent pane.
+        _agentPaneLog("focus-toggle: focusing agent pane");
+        if (activeId.has_value())
+        {
+            _priorPaneId = activeId;
+        }
+        if (agentId.has_value())
+        {
+            activeTab->FocusPane(agentId.value());
+        }
+        if (const auto ctrl = existingPane->GetTerminalControl())
+        {
+            ctrl.Focus(winrt::Windows::UI::Xaml::FocusState::Programmatic);
+        }
+        _UpdateBottomBarState();
+    }
+
     // Method Description:
     // - This method is called once on startup, on the first LayoutUpdated event.
     //   We'll use this event to know that we have an ActualWidth and

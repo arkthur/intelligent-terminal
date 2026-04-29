@@ -548,16 +548,28 @@ Protocol::TabCreationResult TerminalProtocolComServer::SplitPane(
     THROW_HR_IF(E_INVALIDARG, paneId == 0);
 
     // Map direction string to SplitDirection enum.
+    // Accepts: "right" (default), "left", "up", "down", "auto"/"automatic".
+    // Legacy values "horizontal"/"vertical" are honoured as down/right respectively
+    // so older callers (early wtcli builds) keep working instead of silently
+    // collapsing into the default Right.
     auto splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Right;
     if (!direction.empty())
     {
         const auto dirStr = winrt::to_string(direction);
-        if (dirStr == "left")
+        if (dirStr == "right")
+            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Right;
+        else if (dirStr == "left")
             splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Left;
         else if (dirStr == "up")
             splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Up;
         else if (dirStr == "down")
             splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Down;
+        else if (dirStr == "auto" || dirStr == "automatic")
+            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Automatic;
+        else if (dirStr == "horizontal")
+            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Down;
+        else if (dirStr == "vertical")
+            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Right;
     }
 
     // Build NewTerminalArgs.

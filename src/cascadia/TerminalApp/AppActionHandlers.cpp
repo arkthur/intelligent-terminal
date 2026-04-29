@@ -1665,6 +1665,14 @@ namespace winrt::TerminalApp::implementation
         args.Handled(true);
     }
 
+    void TerminalPage::_HandleFocusAgentPane(const IInspectable& /*sender*/,
+                                             const ActionEventArgs& args)
+    {
+        OutputDebugStringW(L"[AgentPane] _HandleFocusAgentPane called\n");
+        _FocusAgentPane();
+        args.Handled(true);
+    }
+
     void TerminalPage::_HandleTriggerAutofix(const IInspectable& /*sender*/,
                                               const ActionEventArgs& args)
     {

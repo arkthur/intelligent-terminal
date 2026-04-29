@@ -1194,6 +1194,7 @@ async fn run_ensure_host(
                                             agent: Some(delegate_agent_id.clone()),
                                             cwd: None,
                                             title: None,
+                                            direction: None,
                                         },
                                     ],
                                 };

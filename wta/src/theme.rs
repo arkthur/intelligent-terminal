@@ -29,6 +29,10 @@ pub const CARD_FILL: Style = Style::new().bg(CARD_BG);
 pub const CARD_BORDER: Style = Style::new().fg(Color::DarkGray).bg(CARD_BG);
 pub const CARD_BORDER_SELECTED: Style = Style::new().fg(Color::White).bg(CARD_BG);
 pub const CARD_CODE: Style = Style::new().fg(Color::White).bg(CARD_BG);
+pub const CARD_DESCRIPTION: Style = Style::new()
+    .fg(Color::Gray)
+    .bg(CARD_BG)
+    .add_modifier(Modifier::ITALIC);
 pub const BUTTON: Style = Style::new().fg(Color::Gray).bg(BUTTON_BG);
 pub const BUTTON_FOCUSED: Style = Style::new()
     .fg(Color::Black)
