@@ -174,7 +174,7 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         static Windows::UI::Xaml::Thickness ParseThicknessFromPadding(const hstring padding);
 
         hstring ReadEntireBuffer() const;
-        hstring ReadLastCommandOutput() const;
+        hstring ReadLastPrompt() const;
         Control::CommandHistoryContext CommandHistory() const;
         void UpdateWinGetSuggestions(Windows::Foundation::Collections::IVector<hstring> suggestions);
 

@@ -271,16 +271,20 @@ int main()
     // ── capture-pane ──
     std::string capturePaneTarget;
     int captureMaxLines = 200;
+    bool captureLastPrompt = false;
     auto* capturePaneCmd = app.add_subcommand("capture-pane", "Capture pane output")->alias("capturep");
     capturePaneCmd->add_option("-t,--target", capturePaneTarget, "Pane ID");
     capturePaneCmd->add_option("-l,--max-lines", captureMaxLines, "Max lines");
+    capturePaneCmd->add_flag("--last-prompt", captureLastPrompt,
+        "Only return the most recent completed shell prompt (command + output, requires OSC 133 shell integration)");
     capturePaneCmd->callback([&]() {
         auto server = connect();
         if (!server) return;
         try
         {
             auto paneId = ResolvePaneId(server, capturePaneTarget);
-            auto output = server.ReadPaneOutput(paneId, L"scrollback", captureMaxLines);
+            const auto sourceArg = captureLastPrompt ? L"last_prompt" : L"scrollback";
+            auto output = server.ReadPaneOutput(paneId, sourceArg, captureMaxLines);
             if (jsonMode)
             {
                 PrintJson(PaneOutputToJson(output));
@@ -294,34 +298,6 @@ int main()
         catch (const winrt::hresult_error& e)
         {
             fprintf(stderr, "ReadPaneOutput failed: 0x%08X\n", static_cast<uint32_t>(e.code()));
-            exitCode = 1;
-        }
-    });
-
-    // ── last-command ──
-    std::string lastCommandTarget;
-    auto* lastCommandCmd = app.add_subcommand("last-command", "Capture the most recent shell-integration command")->alias("lastcmd");
-    lastCommandCmd->add_option("-t,--target", lastCommandTarget, "Pane ID");
-    lastCommandCmd->callback([&]() {
-        auto server = connect();
-        if (!server) return;
-        try
-        {
-            auto paneId = ResolvePaneId(server, lastCommandTarget);
-            auto output = server.ReadPaneLastCommand(paneId);
-            if (jsonMode)
-            {
-                PrintJson(PaneOutputToJson(output));
-            }
-            else
-            {
-                auto content = winrt::to_string(output.Content);
-                printf("%s\n", content.c_str());
-            }
-        }
-        catch (const winrt::hresult_error& e)
-        {
-            fprintf(stderr, "ReadPaneLastCommand failed: 0x%08X\n", static_cast<uint32_t>(e.code()));
             exitCode = 1;
         }
     });

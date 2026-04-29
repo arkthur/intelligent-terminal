@@ -281,6 +281,39 @@ namespace winrt::TerminalApp::implementation
 
             try
             {
+                if (sourceStr == "last_prompt")
+                {
+                    // Special path: return only the most recent completed
+                    // shell prompt (command + output, bracketed by FTCS
+                    // marks). Avoids leaking arbitrary trailing buffer
+                    // content (older commands, secrets) to external agents.
+                    result.PaneId = paneId;
+                    const auto lastPrompt = termControl.ReadLastPrompt();
+                    auto lastPromptStr = winrt::to_string(lastPrompt);
+                    if (lastPromptStr.empty())
+                    {
+                        // No OSC 133 marks (or no completed prompt yet) —
+                        // signal so the caller can fall back to a line-count
+                        // read. has_marks=false signals the caller to fall back.
+                        result.HasMarks = false;
+                        result.Content = L"";
+                        result.LineCount = 0;
+                        result.Truncated = false;
+                        co_return result;
+                    }
+                    int32_t lineCount = 1;
+                    for (auto ch : lastPromptStr)
+                    {
+                        if (ch == '\n')
+                            ++lineCount;
+                    }
+                    result.HasMarks = true;
+                    result.Content = winrt::to_hstring(lastPromptStr);
+                    result.LineCount = lineCount;
+                    result.Truncated = false;
+                    co_return result;
+                }
+
                 fullBuffer = termControl.ReadEntireBuffer();
                 viewHeight = termControl.ViewHeight();
             }
@@ -351,71 +384,6 @@ namespace winrt::TerminalApp::implementation
         }
 
         co_return result;
-    }
-
-    IAsyncOperation<Protocol::PaneOutput> TerminalPage::ReadProtocolPaneLastCommand(uint32_t paneId)
-    {
-        auto strong = get_strong();
-        co_await wil::resume_foreground(Dispatcher());
-
-        Protocol::PaneOutput result{};
-
-        for (const auto& tab : _tabs)
-        {
-            const auto tabImpl = _GetTabImpl(tab);
-            if (!tabImpl)
-                continue;
-
-            const auto rootPane = tabImpl->GetRootPane();
-            if (!rootPane)
-                continue;
-
-            const auto foundPane = rootPane->FindPaneByContentId(paneId);
-            if (!foundPane)
-                continue;
-
-            const auto termControl = foundPane->GetTerminalControl();
-            if (!termControl)
-                co_return result; // PaneId == 0 signals not-ready
-
-            hstring sliced;
-            try
-            {
-                sliced = termControl.ReadLastCommandOutput();
-            }
-            catch (...)
-            {
-                co_return result; // PaneId == 0 signals error
-            }
-
-            result.PaneId = paneId;
-            const auto str = winrt::to_string(sliced);
-            if (str.empty())
-            {
-                // No OSC 133 marks — caller should fall back to ReadPaneOutput.
-                result.HasMarks = false;
-                result.Content = L"";
-                result.LineCount = 0;
-                result.Truncated = false;
-                co_return result;
-            }
-
-            // Count lines for parity with ReadProtocolPaneOutput.
-            int lineCount = 1;
-            for (const auto ch : str)
-            {
-                if (ch == '\n')
-                    lineCount++;
-            }
-
-            result.HasMarks = true;
-            result.Content = sliced;
-            result.LineCount = lineCount;
-            result.Truncated = false;
-            co_return result;
-        }
-
-        co_return result; // not found
     }
 
     IAsyncOperation<Protocol::ProcessStatus> TerminalPage::GetProtocolProcessStatus(uint32_t paneId)

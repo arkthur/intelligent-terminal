@@ -2388,60 +2388,68 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         return hstring{ str };
     }
 
-    // Returns the recent shell-integration history as a single string. Slices
-    // from the start of the second-to-last OSC 133 prompt mark (so the agent
-    // sees the previous completed command + its output, plus the current
-    // prompt line) to the last non-space row. When only one mark exists, slices
-    // from that single mark. Returns empty when no marks — callers fall back to
-    // a line-count read.
-    hstring ControlCore::ReadLastCommandOutput() const
+    // Returns the most recent *finished* shell prompt — the command typed
+    // at an OSC 133;B mark plus its output, sliced exactly between the
+    // command-start and command-end markers. Used by external agents
+    // (wtcli / wta) to fetch a tightly-scoped pane snapshot instead of an
+    // arbitrary tail of the buffer (which may contain unrelated commands
+    // and secrets).
+    //
+    // Behavior (walking marks in reverse, picking the first match):
+    //   * Finished command, with output       → [B..D] exact slice.
+    //   * Finished command, no output (`cd`)  → [B..C] (command text only).
+    //   * In-flight (no exitCode yet)         → skip; keep walking back.
+    //                              Always treat the live/most-recent mark as
+    //                              "not yet a result". Avoids the degenerate
+    //                              self-query case (agent would otherwise
+    //                              see only its own command line) and the
+    //                              "Start-Sleep right after Enter" case;
+    //                              long-running commands streaming partial
+    //                              output also fall through to the prior
+    //                              completed prompt rather than returning a
+    //                              half-baked truncated read.
+    //   * No marks present, or no finished command found
+    //                                         → empty hstring (caller may
+    //                                           fall back to a line-count
+    //                                           read).
+    //
+    // We key the "finished" decision off the FTCS CommandEnd / OSC 133;D
+    // marker, which the buffer surfaces as ScrollbarData::exitCode. Note
+    // outputEnd alone is not reliable: it grows as Output cells stream in,
+    // so an in-flight long-running command will already have outputEnd set
+    // pointing at the latest streamed output line.
+    hstring ControlCore::ReadLastPrompt() const
     {
-        const auto lock = _terminal->LockForWriting();
-
+        const auto lock = _terminal->LockForReading();
         const auto& marks = _terminal->GetMarkExtents();
         if (marks.empty())
         {
             return {};
         }
 
-        // Prefer the second-to-last mark when available so we capture a full
-        // previous QA cycle plus the current prompt line.
-        const auto& slicingFrom = marks.size() >= 2 ? marks[marks.size() - 2] : marks.back();
-        const auto& last = marks.back();
         const auto& textBuffer = _terminal->GetTextBuffer();
-        const auto lastNonSpaceY = textBuffer.GetLastNonSpaceCharacter().y;
 
-        const auto startY = slicingFrom.start.y;
-        // Endpoint: if the last mark's command is fully finished, clip to its
-        // outputEnd. Otherwise, the latest activity is still in flight or only
-        // a fresh prompt line — extend to the last non-space row.
-        auto endY = last.outputEnd.has_value()
-                        ? std::min<til::CoordType>(last.outputEnd->y, lastNonSpaceY)
-                        : lastNonSpaceY;
-
-        if (endY < startY)
+        for (auto it = marks.rbegin(); it != marks.rend(); ++it)
         {
-            return {};
-        }
-
-        std::wstring str;
-        for (auto rowIndex = startY; rowIndex <= endY; rowIndex++)
-        {
-            const auto& row = textBuffer.GetRowByOffset(rowIndex);
-            const auto rowText = row.GetText();
-            const auto strEnd = rowText.find_last_not_of(UNICODE_SPACE);
-            if (strEnd != decltype(rowText)::npos)
+            if (!it->HasCommand())
             {
-                str.append(rowText.substr(0, strEnd + 1));
+                continue;
             }
 
-            if (!row.WasWrapForced())
+            // Skip until we find a finished command (saw FTCS CommandEnd).
+            if (!it->data.exitCode.has_value())
             {
-                str.append(L"\r\n");
+                continue;
             }
+
+            // Finished. Prefer [B..D]; if no output region was ever produced
+            // (e.g. `cd`), outputEnd is unset → fall back to [B..C] for the
+            // command text only.
+            const auto endPoint = it->outputEnd.value_or(*it->commandEnd);
+            return hstring{ textBuffer.GetPlainText(it->end, endPoint) };
         }
 
-        return hstring{ str };
+        return {};
     }
 
     // Get all of our recent commands. This will only really work if the user has enabled shell integration.
