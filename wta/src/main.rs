@@ -952,7 +952,7 @@ async fn run_listen(po: &PipeOverride, pane_filter: Option<&str>) -> Result<()> 
 
     eprintln!("Connected. Listening for events... (Ctrl+C to stop)");
     if let Some(pane) = pane_filter {
-        eprintln!("Filtering: pane_id={}", pane);
+        eprintln!("Filtering: session_id={}", pane);
     }
 
     while let Some(msg) = event_rx.recv().await {
@@ -961,13 +961,13 @@ async fn run_listen(po: &PipeOverride, pane_filter: Option<&str>) -> Result<()> 
             continue;
         }
 
-        // Optional pane_id filter.
+        // Optional session_id filter.
         if let Some(filter) = pane_filter {
-            let pane_id = msg
+            let session_id = msg
                 .get("params")
-                .and_then(|p| p.get("pane_id"))
+                .and_then(|p| p.get("session_id"))
                 .and_then(|v| v.as_str());
-            if pane_id != Some(filter) {
+            if session_id != Some(filter) {
                 continue;
             }
         }
@@ -1412,9 +1412,9 @@ async fn run_attach_tui(
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
-                        let pane_id = event_json
+                        let session_id = event_json
                             .get("params")
-                            .and_then(|p| p.get("pane_id"))
+                            .and_then(|p| p.get("session_id"))
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
@@ -1424,7 +1424,7 @@ async fn run_attach_tui(
                             .unwrap_or(serde_json::Value::Null);
                         let _ = wt_event_tx.send(app::AppEvent::WtEvent {
                             method,
-                            pane_id,
+                            session_id,
                             params,
                         });
                     }
@@ -1433,11 +1433,13 @@ async fn run_attach_tui(
 
             // Build PaneContext from discovered pane identity.
             let pane_context = shared_host::PaneContext {
-                pane_id: pane_identity.as_ref().map(|(p, _, _)| p.clone()),
+                session_id: pane_identity.as_ref().map(|(p, _, _)| p.clone()),
                 tab_id: pane_identity.as_ref().map(|(_, t, _)| t.clone()),
                 window_id: pane_identity.as_ref().map(|(_, _, w)| w.clone()),
-                cwd: None,
-                source_pane_id: None,
+                cwd: std::env::var("WTA_SOURCE_CWD").ok().filter(|s| !s.is_empty()),
+                source_session_id: std::env::var("WTA_SOURCE_SESSION_ID")
+                    .ok()
+                    .filter(|s| !s.is_empty()),
             };
 
             // Spawn the attach client (replaces run_acp_client in shared mode).
@@ -1477,10 +1479,14 @@ async fn run_attach_tui(
             }
 
             if let Some((pane_id, tab_id, window_id)) = pane_identity {
-                app_state.pane_id = Some(pane_id);
+                app_state.pane_session_id = Some(pane_id);
                 app_state.tab_id = Some(tab_id);
                 app_state.window_id = Some(window_id);
             }
+            app_state.source_session_id =
+                std::env::var("WTA_SOURCE_SESSION_ID").ok().filter(|s| !s.is_empty());
+            app_state.source_cwd =
+                std::env::var("WTA_SOURCE_CWD").ok().filter(|s| !s.is_empty());
 
             app_state.run(&mut terminal, event_rx, ui_event_rx).await
         })
@@ -1835,9 +1841,9 @@ async fn run_acp_app(
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
-                        let pane_id = event_json
+                        let session_id = event_json
                             .get("params")
-                            .and_then(|p| p.get("pane_id"))
+                            .and_then(|p| p.get("session_id"))
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
@@ -1847,7 +1853,7 @@ async fn run_acp_app(
                             .unwrap_or(serde_json::Value::Null);
                         let _ = wt_event_tx.send(app::AppEvent::WtEvent {
                             method,
-                            pane_id,
+                            session_id,
                             params,
                         });
                     }
@@ -1948,10 +1954,13 @@ async fn run_acp_app(
             }
 
             if let Some((pane_id, tab_id, window_id)) = pane_identity {
-                app_state.pane_id = Some(pane_id);
+                app_state.pane_session_id = Some(pane_id);
                 app_state.tab_id = Some(tab_id);
                 app_state.window_id = Some(window_id);
             }
+            // Read source pane context from env vars set by WT when creating the agent pane.
+            app_state.source_session_id = std::env::var("WTA_SOURCE_SESSION_ID").ok().filter(|s| !s.is_empty());
+            app_state.source_cwd = std::env::var("WTA_SOURCE_CWD").ok().filter(|s| !s.is_empty());
 
             // If a prompt was passed via CLI arg (e.g., from command palette creating
             // a new agent pane), delegate it to a new tab agent on startup.

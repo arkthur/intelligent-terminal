@@ -665,12 +665,12 @@ fn truncate_for_prompt(text: &str, max_chars: usize) -> String {
 fn format_pane_context_summary(pane_context: Option<&PaneContext>) -> String {
     match pane_context {
         Some(context) => format!(
-            "pane_id={:?} tab_id={:?} window_id={:?} source_pane_id={:?} effective_source_pane_id={:?} cwd={:?}",
-            context.pane_id,
+            "session_id={:?} tab_id={:?} window_id={:?} source_session_id={:?} effective_source_session_id={:?} cwd={:?}",
+            context.session_id,
             context.tab_id,
             context.window_id,
-            context.source_pane_id,
-            context.effective_source_pane_id(),
+            context.source_session_id,
+            context.effective_source_session_id(),
             context.cwd
         ),
         None => "none".to_string(),
@@ -927,18 +927,18 @@ async fn build_prompt_text(
         // Prefer shell-integration mark slicing — falls back to a 30-line read
         // when shell integration is unavailable.
         if wt_connected {
-            if let Some(source_pane_id) = pane_context
-                .and_then(|ctx| ctx.effective_source_pane_id())
+            if let Some(source_session_id) = pane_context
+                .and_then(|ctx| ctx.effective_source_session_id())
             {
                 tracing::debug!(
                     target: "acp.terminal_context",
-                    source_pane_id,
+                    source_session_id,
                     mode = "autofix",
                     "terminal_context_target_resolved"
                 );
                 if let Some(content) = read_pane_last_message(
                     shell_mgr,
-                    source_pane_id,
+                    source_session_id,
                     30,
                     ACTIVE_PANE_CONTEXT_MAX_CHARS,
                 )

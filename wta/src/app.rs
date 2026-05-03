@@ -130,7 +130,7 @@ pub enum WtEventSeverity {
 #[derive(Debug, Clone)]
 pub struct WtNotification {
     pub severity: WtEventSeverity,
-    pub pane_id: String,
+    pub session_id: String,
     pub summary: String,
     pub acknowledged: bool,
     pub age_ticks: u32,
@@ -145,7 +145,7 @@ impl WtNotification {
 }
 
 /// Classify a WT protocol event into a notification.
-pub fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value) -> WtNotification {
+pub fn classify_wt_event(method: &str, session_id: &str, params: &serde_json::Value) -> WtNotification {
     match method {
         "connection_state" => {
             let state = params
@@ -155,37 +155,37 @@ pub fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value
             match state {
                 "failed" => WtNotification {
                     severity: WtEventSeverity::Critical,
-                    pane_id: pane_id.to_string(),
-                    summary: format!("Pane {}: connection failed", pane_id),
+                    session_id: session_id.to_string(),
+                    summary: format!("Session {}: connection failed", session_id),
                     acknowledged: false,
                     age_ticks: 0,
                 },
                 "closed" => WtNotification {
                     severity: WtEventSeverity::Actionable,
-                    pane_id: pane_id.to_string(),
-                    summary: format!("Pane {}: process exited", pane_id),
+                    session_id: session_id.to_string(),
+                    summary: format!("Session {}: process exited", session_id),
                     acknowledged: false,
                     age_ticks: 0,
                 },
                 "connected" => WtNotification {
                     severity: WtEventSeverity::Informational,
-                    pane_id: pane_id.to_string(),
-                    summary: format!("Pane {}: connected", pane_id),
+                    session_id: session_id.to_string(),
+                    summary: format!("Session {}: connected", session_id),
                     acknowledged: false,
                     age_ticks: 0,
                 },
                 // "unknown" is sent when the C++ try_as cast fails — ignore it.
                 "unknown" => return WtNotification {
                     severity: WtEventSeverity::Informational,
-                    pane_id: pane_id.to_string(),
+                    session_id: session_id.to_string(),
                     summary: String::new(),
                     acknowledged: true, // auto-acknowledge so it never shows
                     age_ticks: 100,     // will be auto-dismissed immediately
                 },
                 _ => WtNotification {
                     severity: WtEventSeverity::Informational,
-                    pane_id: pane_id.to_string(),
-                    summary: format!("Pane {}: {}", pane_id, state),
+                    session_id: session_id.to_string(),
+                    summary: format!("Session {}: {}", session_id, state),
                     acknowledged: false,
                     age_ticks: 0,
                 },
@@ -213,7 +213,7 @@ pub fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value
                         // an async hop; for now surface just the exit code.
                         return WtNotification {
                             severity: WtEventSeverity::Actionable,
-                            pane_id: pane_id.to_string(),
+                            session_id: session_id.to_string(),
                             summary: format!("Command failed (exit {})", exit_code),
                             acknowledged: false,
                             age_ticks: 0,
@@ -222,7 +222,7 @@ pub fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value
                         // exit code 0 = success, not interesting
                         return WtNotification {
                             severity: WtEventSeverity::Informational,
-                            pane_id: pane_id.to_string(),
+                            session_id: session_id.to_string(),
                             summary: String::new(),
                             acknowledged: true,
                             age_ticks: 100,
@@ -234,7 +234,7 @@ pub fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value
             // All other VT sequences — not interesting, suppress.
             WtNotification {
                 severity: WtEventSeverity::Informational,
-                pane_id: pane_id.to_string(),
+                session_id: session_id.to_string(),
                 summary: String::new(),
                 acknowledged: true,
                 age_ticks: 100,
@@ -247,7 +247,7 @@ pub fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value
                 .unwrap_or("");
             WtNotification {
                 severity: WtEventSeverity::Actionable,
-                pane_id: pane_id.to_string(),
+                session_id: session_id.to_string(),
                 summary: format!("agent_prompt:{}", prompt),
                 acknowledged: false,
                 age_ticks: 0,
@@ -255,8 +255,8 @@ pub fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value
         }
         _ => WtNotification {
             severity: WtEventSeverity::Informational,
-            pane_id: pane_id.to_string(),
-            summary: format!("Pane {}: {}", pane_id, method),
+            session_id: session_id.to_string(),
+            summary: format!("Session {}: {}", session_id, method),
             acknowledged: false,
             age_ticks: 0,
         },
@@ -320,7 +320,7 @@ pub enum AppEvent {
     /// Push event from Windows Terminal protocol (VT sequence or connection state).
     WtEvent {
         method: String,
-        pane_id: String,
+        session_id: String,
         params: serde_json::Value,
     },
     /// Preflight checks completed — transition from Setup to Chat if all passed.
@@ -391,20 +391,23 @@ pub struct App {
     pub show_debug_panel: bool,
     pub debug_scroll: usize,
     // Pane identity (populated via VT channel)
-    pub pane_id: Option<String>,
+    pub pane_session_id: Option<String>,
     pub tab_id: Option<String>,
     pub window_id: Option<String>,
+    // Source pane context (from WTA_SOURCE_* env vars set by WT)
+    pub source_session_id: Option<String>,
+    pub source_cwd: Option<String>,
     current_prompt_text: Option<String>,
     pending_completed_turn: Option<CompletedTurn>,
     // WT event notifications
     pub wt_notifications: std::collections::VecDeque<WtNotification>,
     pub show_notification_banner: bool,
-    // Auto-fix: the pane ID where the error occurred (used to auto-fill Send parent)
-    pub autofix_pane_id: Option<String>,
-    // Auto-fix Suggested state: pane ID with a non-actionable suggestion shown on
+    // Auto-fix: the session ID where the error occurred (used to auto-fill Send parent)
+    pub autofix_session_id: Option<String>,
+    // Auto-fix Suggested state: session ID with a non-actionable suggestion shown on
     // the bottom bar. Cleared when the user runs a successful command in the
     // same pane (signal that they've moved on) or when a new autofix triggers.
-    pub suggested_pane_id: Option<String>,
+    pub suggested_session_id: Option<String>,
     pub autofix_enabled: bool,
     // Generation counter: incremented on every new trigger or cancel.
     // AgentMessageEnd responses whose generation doesn't match are discarded.
@@ -470,15 +473,17 @@ impl App {
             debug_messages: Vec::new(),
             show_debug_panel: false,
             debug_scroll: 0,
-            pane_id: None,
+            pane_session_id: None,
             tab_id: None,
             window_id: None,
+            source_session_id: None,
+            source_cwd: None,
             current_prompt_text: None,
             pending_completed_turn: None,
             wt_notifications: VecDeque::new(),
             show_notification_banner: false,
-            autofix_pane_id: None,
-            suggested_pane_id: None,
+            autofix_session_id: None,
+            suggested_session_id: None,
             autofix_enabled,
             autofix_generation: 0,
             inflight_autofix_generation: None,
@@ -1002,18 +1007,18 @@ impl App {
             }
             AppEvent::WtEvent {
                 method,
-                pane_id,
+                session_id,
                 params,
             } => {
-                tracing::debug!(target: "autofix", method = %method, pane_id = %pane_id, self_pane_id = ?self.pane_id, "WtEvent");
+                tracing::debug!(target: "autofix", method = %method, session_id = %session_id, self_pane_session_id = ?self.pane_session_id, "WtEvent");
 
                 // autofix_execute is an inbound UI action ("run the armed
-                // fix now") from TerminalPage. pane_id is the failing
+                // fix now") from TerminalPage. session_id is the failing
                 // pane — NOT our own — so this check must run before the
                 // same-pane skip below. Ignore the event if we don't
                 // actually have a cached autofix for that pane.
                 if method == "autofix_execute" {
-                    self.handle_autofix_execute_request(&pane_id);
+                    self.handle_autofix_execute_request(&session_id);
                     return;
                 }
 
@@ -1041,12 +1046,12 @@ impl App {
                 }
 
                 // Skip events from our own pane
-                if self.pane_id.as_deref() == Some(pane_id.as_str()) {
+                if self.pane_session_id.as_deref() == Some(session_id.as_str()) {
                     tracing::debug!(target: "autofix", "skipped: own pane");
                     return;
                 }
 
-                let notification = classify_wt_event(&method, &pane_id, &params);
+                let notification = classify_wt_event(&method, &session_id, &params);
                 tracing::debug!(target: "autofix", severity = ?notification.severity, summary = %notification.summary, "classified");
 
                 // Always log to chat for critical/actionable events
@@ -1098,11 +1103,11 @@ impl App {
                                 .map(|c| c == 0)
                                 .unwrap_or(false);
                             let is_prompt_start = seq == "osc:133;A";
-                            if is_exit_zero && self.autofix_pane_id.as_deref() == Some(pane_id.as_str()) {
+                            if is_exit_zero && self.autofix_session_id.as_deref() == Some(session_id.as_str()) {
                                 self.autofix_generation = self.autofix_generation.wrapping_add(1);
                                 // Do NOT clear inflight_autofix_generation: the stale
                                 // check in AgentMessageEnd relies on Some(old) != new_gen.
-                                let pane = self.autofix_pane_id.take().unwrap();
+                                let pane = self.autofix_session_id.take().unwrap();
                                 self.clear_recommendations();
                                 self.prompt_in_flight = false;
                                 self.agent_streaming = false;
@@ -1114,9 +1119,9 @@ impl App {
                             // against the original suggested pane so the bar's
                             // lastErrorPaneId stays consistent.
                             if (is_exit_zero || is_prompt_start)
-                                && self.suggested_pane_id.is_some()
+                                && self.suggested_session_id.is_some()
                             {
-                                let pane = self.suggested_pane_id.take().unwrap();
+                                let pane = self.suggested_session_id.take().unwrap();
                                 self.emit_autofix_state_cleared(&pane);
                             }
                         }
@@ -1331,11 +1336,11 @@ impl App {
             }
             KeyCode::Esc
                 if self.recommendations.is_some()
-                    || (self.autofix_pane_id.is_some() && self.prompt_in_flight) =>
+                    || (self.autofix_session_id.is_some() && self.prompt_in_flight) =>
             {
                 // Dismiss armed fix card or cancel in-flight autofix request.
                 self.autofix_generation = self.autofix_generation.wrapping_add(1);
-                let pane = self.autofix_pane_id.take();
+                let pane = self.autofix_session_id.take();
                 self.clear_recommendations();
                 self.prompt_in_flight = false;
                 self.agent_streaming = false;
@@ -1352,11 +1357,11 @@ impl App {
             // any prompt activity in any pane (exit-zero or osc:133;A).
             //
             // NOTE: this only handles the default-tui (single-process) mode.
-            // In shared-host attach mode `suggested_pane_id` lives on the host;
+            // In shared-host attach mode `suggested_session_id` lives on the host;
             // the attach client would need to send a HostCommand::DismissSuggestion.
             // TODO: wire that path when shared-host mode is exercised.
-            KeyCode::Esc if self.suggested_pane_id.is_some() => {
-                let pane = self.suggested_pane_id.take().unwrap();
+            KeyCode::Esc if self.suggested_session_id.is_some() => {
+                let pane = self.suggested_session_id.take().unwrap();
                 self.emit_autofix_state_cleared(&pane);
             }
             KeyCode::Esc if self.input.is_empty() => {
@@ -1370,7 +1375,7 @@ impl App {
                 self.insert_input_char('\n');
             }
             KeyCode::Enter => {
-                tracing::debug!(target: "autofix", input_empty = self.input.is_empty(), state = ?self.state, has_recs = self.recommendations.is_some(), autofix_pane = ?self.autofix_pane_id, selected_idx = self.selected_recommendation, "Enter");
+                tracing::debug!(target: "autofix", input_empty = self.input.is_empty(), state = ?self.state, has_recs = self.recommendations.is_some(), autofix_session = ?self.autofix_session_id, selected_idx = self.selected_recommendation, "Enter");
                 if self.input.is_empty()
                     && self.state == ConnectionState::Connected
                     && self.recommendations.is_some()
@@ -1385,12 +1390,12 @@ impl App {
                             if let Some(input) = first_send_input(&choice) {
                                 crate::osc52::copy(&input);
                             }
-                            let armed_pane = self.autofix_pane_id.take();
+                            let armed_pane = self.autofix_session_id.take();
                             self.commit_pending_completed_turn();
                             self.clear_recommendations();
                             self.push_execution_info("Copied to clipboard.".to_string());
-                            if let Some(pane_id) = armed_pane {
-                                self.emit_autofix_state_cleared(&pane_id);
+                            if let Some(session_id) = armed_pane {
+                                self.emit_autofix_state_cleared(&session_id);
                             }
                         } else {
                             // Send: index 1 = Insert, index 2 = Run.
@@ -1399,19 +1404,19 @@ impl App {
                                 && self.is_send_choice(&choice);
                             tracing::info!(target: "autofix", choice = choice.choice, actions = choice.actions.len(), insert_only, "Executing choice");
                             // Auto-fill parent for Send actions from auto-fix.
-                            if let Some(ref pane_id) = self.autofix_pane_id {
+                            if let Some(ref session_id) = self.autofix_session_id {
                                 for action in &mut choice.actions {
                                     if let crate::coordinator::RecommendedAction::Send {
                                         ref mut parent, ..
                                     } = action
                                     {
                                         if parent.is_empty() {
-                                            *parent = pane_id.clone();
+                                            *parent = session_id.clone();
                                         }
                                     }
                                 }
                             }
-                            let armed_pane = self.autofix_pane_id.take();
+                            let armed_pane = self.autofix_session_id.take();
                             self.commit_pending_completed_turn();
                             self.clear_recommendations();
                             let label = if insert_only { "Inserting" } else { "Executing" };
@@ -1421,8 +1426,8 @@ impl App {
                             );
                             // Clear the bottom-bar Armed state — the fix has been
                             // dispatched to the source pane.
-                            if let Some(pane_id) = armed_pane {
-                                self.emit_autofix_state_cleared(&pane_id);
+                            if let Some(session_id) = armed_pane {
+                                self.emit_autofix_state_cleared(&session_id);
                             }
                         }
                     }
@@ -1436,11 +1441,11 @@ impl App {
                     self.messages.push(ChatMessage::User(text.clone()));
                     self.scroll_to_bottom();
                     let pane_context = crate::shared_host::PaneContext {
-                        pane_id: self.pane_id.clone(),
+                        session_id: self.pane_session_id.clone(),
                         tab_id: self.tab_id.clone(),
                         window_id: self.window_id.clone(),
-                        cwd: None,
-                        source_pane_id: None,
+                        cwd: self.source_cwd.clone(),
+                        source_session_id: self.source_session_id.clone(),
                     };
                     let prompt = PromptSubmission::new(text, Some(pane_context));
                     self.current_prompt_id = Some(prompt.id);
@@ -1858,13 +1863,13 @@ impl App {
         // Latest event always wins. If we're Pending/Armed for a different
         // pane, or Armed for the same pane, bump the generation to invalidate
         // any in-flight response and start fresh.
-        let same_pane = self.autofix_pane_id.as_deref() == Some(notification.pane_id.as_str());
+        let same_pane = self.autofix_session_id.as_deref() == Some(notification.session_id.as_str());
 
         if same_pane && self.prompt_in_flight {
             // Same pane, already Pending: re-emit pending with new summary
             // but don't send another prompt (agent is already working on it).
-            tracing::info!(target: "autofix", pane_id = %notification.pane_id, "autofix re-trigger same pane while pending — re-emit only");
-            self.emit_autofix_state_pending(&notification.pane_id, &notification.summary);
+            tracing::info!(target: "autofix", pane_id = %notification.session_id, "autofix re-trigger same pane while pending — re-emit only");
+            self.emit_autofix_state_pending(&notification.session_id, &notification.summary);
             return;
         }
 
@@ -1877,7 +1882,7 @@ impl App {
         // A new analysis supersedes any leftover suggestion. The C++ side
         // will swap to Pending on the new pending event below; emitting an
         // explicit cleared first would create a flicker.
-        self.suggested_pane_id = None;
+        self.suggested_session_id = None;
 
         // The auto-fix kind is carried by PromptSubmission::is_autofix,
         // so the text doesn't need a marker prefix — just the raw error
@@ -1889,15 +1894,15 @@ impl App {
 
         // Use the failing pane as the source so the agent reads its buffer.
         let pane_context = crate::shared_host::PaneContext {
-            pane_id: self.pane_id.clone(),
+            session_id: self.pane_session_id.clone(),
             tab_id: self.tab_id.clone(),
             window_id: self.window_id.clone(),
-            cwd: None,
-            source_pane_id: Some(notification.pane_id.clone()),
+            cwd: self.source_cwd.clone(),
+            source_session_id: Some(notification.session_id.clone()),
         };
 
-        // Store the failing pane ID so we can auto-fill `parent` on execution.
-        self.autofix_pane_id = Some(notification.pane_id.clone());
+        // Store the failing session ID so we can auto-fill `parent` on execution.
+        self.autofix_session_id = Some(notification.session_id.clone());
 
         self.prompt_in_flight = true;
         self.inflight_autofix_generation = Some(self.autofix_generation);
@@ -1907,12 +1912,12 @@ impl App {
         let prompt = PromptSubmission::new_autofix(prompt_text, Some(pane_context));
         self.current_prompt_id = Some(prompt.id);
         self.current_prompt_submitted_at_unix_s = Some(prompt.submitted_at_unix_s);
-        tracing::info!(target: "autofix", pane_id = %notification.pane_id, generation = self.autofix_generation, "sending auto-fix prompt");
+        tracing::info!(target: "autofix", session_id = %notification.session_id, generation = self.autofix_generation, "sending auto-fix prompt");
         let _ = self.prompt_tx.send(prompt);
 
         // Light up the bottom-bar diagnostic icon in "Pending" state — the
         // user knows something went wrong even before the agent responds.
-        self.emit_autofix_state_pending(&notification.pane_id, &notification.summary);
+        self.emit_autofix_state_pending(&notification.session_id, &notification.summary);
     }
 
     // ── autofix_state signalling ───────────────────────────────────────────
@@ -1952,17 +1957,17 @@ impl App {
     /// clicked the bottom-bar button or pressed Ctrl+. in the terminal
     /// window). Mirrors the Enter-key path in the recommendations handler
     /// but without requiring the agent pane to be focused.
-    fn handle_autofix_execute_request(&mut self, requested_pane_id: &str) {
-        tracing::info!(target: "autofix", requested_pane = %requested_pane_id, armed_pane = ?self.autofix_pane_id, has_recs = self.recommendations.is_some(), "autofix_execute received");
+    fn handle_autofix_execute_request(&mut self, requested_session_id: &str) {
+        tracing::info!(target: "autofix", requested_session = %requested_session_id, armed_pane = ?self.autofix_session_id, has_recs = self.recommendations.is_some(), "autofix_execute received");
         // Only execute if we have a cached autofix for the requested pane.
         // The pane_id check prevents a stale UI click from running against
         // an unrelated, more recent error.
-        let armed_pane = match self.autofix_pane_id.clone() {
-            Some(p) if p == requested_pane_id => p,
+        let armed_pane = match self.autofix_session_id.clone() {
+            Some(p) if p == requested_session_id => p,
             _ => {
                 tracing::info!(target: "autofix", "autofix_execute: no armed fix for this pane");
                 // Tell the UI anyway so it returns to Idle.
-                self.emit_autofix_state_cleared(requested_pane_id);
+                self.emit_autofix_state_cleared(requested_session_id);
                 return;
             }
         };
@@ -1970,7 +1975,7 @@ impl App {
             Some(r) => r,
             None => {
                 self.emit_autofix_state_cleared(&armed_pane);
-                self.autofix_pane_id = None;
+                self.autofix_session_id = None;
                 return;
             }
         };
@@ -1980,7 +1985,7 @@ impl App {
             .min(rec.choices.len().saturating_sub(1));
         let Some(mut choice) = rec.choices.get(idx).cloned() else {
             self.emit_autofix_state_cleared(&armed_pane);
-            self.autofix_pane_id = None;
+            self.autofix_session_id = None;
             return;
         };
         // Auto-fill parent for Send actions, same as Enter path.
@@ -1991,7 +1996,7 @@ impl App {
                 }
             }
         }
-        self.autofix_pane_id = None;
+        self.autofix_session_id = None;
         self.commit_pending_completed_turn();
         self.clear_recommendations();
         self.push_execution_info(format!("Auto-executing choice {}.", choice.choice));
@@ -2176,14 +2181,14 @@ impl App {
         let text = std::mem::take(&mut self.pending_agent_response);
 
         // Autofix responses use a minimal prompt/format; parse them separately.
-        if self.autofix_pane_id.is_some() {
+        if self.autofix_session_id.is_some() {
             return self.finalize_autofix_response(text);
         }
 
         match parse_recommendation_set(&text).and_then(|recommendations| {
             validate_recommendation_set_for_coordinator_target(
                 &recommendations,
-                self.pane_id.as_deref(),
+                self.pane_session_id.as_deref(),
             )
         }) {
             Ok(recommendations) => {
@@ -2228,7 +2233,7 @@ impl App {
     }
 
     fn finalize_autofix_response(&mut self, text: String) -> FinalizeOutcome {
-        let pane_id = match self.autofix_pane_id.clone() {
+        let pane_id = match self.autofix_session_id.clone() {
             Some(p) => p,
             None => return FinalizeOutcome::None,
         };
@@ -2273,11 +2278,11 @@ impl App {
 
                 self.emit_autofix_state_suggested(&pane_id, &title);
 
-                // No executable action to remember, but keep `suggested_pane_id`
+                // No executable action to remember, but keep `suggested_session_id`
                 // so a successful next command in the same pane can dismiss the
                 // bottom bar indicator.
-                self.suggested_pane_id = Some(pane_id.clone());
-                self.autofix_pane_id = None;
+                self.suggested_session_id = Some(pane_id.clone());
+                self.autofix_session_id = None;
                 self.clear_recommendations();
                 self.prompt_in_flight = false;
                 self.progress_status = None;
@@ -2286,7 +2291,7 @@ impl App {
             }
             AutofixDecision::Ignore => {
                 self.log_selection_phase("autofix_ignore", &format!("pane={pane_id}"));
-                self.autofix_pane_id = None;
+                self.autofix_session_id = None;
                 self.clear_recommendations();
                 self.emit_autofix_state_cleared(&pane_id);
                 self.prompt_in_flight = false;
@@ -2832,7 +2837,7 @@ mod tests {
 
     #[test]
     fn classify_connection_failed_is_critical() {
-        let params = json!({"pane_id": "3", "state": "failed"});
+        let params = json!({"session_id": "3", "state": "failed"});
         let n = classify_wt_event("connection_state", "3", &params);
         assert_eq!(n.severity, WtEventSeverity::Critical);
         assert!(n.summary.contains("failed"));
@@ -2841,7 +2846,7 @@ mod tests {
 
     #[test]
     fn classify_connection_closed_is_actionable() {
-        let params = json!({"pane_id": "5", "state": "closed"});
+        let params = json!({"session_id": "5", "state": "closed"});
         let n = classify_wt_event("connection_state", "5", &params);
         assert_eq!(n.severity, WtEventSeverity::Actionable);
         assert!(n.summary.contains("exited"));
@@ -2849,7 +2854,7 @@ mod tests {
 
     #[test]
     fn classify_connection_connected_is_informational() {
-        let params = json!({"pane_id": "1", "state": "connected"});
+        let params = json!({"session_id": "1", "state": "connected"});
         let n = classify_wt_event("connection_state", "1", &params);
         assert_eq!(n.severity, WtEventSeverity::Informational);
         assert!(n.summary.contains("connected"));
@@ -2857,23 +2862,23 @@ mod tests {
 
     #[test]
     fn classify_osc133_command_failed_is_actionable() {
-        let params = json!({"pane_id": "2", "sequence": "osc:133;D;1"});
+        let params = json!({"session_id": "2", "sequence": "osc:133;D;1"});
         let n = classify_wt_event("vt_sequence", "2", &params);
         assert_eq!(n.severity, WtEventSeverity::Actionable);
-        assert!(n.summary.contains("command failed"));
+        assert!(n.summary.contains("Command failed"));
         assert!(n.summary.contains("exit 1"));
     }
 
     #[test]
     fn classify_osc133_command_success_is_silent() {
-        let params = json!({"pane_id": "2", "sequence": "osc:133;D;0"});
+        let params = json!({"session_id": "2", "sequence": "osc:133;D;0"});
         let n = classify_wt_event("vt_sequence", "2", &params);
         assert!(n.acknowledged); // auto-dismissed
     }
 
     #[test]
     fn classify_osc133_high_exit_code() {
-        let params = json!({"pane_id": "2", "sequence": "osc:133;D;127"});
+        let params = json!({"session_id": "2", "sequence": "osc:133;D;127"});
         let n = classify_wt_event("vt_sequence", "2", &params);
         assert_eq!(n.severity, WtEventSeverity::Actionable);
         assert!(n.summary.contains("exit 127"));
@@ -2882,21 +2887,21 @@ mod tests {
     #[test]
     fn classify_osc133_prompt_marker_is_silent() {
         // OSC 133;A is a prompt marker, not a command finish
-        let params = json!({"pane_id": "2", "sequence": "osc:133;A"});
+        let params = json!({"session_id": "2", "sequence": "osc:133;A"});
         let n = classify_wt_event("vt_sequence", "2", &params);
         assert!(n.acknowledged); // silenced
     }
 
     #[test]
     fn classify_normal_vt_sequence_is_silent() {
-        let params = json!({"pane_id": "7", "sequence": "osc:0;title"});
+        let params = json!({"session_id": "7", "sequence": "osc:0;title"});
         let n = classify_wt_event("vt_sequence", "7", &params);
         assert!(n.acknowledged); // silenced
     }
 
     #[test]
     fn classify_unknown_method_is_informational() {
-        let params = json!({"pane_id": "1"});
+        let params = json!({"session_id": "1"});
         let n = classify_wt_event("something_new", "1", &params);
         assert_eq!(n.severity, WtEventSeverity::Informational);
     }
@@ -2907,7 +2912,7 @@ mod tests {
     fn informational_auto_dismisses_after_threshold() {
         let mut n = WtNotification {
             severity: WtEventSeverity::Informational,
-            pane_id: "1".to_string(),
+            session_id: "1".to_string(),
             summary: "test".to_string(),
             acknowledged: false,
             age_ticks: 0,
@@ -2923,7 +2928,7 @@ mod tests {
     fn critical_never_auto_dismisses() {
         let n = WtNotification {
             severity: WtEventSeverity::Critical,
-            pane_id: "1".to_string(),
+            session_id: "1".to_string(),
             summary: "crash".to_string(),
             acknowledged: false,
             age_ticks: 1000,
@@ -2935,7 +2940,7 @@ mod tests {
     fn actionable_never_auto_dismisses() {
         let n = WtNotification {
             severity: WtEventSeverity::Actionable,
-            pane_id: "1".to_string(),
+            session_id: "1".to_string(),
             summary: "exited".to_string(),
             acknowledged: false,
             age_ticks: 1000,
@@ -2950,8 +2955,8 @@ mod tests {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "3".to_string(),
-            params: json!({"pane_id": "3", "state": "failed"}),
+            session_id: "3".to_string(),
+            params: json!({"session_id": "3", "state": "failed"}),
         });
         assert!(app.show_notification_banner);
         assert_eq!(app.wt_notifications.len(), 1);
@@ -2965,8 +2970,8 @@ mod tests {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "5".to_string(),
-            params: json!({"pane_id": "5", "state": "closed"}),
+            session_id: "5".to_string(),
+            params: json!({"session_id": "5", "state": "closed"}),
         });
         assert!(app.show_notification_banner);
         assert!(app.messages.iter().any(|m| matches!(m, ChatMessage::System(_))));
@@ -2977,8 +2982,8 @@ mod tests {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "1".to_string(),
-            params: json!({"pane_id": "1", "state": "connected"}),
+            session_id: "1".to_string(),
+            params: json!({"session_id": "1", "state": "connected"}),
         });
         assert!(!app.show_notification_banner);
         assert!(app.messages.is_empty());
@@ -2988,11 +2993,11 @@ mod tests {
     #[test]
     fn wt_event_from_own_pane_is_ignored() {
         let mut app = test_app();
-        app.pane_id = Some("42".to_string());
+        app.session_id = "42".to_string();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "42".to_string(),
-            params: json!({"pane_id": "42", "state": "failed"}),
+            session_id: "42".to_string(),
+            params: json!({"session_id": "42", "state": "failed"}),
         });
         // Events from our own pane should be completely ignored
         assert!(!app.show_notification_banner);
@@ -3005,8 +3010,8 @@ mod tests {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "3".to_string(),
-            params: json!({"pane_id": "3", "state": "failed"}),
+            session_id: "3".to_string(),
+            params: json!({"session_id": "3", "state": "failed"}),
         });
         assert!(app.show_notification_banner);
         assert_eq!(app.unacknowledged_count(), 1);
@@ -3023,18 +3028,18 @@ mod tests {
         // First event
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "1".to_string(),
-            params: json!({"pane_id": "1", "state": "closed"}),
+            session_id: "1".to_string(),
+            params: json!({"session_id": "1", "state": "closed"}),
         });
         // Second event (more recent)
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "2".to_string(),
-            params: json!({"pane_id": "2", "state": "failed"}),
+            session_id: "2".to_string(),
+            params: json!({"session_id": "2", "state": "failed"}),
         });
 
         let (summary, severity) = app.notification_badge().unwrap();
-        assert!(summary.contains("Pane 2"));
+        assert!(summary.contains("Session 2"));
         assert_eq!(*severity, WtEventSeverity::Critical);
         assert_eq!(app.unacknowledged_count(), 2);
     }
@@ -3045,8 +3050,8 @@ mod tests {
         for i in 0..25 {
             app.handle_event(AppEvent::WtEvent {
                 method: "connection_state".to_string(),
-                pane_id: format!("{}", i),
-                params: json!({"pane_id": format!("{}", i), "state": "connected"}),
+                session_id: format!("{}", i),
+                params: json!({"session_id": format!("{}", i), "state": "connected"}),
             });
         }
         assert_eq!(app.wt_notifications.len(), 20);
@@ -3057,8 +3062,8 @@ mod tests {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "1".to_string(),
-            params: json!({"pane_id": "1", "state": "connected"}),
+            session_id: "1".to_string(),
+            params: json!({"session_id": "1", "state": "connected"}),
         });
         assert_eq!(app.wt_notifications.len(), 1);
         assert_eq!(app.wt_notifications[0].age_ticks, 0);
@@ -3076,8 +3081,8 @@ mod tests {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "3".to_string(),
-            params: json!({"pane_id": "3", "state": "failed"}),
+            session_id: "3".to_string(),
+            params: json!({"session_id": "3", "state": "failed"}),
         });
         // Simulate many ticks
         for _ in 0..200 {
@@ -3093,8 +3098,8 @@ mod tests {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "3".to_string(),
-            params: json!({"pane_id": "3", "state": "failed"}),
+            session_id: "3".to_string(),
+            params: json!({"session_id": "3", "state": "failed"}),
         });
         assert!(app.show_notification_banner);
 
@@ -3111,8 +3116,8 @@ mod tests {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "3".to_string(),
-            params: json!({"pane_id": "3", "state": "closed"}),
+            session_id: "3".to_string(),
+            params: json!({"session_id": "3", "state": "closed"}),
         });
         assert!(app.active_notification().is_some());
 
@@ -3126,20 +3131,20 @@ mod tests {
         // Informational from pane 1
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "1".to_string(),
-            params: json!({"pane_id": "1", "state": "connected"}),
+            session_id: "1".to_string(),
+            params: json!({"session_id": "1", "state": "connected"}),
         });
         // Critical from pane 2
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "2".to_string(),
-            params: json!({"pane_id": "2", "state": "failed"}),
+            session_id: "2".to_string(),
+            params: json!({"session_id": "2", "state": "failed"}),
         });
         // Actionable from pane 3
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
-            pane_id: "3".to_string(),
-            params: json!({"pane_id": "3", "state": "closed"}),
+            session_id: "3".to_string(),
+            params: json!({"session_id": "3", "state": "closed"}),
         });
 
         assert_eq!(app.wt_notifications.len(), 3);

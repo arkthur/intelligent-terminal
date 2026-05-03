@@ -26,16 +26,16 @@ use crate::ui_trace;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PaneContext {
-    pub pane_id: Option<String>,
+    pub session_id: Option<String>,
     pub tab_id: Option<String>,
     pub window_id: Option<String>,
     pub cwd: Option<String>,
-    pub source_pane_id: Option<String>,
+    pub source_session_id: Option<String>,
 }
 
 impl PaneContext {
-    pub fn effective_source_pane_id(&self) -> Option<&str> {
-        self.source_pane_id.as_deref().or(self.pane_id.as_deref())
+    pub fn effective_source_session_id(&self) -> Option<&str> {
+        self.source_session_id.as_deref().or(self.session_id.as_deref())
     }
 }
 
@@ -98,10 +98,10 @@ pub enum HostClientRequest {
     /// Host-internal only (client_id == u64::MAX). Used when the user clicks
     /// the bottom-bar autofix icon / presses Ctrl+. while no attach TUI is
     /// running. Host picks the recommended choice from its state, auto-fills
-    /// `parent` on Send actions with `source_pane_id`, runs it, and emits
+    /// `parent` on Send actions with `source_session_id`, runs it, and emits
     /// autofix_state:cleared.
     ExecuteArmedAutofix {
-        source_pane_id: String,
+        source_session_id: String,
     },
     /// Sent by the attach TUI when the user presses ESC to dismiss a fix card.
     /// Host clears its autofix state and emits autofix_state:cleared so the
@@ -197,7 +197,7 @@ pub enum SharedUiEvent {
     },
     WtEvent {
         method: String,
-        pane_id: String,
+        session_id: String,
         params: serde_json::Value,
     },
 }
@@ -266,11 +266,11 @@ impl SharedUiEvent {
             }),
             AppEvent::WtEvent {
                 method,
-                pane_id,
+                session_id,
                 params,
             } => Some(Self::WtEvent {
                 method: method.clone(),
-                pane_id: pane_id.clone(),
+                session_id: session_id.clone(),
                 params: params.clone(),
             }),
             AppEvent::Tick
@@ -325,11 +325,11 @@ impl SharedUiEvent {
             Self::SystemMessage { message } => AppEvent::SystemMessage(message),
             Self::WtEvent {
                 method,
-                pane_id,
+                session_id,
                 params,
             } => AppEvent::WtEvent {
                 method,
-                pane_id,
+                session_id,
                 params,
             },
         }
@@ -562,18 +562,18 @@ pub async fn run_host_server(
                             "method": "autofix_state",
                             "params": {
                                 "state": "pending",
-                                "pane_id": pane_id,
+                                "session_id": pane_id,
                                 "summary": summary,
                             }
                         });
                         crate::app::send_wt_protocol_event(pending_evt.to_string());
 
                         let pane_context = PaneContext {
-                            pane_id: None,
+                            session_id: None,
                             tab_id: None,
                             window_id: None,
                             cwd: None,
-                            source_pane_id: Some(pane_id.clone()),
+                            source_session_id: Some(pane_id.clone()),
                         };
                         let prompt_text =
                             format!("{}\nDiagnose the error and suggest a fix.", summary);
@@ -606,7 +606,7 @@ pub async fn run_host_server(
                         let _ = command_tx.send(HostCommand::ClientRequest {
                             client_id: u64::MAX,
                             request: HostClientRequest::ExecuteArmedAutofix {
-                                source_pane_id: pane_id,
+                                source_session_id: pane_id,
                             },
                         });
                     }
@@ -765,7 +765,7 @@ async fn run_attach_client_inner(
                     &format!("preview={:?}", prompt.preview()),
                 );
                 // Use the prompt's own pane_context (e.g. autofix sets
-                // source_pane_id), falling back to the attach context.
+                // source_session_id), falling back to the attach context.
                 let effective_context = prompt.pane_context.unwrap_or_else(|| pane_context.clone());
                 send_host_request(
                     &event_tx,
@@ -1039,7 +1039,7 @@ fn handle_host_command(
             let armed_pane = state
                 .current_prompt_pane_context
                 .as_ref()
-                .and_then(|c| c.source_pane_id.as_deref());
+                .and_then(|c| c.source_session_id.as_deref());
             let matches = state.current_prompt_is_autofix && armed_pane == Some(pane_id.as_str());
             // Also clear if there are armed recommendations for this pane,
             // even if prompt is no longer in-flight.
@@ -1073,7 +1073,7 @@ fn handle_host_command(
                 let cleared_evt = serde_json::json!({
                     "type": "event",
                     "method": "autofix_state",
-                    "params": { "state": "cleared", "pane_id": cleared_pane }
+                    "params": { "state": "cleared", "session_id": cleared_pane }
                 });
                 crate::app::send_wt_protocol_event(cleared_evt.to_string());
                 state.recommendations = None;
@@ -1125,12 +1125,12 @@ fn handle_host_command(
                 if is_autofix {
                     let incoming_pane = effective_context
                         .as_ref()
-                        .and_then(|c: &PaneContext| c.source_pane_id.as_deref());
+                        .and_then(|c: &PaneContext| c.source_session_id.as_deref());
                     let same_pane_pending = {
                         let current_pane = state
                             .current_prompt_pane_context
                             .as_ref()
-                            .and_then(|c| c.source_pane_id.as_deref());
+                            .and_then(|c| c.source_session_id.as_deref());
                         state.prompt_in_flight
                             && state.current_prompt_is_autofix
                             && incoming_pane.is_some()
@@ -1217,32 +1217,32 @@ fn handle_host_command(
                 if let Some(mut selected) = maybe_choice {
                     // Auto-fill empty `parent` on Send actions.
                     // Priority:
-                    //   1. current_prompt_pane_context.source_pane_id — the failing pane
+                    //   1. current_prompt_pane_context.source_session_id — the failing pane
                     //      recorded when autofix submitted the prompt (most accurate).
-                    //   2. client's source_pane_id — the pane the agent is associated with.
-                    //   3. client's own pane_id — last resort.
-                    let source_pane = state
+                    //   2. client's source_session_id — the pane the agent is associated with.
+                    //   3. client's own session_id — last resort.
+                    let source_session = state
                         .current_prompt_pane_context
                         .as_ref()
-                        .and_then(|ctx| ctx.source_pane_id.clone())
+                        .and_then(|ctx| ctx.source_session_id.clone())
                         .or_else(|| {
                             clients
                                 .get(&client_id)
-                                .and_then(|c| c.pane_context.source_pane_id.clone())
+                                .and_then(|c| c.pane_context.source_session_id.clone())
                         })
                         .or_else(|| {
                             clients
                                 .get(&client_id)
-                                .and_then(|c| c.pane_context.pane_id.clone())
+                                .and_then(|c| c.pane_context.session_id.clone())
                         });
-                    if let Some(ref pane_id) = source_pane {
+                    if let Some(ref session_id) = source_session {
                         for action in &mut selected.actions {
                             if let crate::coordinator::RecommendedAction::Send {
                                 ref mut parent, ..
                             } = action
                             {
                                 if parent.is_empty() {
-                                    *parent = pane_id.clone();
+                                    *parent = session_id.clone();
                                 }
                             }
                         }
@@ -1263,11 +1263,11 @@ fn handle_host_command(
                     }
 
                     // Clear the bottom-bar Armed badge, mirroring ExecuteArmedAutofix.
-                    if let Some(ref pane_id) = source_pane {
+                    if let Some(ref pane_id) = source_session {
                         let evt = serde_json::json!({
                             "type": "event",
                             "method": "autofix_state",
-                            "params": { "state": "cleared", "pane_id": pane_id }
+                            "params": { "state": "cleared", "session_id": pane_id }
                         });
                         crate::app::send_wt_protocol_event(evt.to_string());
                     }
@@ -1281,7 +1281,7 @@ fn handle_host_command(
                     );
                 }
             }
-            HostClientRequest::ExecuteArmedAutofix { source_pane_id } => {
+            HostClientRequest::ExecuteArmedAutofix { source_session_id } => {
                 // Emit cleared unconditionally — whatever happens below, the
                 // bottom-bar state should return to Idle so a stale Armed
                 // badge doesn't linger.
@@ -1291,7 +1291,7 @@ fn handle_host_command(
                         "method": "autofix_state",
                         "params": {
                             "state": "cleared",
-                            "pane_id": source_pane_id,
+                            "session_id": source_session_id,
                         }
                     });
                     crate::app::send_wt_protocol_event(evt.to_string());
@@ -1312,7 +1312,7 @@ fn handle_host_command(
                 let Some(mut selected) = maybe_choice else {
                     host_log(&format!(
                         "execute_armed_autofix: no recommendation available for pane {}",
-                        source_pane_id
+                        source_session_id
                     ));
                     emit_cleared();
                     return;
@@ -1326,7 +1326,7 @@ fn handle_host_command(
                     } = action
                     {
                         if parent.is_empty() {
-                            *parent = source_pane_id.clone();
+                            *parent = source_session_id.clone();
                         }
                     }
                 }
@@ -1335,7 +1335,7 @@ fn handle_host_command(
                 state.clear_recommendations();
                 state.push_execution_info(format!(
                     "Auto-executing choice {} for pane {}.",
-                    selected.choice, source_pane_id
+                    selected.choice, source_session_id
                 ));
                 broadcast_snapshot(clients, &state.snapshot());
                 if recommendation_tx
@@ -1356,14 +1356,14 @@ fn handle_host_command(
                 let armed_pane_id = state
                     .current_prompt_pane_context
                     .as_ref()
-                    .and_then(|c| c.source_pane_id.clone());
+                    .and_then(|c| c.source_session_id.clone());
                 if state.current_prompt_is_autofix || state.recommendations.is_some() {
                     state.autofix_generation = state.autofix_generation.wrapping_add(1);
                     if let Some(pane_id) = armed_pane_id {
                         let cleared_evt = serde_json::json!({
                             "type": "event",
                             "method": "autofix_state",
-                            "params": { "state": "cleared", "pane_id": pane_id }
+                            "params": { "state": "cleared", "session_id": pane_id }
                         });
                         crate::app::send_wt_protocol_event(cleared_evt.to_string());
                     }
@@ -1993,7 +1993,7 @@ impl HostSessionState {
         let autofix_source_pane = self
             .current_prompt_pane_context
             .as_ref()
-            .and_then(|ctx| ctx.source_pane_id.clone());
+            .and_then(|ctx| ctx.source_session_id.clone());
 
         // Autofix responses use a minimal prompt/format; parse them separately.
         if is_autofix {
@@ -2006,7 +2006,7 @@ impl HostSessionState {
                     &recommendations,
                     self.current_prompt_pane_context
                         .as_ref()
-                        .and_then(|context| context.pane_id.as_deref()),
+                        .and_then(|context| context.session_id.as_deref()),
                 ) {
                     Ok(filtered) => {
                         self.stage_completed_turn(text);
@@ -2044,7 +2044,7 @@ impl HostSessionState {
         let emit_cleared = |pane_id: &str| {
             let evt = serde_json::json!({
                 "type": "event", "method": "autofix_state",
-                "params": { "state": "cleared", "pane_id": pane_id }
+                "params": { "state": "cleared", "session_id": pane_id }
             });
             crate::app::send_wt_protocol_event(evt.to_string());
         };
@@ -2057,7 +2057,7 @@ impl HostSessionState {
                         "type": "event", "method": "autofix_state",
                         "params": {
                             "state": "armed",
-                            "pane_id": pane_id,
+                            "session_id": pane_id,
                             "fix_preview": preview,
                             "hotkey_hint": "Ctrl+Alt+.",
                         }
@@ -2074,7 +2074,7 @@ impl HostSessionState {
                         "type": "event", "method": "autofix_state",
                         "params": {
                             "state": "suggested",
-                            "pane_id": pane_id,
+                            "session_id": pane_id,
                             "suggestion_title": title,
                         }
                     });
