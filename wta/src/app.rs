@@ -1932,7 +1932,7 @@ impl App {
             "method": "autofix_state",
             "params": {
                 "state": "pending",
-                "pane_id": pane_id,
+                "session_id": pane_id,
                 "summary": summary,
             }
         });
@@ -1945,7 +1945,7 @@ impl App {
             "method": "autofix_state",
             "params": {
                 "state": "armed",
-                "pane_id": pane_id,
+                "session_id": pane_id,
                 "fix_preview": fix_preview,
                 "hotkey_hint": "Ctrl+Alt+.",
             }
@@ -2015,7 +2015,7 @@ impl App {
             "method": "autofix_state",
             "params": {
                 "state": "cleared",
-                "pane_id": pane_id,
+                "session_id": pane_id,
             }
         });
         send_wt_protocol_event(evt.to_string());
@@ -2030,7 +2030,7 @@ impl App {
             "method": "autofix_state",
             "params": {
                 "state": "suggested",
-                "pane_id": pane_id,
+                "session_id": pane_id,
                 "suggestion_title": title,
             }
         });
@@ -2993,7 +2993,7 @@ mod tests {
     #[test]
     fn wt_event_from_own_pane_is_ignored() {
         let mut app = test_app();
-        app.session_id = "42".to_string();
+        app.pane_session_id = Some("42".to_string());
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
             session_id: "42".to_string(),

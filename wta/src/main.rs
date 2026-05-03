@@ -1168,9 +1168,9 @@ async fn run_ensure_host(
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
-                        let pane_id = event_json
+                        let session_id = event_json
                             .get("params")
-                            .and_then(|p| p.get("pane_id"))
+                            .and_then(|p| p.get("session_id"))
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
@@ -1214,10 +1214,10 @@ async fn run_ensure_host(
                         // User pressed Ctrl+. or clicked the bottom-bar
                         // autofix icon — execute the armed recommendation.
                         if method == "autofix_execute" {
-                            tracing::info!(pane_id = %pane_id, "host autofix_execute");
+                            tracing::info!(session_id = %session_id, "host autofix_execute");
                             let _ = host_autofix_tx.send(
                                 shared_host::HostAutofixCommand::Execute {
-                                    pane_id: pane_id.clone(),
+                                    pane_id: session_id.clone(),
                                 },
                             );
                             continue;
@@ -1228,14 +1228,14 @@ async fn run_ensure_host(
                         // host-side autofix pipeline so the bottom bar goes
                         // from Idle → Pending → Armed even when no attach
                         // TUI (agent pane) is running.
-                        let note = crate::app::classify_wt_event(&method, &pane_id, &params);
+                        let note = crate::app::classify_wt_event(&method, &session_id, &params);
                         if note.severity == crate::app::WtEventSeverity::Actionable
                             && method != "agent_prompt"
                         {
-                            tracing::info!(pane_id = %pane_id, summary = %note.summary, "host autofix trigger");
+                            tracing::info!(session_id = %session_id, summary = %note.summary, "host autofix trigger");
                             let _ = host_autofix_tx.send(
                                 shared_host::HostAutofixCommand::Trigger {
-                                    pane_id: pane_id.clone(),
+                                    pane_id: session_id.clone(),
                                     summary: note.summary.clone(),
                                 },
                             );
@@ -1262,13 +1262,13 @@ async fn run_ensure_host(
                                 let is_prompt_start = seq == "osc:133;A";
                                 if is_exit_zero || is_prompt_start {
                                     tracing::info!(
-                                        pane_id = %pane_id,
+                                        session_id = %session_id,
                                         seq = %seq,
                                         "host autofix clear on success/prompt-start"
                                     );
                                     let _ = host_autofix_tx.send(
                                         shared_host::HostAutofixCommand::ClearOnSuccess {
-                                            pane_id: pane_id.clone(),
+                                            pane_id: session_id.clone(),
                                         },
                                     );
                                 }
