@@ -58,9 +58,19 @@ fn resolve_wtcli_path() -> String {
 
 /// Fire-and-forget invocation of wtcli for one-shot UI actions
 /// (focus-pane, split-pane). Errors are logged but not surfaced.
+///
+/// Redirects child stdout/stderr/stdin to null so wtcli's own status output
+/// (e.g. "Created pane <id>") does not bleed into the parent TUI's screen
+/// buffer underneath ratatui.
 pub fn spawn_wtcli_async(args: &[String]) {
     let path = resolve_wtcli_path();
-    match std::process::Command::new(&path).args(args).spawn() {
+    match std::process::Command::new(&path)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
         Ok(_child) => {
             tracing::debug!(target: "wtcli", path = %path, ?args, "spawned");
         }

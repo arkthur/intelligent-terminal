@@ -1,5 +1,11 @@
-# send-event.ps1 — Forward Copilot CLI hook events to WTA via wtcli
+# send-event.ps1 — Forward Gemini CLI hook events to WTA via wtcli
+# (Gemini variant: defaults WTA_CLI_SOURCE to "gemini" so the central registry
+# tags entries correctly. Otherwise identical to the Copilot/Claude plugin's
+# script in wta/agent-hooks-plugin/hooks/send-event.ps1.)
 param([string]$EventType = "agent.hook")
+
+# Tag this CLI as Gemini for the wrapper payload.
+if (-not $env:WTA_CLI_SOURCE) { $env:WTA_CLI_SOURCE = "gemini" }
 
 # Skip if not running inside Windows Terminal
 if (-not $env:WT_COM_CLSID) { exit 0 }
@@ -27,40 +33,20 @@ if (-not $wtcliPath) { exit 0 }
 $hookData = [Console]::In.ReadToEnd()
 if (-not $hookData -or -not $hookData.Trim()) { exit 0 }
 
-# Wrap payload and send via ProcessStartInfo to avoid PowerShell argument mangling
 try {
     $parsed = $hookData | ConvertFrom-Json
 
-    # Extract agent_session_id from stdin JSON (Claude/Gemini), env (Copilot), or empty.
+    # Extract agent_session_id from stdin JSON or env (Gemini puts it in stdin's
+    # session_id field per the hooks reference).
     $agentSessionId = ""
     if ($parsed.PSObject.Properties.Name -contains "session_id") {
         $agentSessionId = [string]$parsed.session_id
-    } elseif ($env:COPILOT_SESSION_ID) {
-        $agentSessionId = $env:COPILOT_SESSION_ID
-    } elseif ($env:CLAUDE_SESSION_ID) {
-        $agentSessionId = $env:CLAUDE_SESSION_ID
     } elseif ($env:GEMINI_SESSION_ID) {
         $agentSessionId = $env:GEMINI_SESSION_ID
     }
 
-    # Detect CLI source: prefer WTA_CLI_SOURCE (set by bash hooks); else use the
-    # CLI-specific session-id env var (most reliable: only that CLI sets it);
-    # only fall back to CLAUDE_PLUGIN_ROOT if no session-id was found, since
-    # Copilot CLI also sets CLAUDE_PLUGIN_ROOT (its plugin format borrows from
-    # Claude), which would otherwise mis-tag Copilot sessions as Claude.
-    $cliSource = $env:WTA_CLI_SOURCE
-    if (-not $cliSource) {
-        if     ($env:COPILOT_SESSION_ID) { $cliSource = "copilot" }
-        elseif ($env:GEMINI_SESSION_ID)  { $cliSource = "gemini" }
-        elseif ($env:CLAUDE_SESSION_ID)  { $cliSource = "claude" }
-        elseif ($env:GEMINI_CLI)         { $cliSource = "gemini" }
-        elseif ($env:COPILOT_CLI)        { $cliSource = "copilot" }
-        elseif ($env:CLAUDE_PLUGIN_ROOT) { $cliSource = "claude" }
-        else { $cliSource = "copilot" }
-    }
-
     $wrapper = @{
-        cli_source       = $cliSource
+        cli_source       = $env:WTA_CLI_SOURCE
         agent_session_id = $agentSessionId
         payload          = $parsed
     }

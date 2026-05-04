@@ -108,7 +108,13 @@ impl AgentSessionRegistry {
                     }
                 }
                 entry.cli_source       = cli_source;
-                entry.title            = title;
+                // Preserve an existing title (e.g. one loaded from disk by the
+                // history loader) when the new event carries no replacement.
+                // Live synth titles are sent only for genuinely new sessions
+                // (route_agent_event_to_registry passes "" for resumed ones).
+                if !title.is_empty() {
+                    entry.title        = title;
+                }
                 entry.cwd              = cwd;
                 entry.pane_session_id  = Some(pane_session_id.clone());
                 entry.status           = AgentStatus::Idle;
@@ -240,6 +246,19 @@ impl AgentSessionRegistry {
                 self.dirty = true;
             }
         }
+    }
+
+    /// Insert historical entries loaded from disk, skipping any whose key
+    /// is already present (the live registry wins). Idempotent — safe to
+    /// call multiple times. Used at startup.
+    pub fn merge_historical(&mut self, loaded: Vec<AgentSession>) {
+        for s in loaded {
+            if self.sessions.contains_key(&s.key) {
+                continue;
+            }
+            self.sessions.insert(s.key.clone(), s);
+        }
+        self.dirty = true;
     }
 
     /// Populate the registry with synthetic data covering all 6 statuses.
@@ -577,5 +596,51 @@ mod tests {
         // Attention session must carry an attention reason.
         let att = sessions.iter().find(|s| s.status == AgentStatus::Attention).unwrap();
         assert!(att.attention_reason.is_some());
+    }
+
+    #[test]
+    fn merge_historical_inserts_only_new_keys() {
+        let mut reg = AgentSessionRegistry::new();
+        // Pre-existing live session.
+        reg.apply(SessionEvent::SessionStarted {
+            key:             "live-1".into(),
+            cli_source:      CliSource::Copilot,
+            pane_session_id: "p".into(),
+            cwd:             PathBuf::from("/x"),
+            title:           "live".into(),
+        });
+
+        let now = SystemTime::now();
+        let mk_hist = |key: &str| AgentSession {
+            key:               key.to_string(),
+            cli_source:        CliSource::Claude,
+            pane_session_id:   None,
+            window_id:         None, tab_id: None,
+            title:             format!("hist {}", key),
+            cwd:               PathBuf::from("/y"),
+            started_at:        now,
+            last_activity_at:  now,
+            status:            AgentStatus::Historical,
+            last_error:        None,
+            current_tool:      None,
+            attention_reason:  None,
+            log_path:          None,
+        };
+
+        // Loaded set tries to overwrite live-1 + add hist-1.
+        reg.merge_historical(vec![
+            mk_hist("live-1"),
+            mk_hist("hist-1"),
+        ]);
+
+        // live-1 must remain Working/Idle (Copilot, with pane), NOT Historical.
+        let live = reg.sessions.get("live-1").unwrap();
+        assert_eq!(live.cli_source, CliSource::Copilot);
+        assert_ne!(live.status, AgentStatus::Historical);
+        assert!(live.pane_session_id.is_some());
+
+        // hist-1 must be added as Historical.
+        let hist = reg.sessions.get("hist-1").unwrap();
+        assert_eq!(hist.status, AgentStatus::Historical);
     }
 }

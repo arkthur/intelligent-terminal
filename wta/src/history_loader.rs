@@ -1,0 +1,595 @@
+// wta/src/history_loader.rs
+//
+// Discover historical CLI agent sessions by scanning each CLI's on-disk
+// log/state layout. Used to seed the AgentSessionRegistry with `Historical`
+// entries on App startup so users can resume past sessions from F2.
+//
+// Layouts (verified 2026-05):
+//   Copilot:  ~/.copilot/session-state/<UUID>/{workspace.yaml,events.jsonl}
+//             - session id   = directory name
+//             - cwd          = workspace.yaml `cwd:` field
+//             - title        = workspace.yaml `summary:` (fallback `name:`)
+//             - last_activity= events.jsonl mtime (fallback workspace.yaml mtime)
+//             - in-use marker= inuse.<PID>.lock files (skip those)
+//
+//   Claude:   ~/.claude/projects/<encoded-cwd>/<UUID>.jsonl
+//             - session id   = filename stem
+//             - cwd          = decode parent directory name (drive-dash format)
+//             - title        = first user message in jsonl (best-effort)
+//             - last_activity= file mtime
+//             - skip "memory" project + */subagents/*.jsonl
+//
+//   Gemini:   ~/.gemini/tmp/<project-slug>/chats/session-*.jsonl
+//             - session id   = first JSONL line `sessionId` field
+//             - cwd          = ~/.gemini/projects.json reverse lookup
+//             - title        = first `{type:"user"}` line content[0].text
+//             - last_activity= file mtime
+//
+// Sort each list by last_activity desc; cap each CLI at MAX_PER_CLI.
+
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::SystemTime;
+
+use crate::agent_sessions::{AgentSession, AgentStatus, CliSource};
+
+const MAX_PER_CLI: usize = 50;
+const TITLE_TAIL_BYTES: u64 = 64 * 1024;
+
+pub fn load_all() -> Vec<AgentSession> {
+    let mut out = Vec::new();
+    let Some(home) = home_dir() else { return out };
+    out.extend(take_n(load_copilot(&home), MAX_PER_CLI));
+    out.extend(take_n(load_claude(&home),  MAX_PER_CLI));
+    out.extend(take_n(load_gemini(&home),  MAX_PER_CLI));
+    out
+}
+
+fn take_n(mut v: Vec<AgentSession>, n: usize) -> Vec<AgentSession> {
+    v.truncate(n);
+    v
+}
+
+fn home_dir() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(PathBuf::from)
+}
+
+// ─── Copilot ────────────────────────────────────────────────────────────
+
+fn load_copilot(home: &Path) -> Vec<AgentSession> {
+    let base = home.join(".copilot").join("session-state");
+    let mut out = Vec::new();
+    let Ok(rd) = fs::read_dir(&base) else { return out };
+
+    for entry in rd.flatten() {
+        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) { continue; }
+        let dir = entry.path();
+        let id = match dir.file_name().and_then(|n| n.to_str()) {
+            Some(s) if !s.is_empty() => s.to_string(),
+            _ => continue,
+        };
+
+        let workspace = dir.join("workspace.yaml");
+        let events    = dir.join("events.jsonl");
+
+        let last_activity = events.metadata()
+            .and_then(|m| m.modified()).ok()
+            .or_else(|| workspace.metadata().and_then(|m| m.modified()).ok())
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        let started_at = workspace.metadata()
+            .and_then(|m| m.modified()).ok()
+            .unwrap_or(last_activity);
+
+        let yaml = fs::read_to_string(&workspace).unwrap_or_default();
+        let cwd = parse_simple_yaml(&yaml, "cwd")
+            .map(PathBuf::from)
+            .unwrap_or_default();
+        let title = parse_simple_yaml(&yaml, "summary")
+            .filter(|s| !s.is_empty())
+            .or_else(|| parse_simple_yaml(&yaml, "name").filter(|s| !s.is_empty()))
+            .unwrap_or_else(|| short_id(&id, "copilot"));
+
+        out.push(AgentSession {
+            key:               id.clone(),
+            cli_source:        CliSource::Copilot,
+            pane_session_id:   None,
+            window_id:         None,
+            tab_id:            None,
+            title,
+            cwd,
+            started_at,
+            last_activity_at:  last_activity,
+            status:            AgentStatus::Historical,
+            last_error:        None,
+            current_tool:      None,
+            attention_reason:  None,
+            log_path:          Some(events),
+        });
+    }
+    out.sort_by(|a, b| b.last_activity_at.cmp(&a.last_activity_at));
+    out
+}
+
+// ─── Claude ─────────────────────────────────────────────────────────────
+
+fn load_claude(home: &Path) -> Vec<AgentSession> {
+    let base = home.join(".claude").join("projects");
+    let mut out = Vec::new();
+    let Ok(rd) = fs::read_dir(&base) else { return out };
+
+    for proj_entry in rd.flatten() {
+        let proj_dir = proj_entry.path();
+        let proj_name = match proj_dir.file_name().and_then(|n| n.to_str()) {
+            Some(s) if s != "memory" => s.to_string(),
+            _ => continue,
+        };
+        let cwd = decode_claude_cwd(&proj_name);
+
+        let Ok(files) = fs::read_dir(&proj_dir) else { continue };
+        for f in files.flatten() {
+            let path = f.path();
+            if path.is_dir() { continue; }
+            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") { continue; }
+            let id = match path.file_stem().and_then(|n| n.to_str()) {
+                Some(s) if !s.is_empty() => s.to_string(),
+                _ => continue,
+            };
+            let last_activity = path.metadata().and_then(|m| m.modified()).ok()
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            let title = first_user_text_jsonl(&path, ClaudeOrGemini::Claude)
+                .unwrap_or_else(|| short_id(&id, "claude"));
+
+            out.push(AgentSession {
+                key:               id.clone(),
+                cli_source:        CliSource::Claude,
+                pane_session_id:   None,
+                window_id:         None,
+                tab_id:            None,
+                title,
+                cwd:               cwd.clone(),
+                started_at:        last_activity,
+                last_activity_at:  last_activity,
+                status:            AgentStatus::Historical,
+                last_error:        None,
+                current_tool:      None,
+                attention_reason:  None,
+                log_path:          Some(path),
+            });
+        }
+    }
+    out.sort_by(|a, b| b.last_activity_at.cmp(&a.last_activity_at));
+    out
+}
+
+// ─── Gemini ─────────────────────────────────────────────────────────────
+
+fn load_gemini(home: &Path) -> Vec<AgentSession> {
+    let tmp = home.join(".gemini").join("tmp");
+    let mut out = Vec::new();
+    let Ok(rd) = fs::read_dir(&tmp) else { return out };
+
+    let projects_json = home.join(".gemini").join("projects.json");
+    let cwd_lookup    = parse_gemini_projects(&projects_json);
+
+    for proj_entry in rd.flatten() {
+        if !proj_entry.file_type().map(|t| t.is_dir()).unwrap_or(false) { continue; }
+        let proj_name = match proj_entry.file_name().to_str() {
+            Some(s) => s.to_string(),
+            None => continue,
+        };
+        let chats = proj_entry.path().join("chats");
+        let Ok(files) = fs::read_dir(&chats) else { continue };
+        let cwd = cwd_lookup.get(&proj_name).cloned().unwrap_or_default();
+
+        for f in files.flatten() {
+            let path = f.path();
+            if !path.is_file() { continue; }
+            let name = match path.file_name().and_then(|n| n.to_str()) {
+                Some(s) => s.to_string(),
+                None => continue,
+            };
+            if !name.starts_with("session-") || !name.ends_with(".jsonl") { continue; }
+
+            let last_activity = path.metadata().and_then(|m| m.modified()).ok()
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            let (sid, _start) = parse_gemini_meta(&path);
+            let key = sid.unwrap_or_else(|| format!("gemini:{}", name));
+            let title = first_user_text_jsonl(&path, ClaudeOrGemini::Gemini)
+                .unwrap_or_else(|| short_id(&key, "gemini"));
+
+            out.push(AgentSession {
+                key:               key.clone(),
+                cli_source:        CliSource::Gemini,
+                pane_session_id:   None,
+                window_id:         None,
+                tab_id:            None,
+                title,
+                cwd:               cwd.clone(),
+                started_at:        last_activity,
+                last_activity_at:  last_activity,
+                status:            AgentStatus::Historical,
+                last_error:        None,
+                current_tool:      None,
+                attention_reason:  None,
+                log_path:          Some(path),
+            });
+        }
+    }
+    out.sort_by(|a, b| b.last_activity_at.cmp(&a.last_activity_at));
+    out
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+fn short_id(id: &str, cli: &str) -> String {
+    let head: String = id.chars().take(8).collect();
+    format!("{} {}", cli, head)
+}
+
+/// Extract a value from a flat key:value YAML file. Strings may be unquoted
+/// (Copilot's workspace.yaml) or quoted. Does NOT support nested structures.
+pub(crate) fn parse_simple_yaml(text: &str, key: &str) -> Option<String> {
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if let Some(rest) = trimmed.strip_prefix(key) {
+            // Reject prefix matches like key="summa" against "summary: ...".
+            // Allow only whitespace or `:` immediately after the key.
+            let next = rest.chars().next();
+            if !matches!(next, Some(':') | Some(' ') | Some('\t') | None) {
+                continue;
+            }
+            let rest = rest.trim_start();
+            if let Some(after_colon) = rest.strip_prefix(':') {
+                let mut v = after_colon.trim().to_string();
+                if (v.starts_with('"') && v.ends_with('"') && v.len() >= 2)
+                    || (v.starts_with('\'') && v.ends_with('\'') && v.len() >= 2)
+                {
+                    v = v[1..v.len() - 1].to_string();
+                }
+                return Some(v);
+            }
+        }
+    }
+    None
+}
+
+/// Decode Claude's drive-dash project directory back into a CWD path.
+///
+/// Layout: `C--Users-name-repo` ⇒ `C:\Users\name\repo`. The first `--`
+/// after the drive letter is the drive separator; remaining `-` become
+/// path separators. Cannot disambiguate hyphens inside actual file names
+/// (best-effort; reference impl backtracks via filesystem probing).
+pub(crate) fn decode_claude_cwd(encoded: &str) -> PathBuf {
+    let bytes = encoded.as_bytes();
+    if bytes.len() >= 4
+        && bytes[0].is_ascii_alphabetic()
+        && &bytes[1..3] == b"--"
+    {
+        let drive = bytes[0] as char;
+        let rest = &encoded[3..];
+        let path_part = rest.replace('-', "\\");
+        return PathBuf::from(format!("{}:\\{}", drive, path_part));
+    }
+    // Linux/macOS encoding: leading `-` -> root
+    if let Some(stripped) = encoded.strip_prefix('-') {
+        return PathBuf::from(format!("/{}", stripped.replace('-', "/")));
+    }
+    PathBuf::from(encoded)
+}
+
+/// Parse `~/.gemini/projects.json` `{projects: {<cwd>: <name>}}`.
+/// Returns map of project_name -> cwd (reversed direction).
+pub(crate) fn parse_gemini_projects(path: &Path) -> HashMap<String, PathBuf> {
+    let mut out = HashMap::new();
+    let Ok(text) = fs::read_to_string(path) else { return out };
+    let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) else { return out };
+    let Some(map) = val.get("projects").and_then(|v| v.as_object()) else { return out };
+    for (cwd_str, name_val) in map {
+        if let Some(name) = name_val.as_str() {
+            out.insert(name.to_string(), PathBuf::from(cwd_str));
+        }
+    }
+    out
+}
+
+/// Read first JSONL line; if it has `sessionId` (no `type`) treat as meta.
+pub(crate) fn parse_gemini_meta(path: &Path) -> (Option<String>, Option<SystemTime>) {
+    let Ok(text) = read_first_bytes(path, 8 * 1024) else { return (None, None) };
+    for line in text.lines() {
+        if line.trim().is_empty() { continue; }
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+        if val.get("type").is_some() { return (None, None); }
+        let sid = val.get("sessionId").and_then(|v| v.as_str()).map(String::from);
+        return (sid, None);
+    }
+    (None, None)
+}
+
+#[derive(Copy, Clone)]
+enum ClaudeOrGemini { Claude, Gemini }
+
+/// Best-effort: scan first chunk of JSONL for a user-message line and
+/// return its text content, truncated to 60 chars.
+fn first_user_text_jsonl(path: &Path, kind: ClaudeOrGemini) -> Option<String> {
+    let text = read_first_bytes(path, TITLE_TAIL_BYTES).ok()?;
+    for line in text.lines() {
+        if line.trim().is_empty() { continue; }
+        let val: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let ty = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        if ty != "user" { continue; }
+        // Skip Claude meta entries
+        if val.get("isMeta").and_then(|v| v.as_bool()).unwrap_or(false) {
+            continue;
+        }
+
+        let raw = match kind {
+            ClaudeOrGemini::Claude => extract_claude_user_text(&val),
+            ClaudeOrGemini::Gemini => extract_gemini_user_text(&val),
+        };
+        let cleaned = raw?.trim().lines().next().unwrap_or("").trim().to_string();
+        if cleaned.is_empty() { continue; }
+        return Some(truncate_chars(&cleaned, 60));
+    }
+    None
+}
+
+fn extract_claude_user_text(v: &serde_json::Value) -> Option<String> {
+    let msg = v.get("message")?;
+    if let Some(s) = msg.get("content").and_then(|c| c.as_str()) {
+        return Some(s.to_string());
+    }
+    if let Some(arr) = msg.get("content").and_then(|c| c.as_array()) {
+        for part in arr {
+            if let Some(t) = part.get("text").and_then(|t| t.as_str()) {
+                return Some(t.to_string());
+            }
+        }
+    }
+    msg.get("text").and_then(|t| t.as_str()).map(String::from)
+        .or_else(|| v.get("content").and_then(|c| c.as_str()).map(String::from))
+}
+
+fn extract_gemini_user_text(v: &serde_json::Value) -> Option<String> {
+    let arr = v.get("content")?.as_array()?;
+    for part in arr {
+        if let Some(t) = part.get("text").and_then(|t| t.as_str()) {
+            return Some(t.to_string());
+        }
+    }
+    None
+}
+
+fn read_first_bytes(path: &Path, max: u64) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut f = fs::File::open(path)?;
+    let mut buf = Vec::with_capacity(max as usize);
+    let _ = (&mut f).take(max).read_to_end(&mut buf)?;
+    Ok(String::from_utf8_lossy(&buf).into_owned())
+}
+
+fn truncate_chars(s: &str, n: usize) -> String {
+    if s.chars().count() <= n { return s.to_string(); }
+    let mut out: String = s.chars().take(n.saturating_sub(1)).collect();
+    out.push('…');
+    out
+}
+
+// ─── Tests ─────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn tmp_root(label: &str) -> PathBuf {
+        let mut p = std::env::temp_dir();
+        let id = format!("wta-history-test-{}-{:?}-{:?}",
+            label,
+            std::process::id(),
+            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default().as_nanos(),
+        );
+        p.push(id);
+        let _ = fs::create_dir_all(&p);
+        p
+    }
+
+    fn write_file(p: &Path, contents: &str) {
+        if let Some(parent) = p.parent() { let _ = fs::create_dir_all(parent); }
+        let mut f = fs::File::create(p).unwrap();
+        f.write_all(contents.as_bytes()).unwrap();
+    }
+
+    #[test]
+    fn yaml_extraction_handles_unquoted_and_quoted_values() {
+        let text = "id: abc-123\ncwd: C:\\Users\\foo\nname: 'My session'\nsummary: \"Bug fix #42\"\n";
+        assert_eq!(parse_simple_yaml(text, "id").as_deref(),      Some("abc-123"));
+        assert_eq!(parse_simple_yaml(text, "cwd").as_deref(),     Some("C:\\Users\\foo"));
+        assert_eq!(parse_simple_yaml(text, "name").as_deref(),    Some("My session"));
+        assert_eq!(parse_simple_yaml(text, "summary").as_deref(), Some("Bug fix #42"));
+        assert_eq!(parse_simple_yaml(text, "missing"),            None);
+    }
+
+    #[test]
+    fn yaml_only_matches_full_keys_not_substrings() {
+        // Robustness: a line `summary_count: 0` must not match key `summary`.
+        let text = "summary: hello\nsummary_count: 0\n";
+        assert_eq!(parse_simple_yaml(text, "summary").as_deref(),       Some("hello"));
+        assert_eq!(parse_simple_yaml(text, "summary_count").as_deref(), Some("0"));
+        // Querying a non-existent prefix must not partial-match a longer key.
+        assert_eq!(parse_simple_yaml(text, "summa"), None);
+    }
+
+    #[test]
+    fn claude_cwd_decoding_drive_dash() {
+        assert_eq!(
+            decode_claude_cwd("C--Users-yuazha-GitRepo"),
+            PathBuf::from("C:\\Users\\yuazha\\GitRepo")
+        );
+        assert_eq!(
+            decode_claude_cwd("D--proj"),
+            PathBuf::from("D:\\proj")
+        );
+    }
+
+    #[test]
+    fn claude_cwd_decoding_unix_root() {
+        assert_eq!(
+            decode_claude_cwd("-home-user-repo"),
+            PathBuf::from("/home/user/repo")
+        );
+    }
+
+    #[test]
+    fn gemini_projects_reverse_lookup() {
+        let root = tmp_root("gemini-proj");
+        let p = root.join("projects.json");
+        write_file(&p,
+            r#"{"projects":{"C:\\Users\\me\\proj":"yuazha","D:\\other":"dother"}}"#);
+        let map = parse_gemini_projects(&p);
+        assert_eq!(map.get("yuazha"), Some(&PathBuf::from("C:\\Users\\me\\proj")));
+        assert_eq!(map.get("dother"), Some(&PathBuf::from("D:\\other")));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn gemini_meta_first_line_yields_session_id() {
+        let root = tmp_root("gemini-meta");
+        let f = root.join("session-2026-01-01-abc.jsonl");
+        write_file(&f,
+            "{\"sessionId\":\"abcd-1234\",\"projectHash\":\"x\",\"startTime\":\"2026-01-01T00:00:00Z\",\"kind\":\"main\"}\n\
+             {\"type\":\"user\",\"content\":[{\"text\":\"hello\"}]}\n");
+        let (sid, _) = parse_gemini_meta(&f);
+        assert_eq!(sid.as_deref(), Some("abcd-1234"));
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn copilot_loader_picks_up_session_dir() {
+        let home = tmp_root("copilot-home");
+        let sid = "11111111-2222-3333-4444-555555555555";
+        let dir = home.join(".copilot").join("session-state").join(sid);
+        fs::create_dir_all(&dir).unwrap();
+        write_file(&dir.join("workspace.yaml"),
+            "id: 11111111-2222-3333-4444-555555555555\n\
+             cwd: C:\\Users\\me\\proj\n\
+             summary: Refactor parser\n\
+             summary_count: 1\n");
+        write_file(&dir.join("events.jsonl"),
+            "{\"type\":\"session.start\",\"data\":{}}\n");
+
+        let v = load_copilot(&home);
+        assert_eq!(v.len(), 1);
+        let s = &v[0];
+        assert_eq!(s.key, sid);
+        assert_eq!(s.cli_source, CliSource::Copilot);
+        assert_eq!(s.title, "Refactor parser");
+        assert_eq!(s.cwd, PathBuf::from("C:\\Users\\me\\proj"));
+        assert_eq!(s.status, AgentStatus::Historical);
+        let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn copilot_loader_falls_back_to_short_id_when_no_summary() {
+        let home = tmp_root("copilot-noname");
+        let sid = "abcdef01-aaaa-bbbb-cccc-dddddddddddd";
+        let dir = home.join(".copilot").join("session-state").join(sid);
+        fs::create_dir_all(&dir).unwrap();
+        write_file(&dir.join("workspace.yaml"),
+            "id: abcdef01-aaaa-bbbb-cccc-dddddddddddd\n\
+             cwd: D:\\x\n\
+             user_named: false\n\
+             summary_count: 0\n");
+
+        let v = load_copilot(&home);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].title, "copilot abcdef01");
+        let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn claude_loader_picks_up_jsonl_files_and_skips_memory() {
+        let home = tmp_root("claude-home");
+        let projects = home.join(".claude").join("projects");
+        let proj = projects.join("C--Users-me-myproj");
+        fs::create_dir_all(&proj).unwrap();
+        write_file(&proj.join("aaaa-bbbb-cccc.jsonl"),
+            "{\"type\":\"user\",\"message\":{\"content\":\"Hello there\"}}\n\
+             {\"type\":\"assistant\",\"message\":{\"content\":\"Hi!\"}}\n");
+
+        // memory project must be skipped
+        let mem = projects.join("memory");
+        fs::create_dir_all(&mem).unwrap();
+        write_file(&mem.join("xxx.jsonl"), "{\"type\":\"user\"}\n");
+
+        let v = load_claude(&home);
+        assert_eq!(v.len(), 1);
+        let s = &v[0];
+        assert_eq!(s.key, "aaaa-bbbb-cccc");
+        assert_eq!(s.cli_source, CliSource::Claude);
+        assert_eq!(s.cwd, PathBuf::from("C:\\Users\\me\\myproj"));
+        assert_eq!(s.title, "Hello there");
+        let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn gemini_loader_picks_up_session_files_and_resolves_cwd() {
+        let home = tmp_root("gemini-home");
+        write_file(&home.join(".gemini").join("projects.json"),
+            r#"{"projects":{"C:\\Users\\me\\proj":"meproj"}}"#);
+        let chats = home.join(".gemini").join("tmp").join("meproj").join("chats");
+        fs::create_dir_all(&chats).unwrap();
+        write_file(&chats.join("session-2026-05-03T10-47-abcd.jsonl"),
+            "{\"sessionId\":\"abcd-1234\",\"projectHash\":\"x\",\"startTime\":\"2026-05-03T10:47:50.468Z\",\"kind\":\"main\"}\n\
+             {\"type\":\"user\",\"content\":[{\"text\":\"explain build system\"}]}\n");
+        // subagent-shape file must NOT be picked up
+        let subdir = chats.join("aaaa-bbbb");
+        fs::create_dir_all(&subdir).unwrap();
+        write_file(&subdir.join("inner.jsonl"), "{}\n");
+
+        let v = load_gemini(&home);
+        assert_eq!(v.len(), 1);
+        let s = &v[0];
+        assert_eq!(s.key, "abcd-1234");
+        assert_eq!(s.cli_source, CliSource::Gemini);
+        assert_eq!(s.cwd, PathBuf::from("C:\\Users\\me\\proj"));
+        assert_eq!(s.title, "explain build system");
+        let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn loaders_are_ok_when_directory_missing() {
+        let nowhere = std::env::temp_dir().join("definitely-not-here-zzzzzz");
+        // Should not panic; should return empty.
+        assert!(load_copilot(&nowhere).is_empty());
+        assert!(load_claude(&nowhere).is_empty());
+        assert!(load_gemini(&nowhere).is_empty());
+    }
+
+    #[test]
+    fn copilot_sessions_sorted_newest_first() {
+        let home = tmp_root("copilot-sort");
+        let base = home.join(".copilot").join("session-state");
+
+        for (i, sid) in ["s-1", "s-2", "s-3"].iter().enumerate() {
+            let d = base.join(sid);
+            fs::create_dir_all(&d).unwrap();
+            write_file(&d.join("workspace.yaml"),
+                &format!("id: {}\ncwd: C:\\proj\nsummary: title-{}\n", sid, i));
+            write_file(&d.join("events.jsonl"), "{}\n");
+            // Stagger mtimes by overwriting the events file with a slight delay
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+
+        let v = load_copilot(&home);
+        assert_eq!(v.len(), 3);
+        assert!(v[0].last_activity_at >= v[1].last_activity_at);
+        assert!(v[1].last_activity_at >= v[2].last_activity_at);
+        let _ = fs::remove_dir_all(&home);
+    }
+}

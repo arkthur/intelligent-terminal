@@ -19,7 +19,20 @@ pub fn render(
         .borders(Borders::ALL)
         .title(" Agents  (F2 / Ctrl+Tab to switch · ↑↓ select · Enter activate · Del remove) ");
 
-    let rows: Vec<ListItem> = reg.iter_sorted().into_iter().map(row_for).collect();
+    let sorted = reg.iter_sorted();
+    tracing::debug!(
+        target: "agents_render",
+        total = sorted.len(),
+        first_three = ?sorted.iter().take(3).map(|s| (
+            s.key.clone(),
+            format!("{:?}", s.status),
+            s.title.clone(),
+        )).collect::<Vec<_>>(),
+        area_w = area.width,
+        area_h = area.height,
+        "rendering agents view"
+    );
+    let rows: Vec<ListItem> = sorted.into_iter().map(row_for).collect();
     let list = List::new(rows)
         .block(block)
         .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
@@ -27,7 +40,12 @@ pub fn render(
 }
 
 fn row_for(s: &AgentSession) -> ListItem<'static> {
-    let title  = format!("{} — {}", cli_label(s), cwd_basename(s));
+    let title  = format!(
+        "{}-{}-{}",
+        short_key(&s.key),
+        cli_label(s),
+        if s.title.is_empty() { cwd_basename(s) } else { s.title.clone() },
+    );
     let status = status_label(s);
     let age    = relative_age(s.last_activity_at);
 
@@ -41,13 +59,20 @@ fn row_for(s: &AgentSession) -> ListItem<'static> {
     };
 
     let line = Line::from(vec![
-        Span::styled(format!("{:<32}", trunc(&title, 32)), title_style),
+        Span::styled(format!("{:<48}", trunc(&title, 48)), title_style),
         Span::raw("  "),
         Span::styled(format!("{:<10}", status), status_style),
         Span::raw("  "),
         Span::styled(format!("{:>4}", age), Style::default().dim()),
     ]);
     ListItem::new(line)
+}
+
+/// Return the first 8 characters of the session key, stripping the
+/// synthetic `pane:` prefix used for placeholder rows.
+fn short_key(key: &str) -> String {
+    let stripped = key.strip_prefix("pane:").unwrap_or(key);
+    stripped.chars().take(8).collect()
 }
 
 fn cli_label(s: &AgentSession) -> &'static str {
@@ -88,4 +113,33 @@ fn relative_age(t: SystemTime) -> String {
 fn trunc(s: &str, n: usize) -> String {
     if s.chars().count() <= n { s.to_string() }
     else { format!("{}…", s.chars().take(n.saturating_sub(1)).collect::<String>()) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_key_takes_first_eight_chars_of_uuid() {
+        assert_eq!(short_key("7d0be6ce-71bc-44a3-98f8-9b976846642e"), "7d0be6ce");
+    }
+
+    #[test]
+    fn short_key_strips_pane_prefix_then_takes_eight() {
+        assert_eq!(short_key("pane:abcdef0123-4567-89"), "abcdef01");
+    }
+
+    #[test]
+    fn short_key_handles_short_keys_without_padding() {
+        // Demo-data style keys are shorter than 8 chars after stripping;
+        // we just return whatever we have.
+        assert_eq!(short_key("demo"), "demo");
+        assert_eq!(short_key(""), "");
+    }
+
+    #[test]
+    fn short_key_unicode_safe() {
+        // Take by char (not byte) so multi-byte chars don't panic.
+        assert_eq!(short_key("αβγδεζηθικ"), "αβγδεζηθ");
+    }
 }

@@ -18,6 +18,15 @@
         }]
       }
     ],
+    "Notification": [
+      {
+        "matcher": ".*",
+        "hooks": [{
+          "type": "command",
+          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" agent.notification"
+        }]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "matcher": ".*",

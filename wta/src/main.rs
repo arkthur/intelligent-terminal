@@ -1,5 +1,6 @@
 mod agent_registry;
 mod agent_sessions;
+mod history_loader;
 mod app;
 mod coordinator;
 mod event;
@@ -234,6 +235,25 @@ enum Command {
         target: Option<String>,
     },
 
+    /// Diagnostic: dump historical sessions discovered by the on-disk loader.
+    #[command(name = "debug-history")]
+    DebugHistory,
+
+    /// Diagnostic: drive the live UI by publishing a synthetic sequence
+    /// of agent events through wtcli (`send-event` / `publish`) so an
+    /// open Agent pane (F2) shows real state transitions over time.
+    /// Run from any Windows Terminal pane (WT_COM_CLSID must be set).
+    #[command(name = "debug-live")]
+    DebugLive {
+        /// Milliseconds to sleep between transitions.
+        #[arg(long, default_value_t = 1500)]
+        interval_ms: u64,
+
+        /// CLI source label to use for the synthetic session ("copilot",
+        /// "claude", or "gemini").
+        #[arg(long, default_value = "copilot")]
+        cli_source: String,
+    },
     /// Pre-warm the shared host (called by Windows Terminal on startup)
     #[command(name = "ensure-host")]
     EnsureHost {
@@ -576,6 +596,29 @@ async fn main() -> Result<()> {
             run_listen(&pipe_override, target.as_deref()).await
         }
 
+        // ── Diagnostic: dump historical sessions discovered on disk ──
+        Some(Command::DebugHistory) => {
+            let sessions = history_loader::load_all();
+            println!("Loaded {} historical session(s):", sessions.len());
+            for s in &sessions {
+                let key_short = if s.key.len() > 36 { &s.key[..36] } else { &s.key };
+                println!(
+                    "  [{:>10?}] {:<36} cwd={:<40} | {}",
+                    s.cli_source,
+                    key_short,
+                    s.cwd.display().to_string(),
+                    s.title.chars().take(60).collect::<String>(),
+                );
+            }
+            Ok(())
+        }
+
+        // ── Diagnostic: drive live UI by publishing synthetic agent events ──
+        Some(Command::DebugLive { interval_ms, cli_source }) => {
+            run_debug_live(interval_ms, &cli_source);
+            Ok(())
+        }
+
         // ── No subcommand = ACP TUI mode (default) ──
         None => run_default_tui(cli, pipe_override).await,
     }
@@ -720,6 +763,212 @@ fn print_output(val: &serde_json::Value, json_mode: bool, formatter: fn(&serde_j
     } else {
         formatter(val);
     }
+}
+
+// ─── debug-live: drive the real UI via wtcli ────────────────────────────────
+//
+// Pure-state-machine validation lives in unit tests (see agent_sessions.rs).
+// This subcommand publishes a representative sequence of agent events
+// through the same channels real hooks/connection lifecycle use, so an
+// open Agent pane (F2) exhibits real state-color transitions over time:
+//   Idle → Working → Attention → Error → Ended.
+//
+// Requirements:
+//   * Run from a Windows Terminal pane (WT_COM_CLSID is set there).
+//   * Have at least one Agent pane open in WT (the wta TUI in attach mode
+//     is what consumes the events and renders the agents list).
+fn run_debug_live(interval_ms: u64, cli_source: &str) {
+    use std::thread::sleep;
+    use std::time::Duration;
+
+    if std::env::var_os("WT_COM_CLSID").is_none() {
+        eprintln!("WT_COM_CLSID is not set in this environment.");
+        eprintln!("Run `wta debug-live` from a Windows Terminal pane (any profile).");
+        eprintln!("Open an Agent pane (F2) first so the wta TUI is listening for events.");
+        return;
+    }
+
+    // Synthesize stable identifiers for this run. Using a non-zero pane
+    // session id ensures the agent pane's wta won't filter the events out
+    // as "from our own pane".
+    let pid_lo = (std::process::id() & 0xffff_ffff) as u32;
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let pane = format!(
+        "{:08x}-debu-9b7a-0000-{:012x}",
+        pid_lo,
+        now_ms & 0xffff_ffff_ffff
+    );
+    let asid = format!("debug-live-{:08x}", pid_lo);
+    let cwd = std::env::current_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| String::from("?"));
+
+    println!("debug-live: publishing synthetic agent events.");
+    println!("  cli_source      : {}", cli_source);
+    println!("  pane_session_id : {}", pane);
+    println!("  agent_session_id: {}", asid);
+    println!("  interval        : {} ms", interval_ms);
+    println!();
+    println!("Open the Agent pane (F2) in WT to watch the row change state.");
+    println!();
+
+    // Sequence: target_status, transition_label, action.
+    // For Error we publish a `connection_state: failed` raw event because no
+    // hook event maps to ConnectionFailed (real Error originates from the
+    // connection lifecycle in C++).
+    let payload_started = serde_json::json!({ "cwd": cwd });
+    let payload_tool_start = serde_json::json!({ "tool_name": "shell.run" });
+    let payload_notify = serde_json::json!({ "message": "approve write to C:\\foo?" });
+    let payload_stopped = serde_json::json!({ "reason": "demo finished" });
+
+    let agent_steps: &[(&str, &str, &serde_json::Value)] = &[
+        ("agent.session.started",  "Idle",      &payload_started),
+        ("agent.tool.starting",    "Working",   &payload_tool_start),
+        ("agent.notification",     "Attention", &payload_notify),
+        // ToolCompleted does *not* clear Attention by design (Attention
+        // requires explicit user resolution). Included to verify that.
+        ("agent.tool.completed",   "Attention (still — needs user resolve)", &serde_json::Value::Null),
+    ];
+
+    for (idx, (event, target, payload)) in agent_steps.iter().enumerate() {
+        println!("[{}/{}] send-event {} -> {}", idx + 1, agent_steps.len() + 2, event, target);
+        let payload_obj: serde_json::Value = (*payload).clone();
+        let wrapper = serde_json::json!({
+            "cli_source":       cli_source,
+            "agent_session_id": asid,
+            "payload":          payload_obj,
+        });
+        let wrapper_str = serde_json::to_string(&wrapper).unwrap_or_else(|_| "{}".into());
+        if let Err(e) = run_wtcli(&["send-event", "-e", event, "-p", &pane, &wrapper_str]) {
+            eprintln!("  wtcli send-event failed: {}", e);
+            return;
+        }
+        sleep(Duration::from_millis(interval_ms));
+    }
+
+    println!("[{}/{}] publish connection_state:failed -> Error", agent_steps.len() + 1, agent_steps.len() + 2);
+    let conn_failed = serde_json::json!({
+        "type":   "event",
+        "method": "connection_state",
+        "params": {
+            "session_id": pane,
+            "state":      "failed",
+            "reason":     "simulated API 503",
+        },
+    });
+    if let Err(e) = run_wtcli(&["publish", &conn_failed.to_string()]) {
+        eprintln!("  wtcli publish failed: {}", e);
+        return;
+    }
+    sleep(Duration::from_millis(interval_ms));
+
+    println!("[{}/{}] send-event agent.session.stopped -> Ended", agent_steps.len() + 2, agent_steps.len() + 2);
+    let stopped_wrapper = serde_json::json!({
+        "cli_source":       cli_source,
+        "agent_session_id": asid,
+        "payload":          payload_stopped,
+    });
+    if let Err(e) = run_wtcli(&["send-event", "-e", "agent.session.stopped", "-p", &pane,
+                                 &stopped_wrapper.to_string()]) {
+        eprintln!("  wtcli send-event failed: {}", e);
+        return;
+    }
+
+    println!();
+    println!("Done. The synthetic session ({}-{}) should now show as Ended.", &asid[..asid.len().min(12)], cli_source);
+    println!("Re-run with `--interval-ms <N>` to slow down or speed up.");
+}
+
+/// Resolve and run a wtcli subcommand, inheriting stderr so users see
+/// COM errors. Searches a few candidate locations because `debug-live`
+/// is most useful when run from the deployed package, but users may also
+/// invoke a dev build directly.
+fn run_wtcli(args: &[&str]) -> std::io::Result<()> {
+    use std::process::{Command, Stdio};
+
+    let exe = locate_wtcli().ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "wtcli.exe not found. `debug-live` must run from the deployed \
+             Windows Terminal package (where wta.exe and wtcli.exe sit \
+             together). Open Windows Terminal from Start Menu, then run \
+             `wta debug-live` in any pane. Running `wta\\target\\debug\\wta.exe` \
+             directly will not work because dev builds lack package identity \
+             and cannot reach the COM server.",
+        )
+    })?;
+
+    let status = Command::new(&exe)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .status()?;
+
+    if !status.success() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("wtcli exited with status {}", status),
+        ));
+    }
+    Ok(())
+}
+
+/// Hunt for `wtcli.exe` in plausible locations in priority order:
+///   1. Co-located with the running `wta.exe` (this is the package layout)
+///   2. Sibling MSBuild output dirs when running a cargo dev build, e.g.
+///      `<repo>/wta/target/debug/wta.exe` ->
+///      `<repo>/src/cascadia/CascadiaPackage/bin/x64/{Debug,Release}/AppX/wtcli.exe`
+///   3. Less specific MSBuild layouts (`<root>/bin/x64/{Debug,Release}`)
+///   4. PATH
+fn locate_wtcli() -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+
+    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.to_path_buf()));
+
+    // 1. Co-located.
+    if let Some(d) = exe_dir.as_ref() {
+        let p = d.join("wtcli.exe");
+        if p.exists() { return Some(p); }
+    }
+
+    // Walk up looking for a repo root, then probe known build-output layouts.
+    if let Some(d) = exe_dir.as_ref() {
+        let mut cur: Option<&std::path::Path> = Some(d.as_path());
+        for _ in 0..6 {
+            if let Some(c) = cur {
+                for cfg in &["Debug", "Release"] {
+                    // 2. Cascadia package AppX layout (real wtcli.exe lives here).
+                    let appx: PathBuf = c
+                        .join("src").join("cascadia").join("CascadiaPackage")
+                        .join("bin").join("x64").join(cfg).join("AppX").join("wtcli.exe");
+                    if appx.exists() {
+                        return Some(appx);
+                    }
+
+                    // 3. Generic MSBuild output (older layouts / fallback).
+                    let generic: PathBuf = c.join("bin").join("x64").join(cfg).join("wtcli.exe");
+                    if generic.exists() {
+                        return Some(generic);
+                    }
+                }
+                cur = c.parent();
+            }
+        }
+    }
+
+    // 4. PATH lookup.
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            let p = dir.join("wtcli.exe");
+            if p.exists() { return Some(p); }
+        }
+    }
+
+    None
 }
 
 fn format_windows_human(val: &serde_json::Value) {

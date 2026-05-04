@@ -163,12 +163,22 @@ pub fn route_agent_event_to_registry(
     //     "payload": { ...original hook stdin... } }
     let event = params.get("event").and_then(|v| v.as_str()).unwrap_or("");
     if !event.starts_with("agent.") {
+        tracing::debug!(target: "agent_route", event = %event, "skipped: not agent.*");
         return false;
     }
 
     let cli_source = CliSource::parse(params.get("cli_source").and_then(|v| v.as_str()));
     let asid       = params.get("agent_session_id").and_then(|v| v.as_str()).unwrap_or("");
     let key        = reg.resolve_or_synthesize_key(asid, pane_session_id);
+    tracing::info!(
+        target: "agent_route",
+        event = %event,
+        asid = %asid,
+        key = %key,
+        pane_session_id = %pane_session_id,
+        cli_source = ?cli_source,
+        "routing"
+    );
 
     let payload = params.get("payload").cloned().unwrap_or(serde_json::Value::Null);
     let cwd = payload.get("cwd")
@@ -176,12 +186,21 @@ pub fn route_agent_event_to_registry(
         .map(PathBuf::from)
         .unwrap_or_default();
     let cwd_label = cwd.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-    let title_for_synth = format!("{:?} — {}", cli_source, cwd_label);
 
     // Synthesize SessionStarted on first sighting since the hooks plugin
     // doesn't ship a session-start hook (PreToolUse always fires before any
     // user-visible activity).
     let session_known = reg.has_session(&key);
+    // For brand-new sessions, fall back to the cwd's leaf folder. The CLI
+    // source is already shown in its own column, so we don't repeat it here.
+    // For resumed sessions (already known to the registry — typically loaded
+    // from history) we pass "" so the apply() handler keeps the existing
+    // title (e.g. workspace.yaml `summary:`).
+    let synth_title: String = if session_known {
+        String::new()
+    } else {
+        cwd_label.clone()
+    };
     let needs_synthetic_start = event != "agent.session.started" && !session_known;
     if needs_synthetic_start {
         reg.apply(SessionEvent::SessionStarted {
@@ -189,7 +208,7 @@ pub fn route_agent_event_to_registry(
             cli_source: cli_source.clone(),
             pane_session_id: pane_session_id.to_string(),
             cwd: cwd.clone(),
-            title: title_for_synth.clone(),
+            title: synth_title.clone(),
         });
     }
 
@@ -199,32 +218,60 @@ pub fn route_agent_event_to_registry(
     }
 
     let ev = match event {
-        "agent.session.started" => SessionEvent::SessionStarted {
+        "agent.session.started" | "agent.session.start" => SessionEvent::SessionStarted {
             key,
             cli_source,
             pane_session_id: pane_session_id.to_string(),
             cwd,
-            title: title_for_synth,
+            title: synth_title,
         },
         "agent.tool.starting" => SessionEvent::ToolStarting {
             key,
             tool_name: payload.get("tool_name").or_else(|| payload.get("toolName"))
                 .and_then(|v| v.as_str()).unwrap_or("").to_string(),
         },
-        "agent.tool.completed" => SessionEvent::ToolCompleted { key },
+        // A user prompt kicks off a "thinking" cycle even when no tool fires.
+        // Treat it as a synthetic ToolStarting so the row goes Idle -> Working;
+        // it pairs with agent.stop / agent.subagent.stop below.
+        "agent.prompt.submit" => SessionEvent::ToolStarting {
+            key,
+            tool_name: "prompt".to_string(),
+        },
+        // Real or aliased tool-end events. Also treat per-prompt Stop hooks as
+        // "back to Idle" since they pair with the prompt.submit synthetic above.
+        "agent.tool.completed" | "agent.tool.finished" | "agent.tool.failed"
+        | "agent.stop" | "agent.subagent.stop" => SessionEvent::ToolCompleted { key },
         "agent.notification"   => SessionEvent::Notification {
             key,
             message: payload.get("message").and_then(|v| v.as_str()).unwrap_or("").to_string(),
         },
-        "agent.session.stopped" => SessionEvent::SessionStopped {
+        // Session lifecycle end (vs per-prompt Stop).
+        "agent.session.stopped" | "agent.session.end" => SessionEvent::SessionStopped {
             key,
             reason: payload.get("reason").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        },
+        // Agent-side error (e.g., API/network failure surfaced by ErrorOccurred
+        // hook). Reuses ConnectionFailed since both flow into the same
+        // status=Error + last_error=<reason> handling at the registry level.
+        "agent.error" => SessionEvent::ConnectionFailed {
+            pane_session_id: pane_session_id.to_string(),
+            reason: payload.get("error").and_then(|v| v.as_str())
+                .or_else(|| payload.get("message").and_then(|v| v.as_str()))
+                .unwrap_or("agent error").to_string(),
         },
         _ => return reg.take_dirty(),
     };
 
     reg.apply(ev);
-    reg.take_dirty()
+    let dirty = reg.take_dirty();
+    tracing::info!(
+        target: "agent_route",
+        event = %event,
+        dirty = dirty,
+        session_count = reg.iter_sorted().len(),
+        "applied"
+    );
+    dirty
 }
 
 /// Classify a WT protocol event into a notification.
@@ -594,6 +641,10 @@ impl App {
                 let mut reg = crate::agent_sessions::AgentSessionRegistry::new();
                 if std::env::var("WTA_DEMO_AGENTS").ok().as_deref() == Some("1") {
                     reg.populate_demo_data();
+                }
+                #[cfg(not(test))]
+                if std::env::var("WTA_NO_HISTORY").ok().as_deref() != Some("1") {
+                    reg.merge_historical(crate::history_loader::load_all());
                 }
                 reg
             },
@@ -2991,7 +3042,25 @@ impl App {
             // v1: silently no-op for CLIs without resume support.
             return;
         }
-        let commandline = format!("{} {} {}", cli_id, profile.resume_flag, s.key);
+        // Pre-flight: is the CLI binary on PATH? If not, surface a friendly
+        // error in the chat instead of letting CreateProcess fail with
+        // 0x80070002 in a flash of an empty pane. Skipped in tests because
+        // the dev/CI machine usually doesn't have all CLIs installed.
+        #[cfg(not(test))]
+        if !crate::agent_registry::is_cli_available(cli_id) {
+            let msg = format!(
+                "Cannot resume: '{}' is not installed or not on PATH.\n  Install hint: {}",
+                cli_id,
+                profile.install_hint,
+            );
+            self.messages.push(ChatMessage::Error(msg));
+            self.scroll_to_bottom();
+            return;
+        }
+        // Use the resolved executable name (e.g. "gemini.cmd") so CreateProcess
+        // finds shim'd npm installs without an .exe extension.
+        let resolved = crate::agent_registry::resolve_bare_agent_name(cli_id);
+        let commandline = format!("{} {} {}", resolved, profile.resume_flag, s.key);
 
         // TODO(v2): wtcli's split-pane does not currently accept --starting-directory.
         // The resumed pane inherits the splitting pane's cwd; the CLI's own --resume
@@ -3840,5 +3909,159 @@ mod tests {
         let params = serde_json::json!({"event": "something.else"});
         let dirty = route_agent_event_to_registry(&mut reg, "p", &params);
         assert!(!dirty);
+    }
+
+    #[test]
+    fn route_agent_event_accepts_real_hook_event_aliases() {
+        // Real hooks fire `agent.session.start` (not `started`),
+        // `agent.tool.finished` (not `completed`), and `agent.stop`/`agent.session.end`
+        // (not `agent.session.stopped`). Make sure the registry transitions on all of them.
+        use crate::agent_sessions::{AgentSessionRegistry, AgentStatus};
+        let mut reg = AgentSessionRegistry::new();
+        let pane = "00000000-0000-0000-0000-000000000099";
+        let key = "alias-test".to_string();
+
+        // start (alias)
+        let p = serde_json::json!({
+            "event": "agent.session.start",
+            "cli_source": "copilot",
+            "agent_session_id": "alias-test",
+            "payload": {"cwd": "/work"},
+        });
+        assert!(route_agent_event_to_registry(&mut reg, pane, &p));
+        assert!(reg.has_session(&key));
+
+        // prompt.submit -> Working
+        let p = serde_json::json!({
+            "event": "agent.prompt.submit",
+            "cli_source": "copilot",
+            "agent_session_id": "alias-test",
+            "payload": {"prompt": "hi"},
+        });
+        assert!(route_agent_event_to_registry(&mut reg, pane, &p));
+        assert_eq!(reg.iter_sorted().iter().find(|s| s.key == key).unwrap().status, AgentStatus::Working);
+
+        // stop -> back to Idle
+        let p = serde_json::json!({
+            "event": "agent.stop",
+            "cli_source": "copilot",
+            "agent_session_id": "alias-test",
+            "payload": {},
+        });
+        assert!(route_agent_event_to_registry(&mut reg, pane, &p));
+        assert_eq!(reg.iter_sorted().iter().find(|s| s.key == key).unwrap().status, AgentStatus::Idle);
+
+        // tool.finished alias -> still Idle (no-op transition from Idle)
+        let p = serde_json::json!({
+            "event": "agent.tool.finished",
+            "cli_source": "copilot",
+            "agent_session_id": "alias-test",
+            "payload": {},
+        });
+        route_agent_event_to_registry(&mut reg, pane, &p);
+
+        // session.end alias -> Ended
+        let p = serde_json::json!({
+            "event": "agent.session.end",
+            "cli_source": "copilot",
+            "agent_session_id": "alias-test",
+            "payload": {"reason": "user-quit"},
+        });
+        assert!(route_agent_event_to_registry(&mut reg, pane, &p));
+        assert_eq!(reg.iter_sorted().iter().find(|s| s.key == key).unwrap().status, AgentStatus::Ended);
+    }
+
+    #[test]
+    fn route_agent_event_error_transitions_to_error_state() {
+        // ErrorOccurred hook fires `agent.error`. The registry must surface this
+        // as status=Error with the reason captured in last_error.
+        use crate::agent_sessions::{AgentSessionRegistry, AgentStatus};
+        let mut reg = AgentSessionRegistry::new();
+        let pane = "00000000-0000-0000-0000-0000000000aa";
+        let key = "err-test".to_string();
+
+        // Synthesize via prompt.submit so the session is bound to the pane.
+        let p = serde_json::json!({
+            "event": "agent.prompt.submit",
+            "cli_source": "copilot",
+            "agent_session_id": "err-test",
+            "payload": {"prompt": "do something"},
+        });
+        route_agent_event_to_registry(&mut reg, pane, &p);
+
+        // Now fire agent.error.
+        let p = serde_json::json!({
+            "event": "agent.error",
+            "cli_source": "copilot",
+            "agent_session_id": "err-test",
+            "payload": {"error": "API request failed: 503 Service Unavailable"},
+        });
+        assert!(route_agent_event_to_registry(&mut reg, pane, &p));
+        let s = reg.iter_sorted().into_iter().find(|s| s.key == key).unwrap();
+        assert_eq!(s.status, AgentStatus::Error);
+        assert_eq!(s.last_error.as_deref(), Some("API request failed: 503 Service Unavailable"));
+    }
+
+    #[test]
+    fn route_agent_event_preserves_historical_title_on_resume() {
+        // When a historical session (e.g., one with a workspace.yaml `summary:`
+        // already loaded by history_loader) is resumed and the live SessionStarted
+        // event arrives, the live synth title must NOT clobber the existing one.
+        use crate::agent_sessions::{AgentSession, AgentSessionRegistry, AgentStatus, CliSource, SessionEvent};
+        use std::path::PathBuf;
+        use std::time::SystemTime;
+
+        let mut reg = AgentSessionRegistry::new();
+        let key = "32a73b8d-aaaa-bbbb-cccc-1234567890ab".to_string();
+
+        // Pre-load a historical entry like history_loader does.
+        reg.merge_historical(vec![AgentSession {
+            key:               key.clone(),
+            cli_source:        CliSource::Copilot,
+            pane_session_id:   None,
+            window_id:         None,
+            tab_id:            None,
+            title:             "Copilot Test".to_string(),  // workspace.yaml summary
+            cwd:               PathBuf::from("C:\\Users\\yuazha"),
+            started_at:        SystemTime::now(),
+            last_activity_at:  SystemTime::now(),
+            status:            AgentStatus::Historical,
+            last_error:        None,
+            current_tool:      None,
+            attention_reason:  None,
+            log_path:          None,
+        }]);
+
+        // Now fire a real agent.session.start matching that key.
+        let p = serde_json::json!({
+            "event": "agent.session.start",
+            "cli_source": "copilot",
+            "agent_session_id": key,
+            "payload": {"cwd": "C:\\Users\\yuazha"},
+        });
+        let pane = "00000000-0000-0000-0000-0000000000bb";
+        route_agent_event_to_registry(&mut reg, pane, &p);
+
+        let s = reg.iter_sorted().into_iter().find(|s| s.key == key).unwrap();
+        // Title must still be the historical workspace.yaml summary.
+        assert_eq!(s.title, "Copilot Test");
+    }
+
+    #[test]
+    fn route_agent_event_uses_cwd_basename_for_brand_new_session() {
+        // For sessions that have no historical record, the synthetic title is
+        // just the cwd's leaf folder name (not "Copilot — yuazha"). The CLI
+        // source already shows up in its own column.
+        use crate::agent_sessions::AgentSessionRegistry;
+        let mut reg = AgentSessionRegistry::new();
+        let p = serde_json::json!({
+            "event": "agent.session.start",
+            "cli_source": "copilot",
+            "agent_session_id": "fresh-asid",
+            "payload": {"cwd": "C:\\Users\\yuazha\\proj"},
+        });
+        route_agent_event_to_registry(&mut reg, "00000000-0000-0000-0000-0000000000cc", &p);
+        let s = reg.iter_sorted().into_iter().find(|s| s.key == "fresh-asid").unwrap();
+        assert_eq!(s.title, "proj");
     }
 }
