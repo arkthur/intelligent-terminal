@@ -26,7 +26,7 @@ use std::io;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use shell::wt_channel::{PipeChannel, WtChannel};
+use shell::wt_channel::{CliChannel, WtChannel};
 use shell::ShellManager;
 
 // ─── CLI Definition ─────────────────────────────────────────────────────────
@@ -571,12 +571,13 @@ struct PipeOverride {
 fn resolve_pipe_info(po: &PipeOverride) -> Option<shell::wt_channel::ConnectionInfo> {
     use shell::wt_channel::{ConnectionInfo, DiscoverySource, discover_connection_info};
 
-    // 1. CLI override — highest priority
+    // 1. CLI override — highest priority. Reuse ComClsid as the discovery
+    // tag for explicit overrides (the legacy EnvVar variant is gone).
     if let Some(ref name) = po.pipe_name {
         return Some(ConnectionInfo {
             pipe_name: name.clone(),
             token: po.pipe_token.clone().unwrap_or_default(),
-            source: DiscoverySource::EnvVar, // reuse; semantically "explicit"
+            source: DiscoverySource::ComClsid,
         });
     }
 
@@ -586,9 +587,9 @@ fn resolve_pipe_info(po: &PipeOverride) -> Option<shell::wt_channel::ConnectionI
 
 // ─── Helper: connect to WT pipe (no debug channel, no ShellManager) ─────────
 
-async fn connect_channel(po: &PipeOverride) -> Result<PipeChannel> {
+async fn connect_channel(po: &PipeOverride) -> Result<CliChannel> {
     if let Some(info) = resolve_pipe_info(po) {
-        return PipeChannel::connect_with(&info.pipe_name, &info.token).await;
+        return CliChannel::connect_with(&info.pipe_name, &info.token).await;
     }
     bail!("Cannot find Windows Terminal pipe. Use --pipe-name or set WT_PIPE_NAME.");
 }
@@ -600,7 +601,7 @@ async fn wt_call(po: &PipeOverride, method: &str, params: serde_json::Value) -> 
 }
 
 /// Resolve -t target: Some(id) → use it, None → get_active_pane fallback
-async fn resolve_pane_id(channel: &PipeChannel, target: &Option<String>) -> Result<String> {
+async fn resolve_pane_id(channel: &CliChannel, target: &Option<String>) -> Result<String> {
     match target {
         Some(id) => Ok(id.clone()),
         None => {
@@ -619,7 +620,7 @@ async fn resolve_pane_id(channel: &PipeChannel, target: &Option<String>) -> Resu
 }
 
 /// Get the first window ID from list_windows.
-async fn get_first_window_id(channel: &PipeChannel) -> Result<String> {
+async fn get_first_window_id(channel: &CliChannel) -> Result<String> {
     let result = channel.request("list_windows", json!({})).await?;
     result
         .get("windows")
@@ -632,7 +633,7 @@ async fn get_first_window_id(channel: &PipeChannel) -> Result<String> {
 }
 
 /// Get the first tab ID from a window.
-async fn get_first_tab_id(channel: &PipeChannel, window_id: &str) -> Result<String> {
+async fn get_first_tab_id(channel: &CliChannel, window_id: &str) -> Result<String> {
     let result = channel
         .request("list_tabs", json!({ "window_id": window_id }))
         .await?;
@@ -1060,15 +1061,60 @@ async fn run_default_tui(cli: Cli, po: PipeOverride) -> Result<()> {
     // Try to connect to the Windows Terminal pipe.
     let mut shell_mgr = ShellManager::new();
     let mut wt_event_rx = None;
-    let mut wt_pipe_channel: Option<Arc<PipeChannel>> = None;
+    let mut wt_pipe_channel: Option<Arc<CliChannel>> = None;
     let wt_connected = match connect_to_wt_pipe(&po, debug_tx.clone()).await {
         Ok(channel) => {
             tracing::info!("Connected to WT pipe OK — subscribing to events");
             // Subscribe to push events before wrapping in Arc.
             wt_event_rx = Some(channel.subscribe_events());
-            let arc_channel = Arc::new(channel);
-            wt_pipe_channel = Some(Arc::clone(&arc_channel));
-            shell_mgr = shell_mgr.with_wt_channel(arc_channel as Arc<dyn shell::wt_channel::WtChannel>);
+            let cli_arc = Arc::new(channel);
+            wt_pipe_channel = Some(Arc::clone(&cli_arc));
+
+            // If WT inherited a duplex pipe pair into our process via
+            // STARTUPINFOEX HANDLE_LIST, prefer it for the methods it carries
+            // (initially: send_input). All other methods fall through to the
+            // CliChannel (wtcli + COM) until they migrate too.
+            let wt_channel_for_mgr: Arc<dyn shell::wt_channel::WtChannel> =
+                match shell::wt_channel::PipeChannel::from_env() {
+                    Ok(Some(pipe)) => match pipe.handshake().await {
+                        Ok(()) => {
+                            tracing::info!(
+                                "PipeChannel handshake OK — routing send_input via inherited pipe"
+                            );
+                            let pipe_arc: Arc<dyn shell::wt_channel::WtChannel> =
+                                Arc::new(pipe);
+                            let cli_dyn: Arc<dyn shell::wt_channel::WtChannel> =
+                                cli_arc.clone();
+                            Arc::new(shell::wt_channel::RoutedChannel::new(
+                                pipe_arc,
+                                cli_dyn,
+                                &["send_input"],
+                            )) as Arc<dyn shell::wt_channel::WtChannel>
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                "PipeChannel handshake failed; falling back to CliChannel"
+                            );
+                            cli_arc.clone() as Arc<dyn shell::wt_channel::WtChannel>
+                        }
+                    },
+                    Ok(None) => {
+                        tracing::debug!(
+                            "No inherited pipe handles in env; using CliChannel only"
+                        );
+                        cli_arc.clone() as Arc<dyn shell::wt_channel::WtChannel>
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            "PipeChannel::from_env error; using CliChannel only"
+                        );
+                        cli_arc.clone() as Arc<dyn shell::wt_channel::WtChannel>
+                    }
+                };
+
+            shell_mgr = shell_mgr.with_wt_channel(wt_channel_for_mgr);
             true
         }
         Err(e) => {
@@ -1135,7 +1181,7 @@ async fn run_acp_tui_mode(
     debug_rx: tokio::sync::mpsc::UnboundedReceiver<app::DebugMessage>,
     pane_identity: Option<(String, String, String)>,
     wt_event_rx: Option<tokio::sync::mpsc::UnboundedReceiver<serde_json::Value>>,
-    wt_pipe_channel: Option<Arc<PipeChannel>>,
+    wt_pipe_channel: Option<Arc<CliChannel>>,
 ) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -1184,15 +1230,15 @@ async fn run_test_pipe(po: &PipeOverride) -> Result<()> {
 async fn connect_to_wt_pipe(
     po: &PipeOverride,
     debug_tx: tokio::sync::mpsc::UnboundedSender<app::DebugMessage>,
-) -> Result<shell::wt_channel::PipeChannel> {
-    use shell::wt_channel::PipeChannel;
+) -> Result<shell::wt_channel::CliChannel> {
+    use shell::wt_channel::CliChannel;
 
     if let Some(info) = resolve_pipe_info(po) {
         eprintln!(
             "[wta] Discovered pipe via {:?}: {}",
             info.source, info.pipe_name
         );
-        let channel = PipeChannel::connect_with(&info.pipe_name, &info.token).await?;
+        let channel = CliChannel::connect_with(&info.pipe_name, &info.token).await?;
         return Ok(channel.with_debug_sender(debug_tx));
     }
 
@@ -1217,8 +1263,8 @@ async fn run_info_mode(po: &PipeOverride) -> Result<()> {
 
     let source_str = match info.source {
         DiscoverySource::VtOsc => "VT OSC discovery",
-        DiscoverySource::EnvVar => "WT_PIPE_NAME env var",
         DiscoverySource::ComClsid => "WT_COM_CLSID env var",
+        DiscoverySource::InheritedPipe => "inherited pipe (WT_PROTOCOL_PIPE_R/W)",
     };
     let token_display = if info.token.is_empty() {
         "(dev bypass)"
@@ -1231,7 +1277,7 @@ async fn run_info_mode(po: &PipeOverride) -> Result<()> {
     println!("  Source: {}", source_str);
     println!();
 
-    let channel = match PipeChannel::connect_with(&info.pipe_name, &info.token).await {
+    let channel = match CliChannel::connect_with(&info.pipe_name, &info.token).await {
         Ok(ch) => ch,
         Err(e) => {
             println!("  Connection failed: {}", e);
@@ -1339,7 +1385,7 @@ async fn run_acp_app(
     mut debug_rx: tokio::sync::mpsc::UnboundedReceiver<app::DebugMessage>,
     pane_identity: Option<(String, String, String)>,
     wt_event_rx: Option<tokio::sync::mpsc::UnboundedReceiver<serde_json::Value>>,
-    wt_pipe_channel: Option<Arc<PipeChannel>>,
+    wt_pipe_channel: Option<Arc<CliChannel>>,
 ) -> Result<()> {
     let agent_cmd = cli.agent.clone();
 

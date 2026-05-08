@@ -282,7 +282,9 @@ Protocol::AuthResult TerminalProtocolComServer::Authenticate(winrt::hstring cons
 
     Protocol::AuthResult result{};
     result.Authenticated = _authenticated;
-    result.ProtocolVersion = L"1.1";
+    // 2.0 — IProtocolServer no longer exposes SendInput. Keystroke injection
+    // is restricted to per-wta secure pipes (TerminalProtocolPipeServer).
+    result.ProtocolVersion = L"2.0";
     return result;
 }
 
@@ -302,7 +304,6 @@ winrt::hstring TerminalProtocolComServer::GetCapabilities()
         "create_tab",
         "split_pane",
         "close_pane",
-        "send_input",
         "set_session_variable",
         "set_settings",
         "quick_pick",
@@ -589,27 +590,6 @@ void TerminalProtocolComServer::ClosePane(uint32_t paneId)
             continue;
 
         if (page.CloseProtocolPane(paneId).get())
-            return;
-    }
-
-    winrt::throw_hresult(E_FAIL);
-}
-
-void TerminalProtocolComServer::SendInput(
-    uint32_t paneId,
-    winrt::hstring const& text)
-{
-    THROW_HR_IF(E_NOT_VALID_STATE, !s_emperor);
-    THROW_HR_IF(E_INVALIDARG, paneId == 0);
-    THROW_HR_IF(E_INVALIDARG, text.empty());
-
-    for (const auto& host : s_emperor->GetWindows())
-    {
-        const auto page = _getPage(host.get());
-        if (!page)
-            continue;
-
-        if (page.SendProtocolInput(paneId, text).get())
             return;
     }
 

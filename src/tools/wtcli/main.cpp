@@ -97,38 +97,6 @@ static uint32_t GetFirstTabId(const Protocol::IProtocolServer& server, uint64_t 
     return UINT32_MAX;
 }
 
-// Translate tmux-style key names to actual characters.
-static std::wstring TranslateKeys(const std::vector<std::string>& keys)
-{
-    std::wstring result;
-    for (const auto& key : keys)
-    {
-        if (key == "Enter" || key == "enter")
-            result += L"\r\n";
-        else if (key == "Space" || key == "space")
-            result += L" ";
-        else if (key == "Tab" || key == "tab")
-            result += L"\t";
-        else if (key == "Escape" || key == "escape" || key == "Esc")
-            result += L"\x1b";
-        else if (key == "BSpace" || key == "bspace")
-            result += L"\b";
-        else if (key == "C-c")
-            result += L"\x03";
-        else if (key == "C-d")
-            result += L"\x04";
-        else if (key == "C-z")
-            result += L"\x1a";
-        else if (key == "C-l")
-            result += L"\x0c";
-        else if (key.size() == 3 && key[0] == 'C' && key[1] == '-' && key[2] >= 'a' && key[2] <= 'z')
-            result += static_cast<wchar_t>(key[2] - 'a' + 1);
-        else
-            result += winrt::to_hstring(key);
-    }
-    return result;
-}
-
 // ── Main ──
 
 int main()
@@ -334,33 +302,10 @@ int main()
         }
     });
 
-    // ── send-keys ──
-    std::string sendKeysTarget;
-    std::vector<std::string> sendKeysArgs;
-    auto* sendKeysCmd = app.add_subcommand("send-keys", "Send keys to a pane")->alias("send");
-    sendKeysCmd->add_option("-t,--target", sendKeysTarget, "Pane ID");
-    sendKeysCmd->add_option("keys", sendKeysArgs, "Keys to send")->required();
-    sendKeysCmd->callback([&]() {
-        auto server = connect();
-        if (!server) return;
-        try
-        {
-            auto paneId = ResolvePaneId(server, sendKeysTarget);
-            auto text = TranslateKeys(sendKeysArgs);
-            server.SendInput(paneId, text);
-            if (jsonMode)
-            {
-                Json::Value v;
-                v["ok"] = true;
-                PrintJson(v);
-            }
-        }
-        catch (const winrt::hresult_error& e)
-        {
-            fprintf(stderr, "SendInput failed: 0x%08X\n", static_cast<uint32_t>(e.code()));
-            exitCode = 1;
-        }
-    });
+    // send-keys removed: keystroke injection is now confined to per-wta
+    // secure pipes (see TerminalProtocolPipeServer in TerminalApp). Any
+    // caller that previously used `wtcli send-keys` must route through
+    // the wta process WT spawned for it.
 
     // ── new-tab ──
     std::string newTabCommand, newTabTitle, newTabCwd;

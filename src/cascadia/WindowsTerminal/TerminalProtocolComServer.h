@@ -83,7 +83,8 @@ TerminalProtocolComServer : winrt::implements<TerminalProtocolComServer, Protoco
                                            winrt::hstring const& commandline,
                                            bool background);
     void ClosePane(uint32_t paneId);
-    void SendInput(uint32_t paneId, winrt::hstring const& text);
+    // SendInput intentionally removed from COM. Keystroke injection is now
+    // confined to per-wta secure pipes (TerminalProtocolPipeServer).
     void FocusPane(uint32_t paneId);
     void SetSessionVariable(uint32_t paneId,
                             winrt::hstring const& name,

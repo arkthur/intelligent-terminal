@@ -57,7 +57,7 @@ pub(crate) fn resolve_wtcli_path() -> String {
 }
 
 /// Channel that invokes `wtcli.exe` for protocol operations.
-/// Replaces the old PipeChannel (named-pipe transport).
+/// Used for read-only methods until those also migrate to PipeChannel.
 pub struct CliChannel {
     available: AtomicBool,
     debug_tx: Option<mpsc::UnboundedSender<DebugMessage>>,
@@ -68,8 +68,8 @@ pub struct CliChannel {
 impl CliChannel {
     pub async fn connect() -> anyhow::Result<Self> {
         // WT_COM_CLSID must be set — wtcli reads it from the environment.
-        if std::env::var("WT_COM_CLSID").is_err() && std::env::var("WT_PIPE_NAME").is_err() {
-            bail!("Neither WT_COM_CLSID nor WT_PIPE_NAME set. Must run inside a Windows Terminal pane.");
+        if std::env::var("WT_COM_CLSID").is_err() {
+            bail!("WT_COM_CLSID not set. Must run inside a Windows Terminal pane.");
         }
 
         Ok(Self {
@@ -278,17 +278,9 @@ impl WtChannel for CliChannel {
                 let pane_id = params.get("pane_id").and_then(json_id_as_str).unwrap_or_default();
                 self.run_wtcli(&["focus-pane", "-t", &pane_id]).await
             }
-            "send_input" => {
-                let pane_id = params.get("pane_id").and_then(json_id_as_str).unwrap_or_default();
-                let text = params.get("text").and_then(|v| v.as_str()).unwrap_or("");
-                let text_owned = text.to_string();
-                let mut args = vec!["send-keys"];
-                if !pane_id.is_empty() {
-                    args.extend(["-t", &pane_id]);
-                }
-                args.push(&text_owned);
-                self.run_wtcli(&args).await
-            }
+            // send_input intentionally not handled here. It now requires a
+            // PipeChannel attached via inherited handles — only the wta
+            // processes WT itself launches can satisfy it.
             "get_capabilities" => self.run_wtcli(&["info"]).await,
             "quick_pick" => {
                 let title = params.get("title").and_then(|v| v.as_str()).unwrap_or("");
