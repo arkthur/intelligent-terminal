@@ -7,9 +7,7 @@
 #include "AgentEntry.g.cpp"
 #include "EnumEntry.h"
 #include "../inc/AgentRegistry.h"
-
-#include <fstream>
-#include <sstream>
+#include "../inc/AgentHooksStatus.h"
 
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Foundation::Collections;
@@ -162,7 +160,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _agentPanePositionList = winrt::single_threaded_observable_vector<Editor::EnumEntry>(std::move(posEntries));
 
         // Populate the Agent Hooks section's per-CLI detection + install
-        // state so the UI displays meaningful labels on first paint.
+        // state so the UI displays meaningful labels on first paint. The
+        // actual status query shells out to `wta hooks status --json`
+        // off the UI thread; seed a placeholder until it returns so the
+        // user sees something other than empty rows.
+        const winrt::hstring detecting{ L"Detecting…" };
+        _copilotHooksStatus = detecting;
+        _claudeHooksStatus = detecting;
+        _geminiHooksStatus = detecting;
         RefreshAgentHooksStatus();
     }
 
@@ -513,22 +518,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     // ── Agent Hooks ──────────────────────────────────────────────────────
     //
-    // Detects each supported agent CLI (Copilot / Claude / Gemini) on PATH
-    // and whether the wt-agent-hooks plugin is installed for it. Drives a
-    // single primary "Install hooks" button that delegates to
-    // `wta.exe install-hooks` (the wta subcommand that runs the same
-    // idempotent installer wta runs at startup). Per-CLI status text is
-    // recomputed before and after each install attempt.
-
-    std::wstring AIAgentsViewModel::_UserHomeDir()
-    {
-        wchar_t buf[MAX_PATH];
-        DWORD n = GetEnvironmentVariableW(L"USERPROFILE", buf, MAX_PATH);
-        if (n > 0 && n < MAX_PATH) return std::wstring{ buf, n };
-        n = GetEnvironmentVariableW(L"HOME", buf, MAX_PATH);
-        if (n > 0 && n < MAX_PATH) return std::wstring{ buf, n };
-        return {};
-    }
+    // Source of truth is `wta hooks status --json` (see Track 2 / wta's
+    // agent_hooks_installer.rs). We spawn it on a background thread,
+    // capture stdout, and feed the response into the pure parser at
+    // src/cascadia/inc/AgentHooksStatus.h. Same JSON contract that
+    // build/scripts/Verify-AgentHooks.ps1 consumes — so the Settings UI
+    // and the verify script can never disagree about install state.
+    //
+    // The single primary "Install hooks" button still delegates to
+    // `wta install-hooks`; afterwards we re-invoke the status query to
+    // refresh the rows.
 
     std::wstring AIAgentsViewModel::_ResolveWtaExePath()
     {
@@ -571,94 +570,141 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         return {};
     }
 
-    bool AIAgentsViewModel::_IsCopilotHookInstalled(const std::wstring& home)
+    // Spawn `wta.exe <args>` and return its stdout on exit-0; empty
+    // string otherwise. Synchronous; intended to be called from a
+    // resume_background coroutine. Captures via an anonymous pipe with
+    // child's stdout/stderr both routed to it (stderr swallowed
+    // intentionally — we only care about the JSON payload, and any
+    // human-readable error text on stderr would just confuse the
+    // parser).
+    std::string AIAgentsViewModel::_RunWtaCaptureStdout(const std::wstring& wtaPath,
+                                                       const std::wstring& argsAfterExe,
+                                                       DWORD timeoutMs)
     {
-        if (home.empty()) return false;
-        std::error_code ec;
-        const auto pluginDir = std::filesystem::path{ home } /
-                               L".copilot" / L"installed-plugins" /
-                               L"wt-local" / L"wt-agent-hooks";
-        return std::filesystem::is_directory(pluginDir, ec) &&
-               std::filesystem::exists(pluginDir / L"hooks" / L"hooks.json", ec);
-    }
-
-    bool AIAgentsViewModel::_IsClaudeHookInstalled(const std::wstring& home)
-    {
-        // Claude installs the wt-agent-hooks plugin via
-        // `claude plugin marketplace add` + `claude plugin install`. After a
-        // successful registration, Claude writes our marketplace into
-        // `~/.claude/plugins/known_marketplaces.json` keyed under
-        // "wt-local". Detect that entry plus the existence of our staged
-        // plugin source files (which the wta installer always writes
-        // before invoking the CLI) as a proxy for "hooks installed".
-        if (home.empty()) return false;
-        std::error_code ec;
-
-        const auto knownPath = std::filesystem::path{ home } /
-                               L".claude" / L"plugins" / L"known_marketplaces.json";
-        if (!std::filesystem::exists(knownPath, ec)) return false;
-
-        std::ifstream in{ knownPath };
-        if (!in) return false;
-        std::stringstream ss;
-        ss << in.rdbuf();
-        const auto text = ss.str();
-        // Substring check is enough — the marketplace name is unique to wta.
-        if (text.find("\"wt-local\"") == std::string::npos) return false;
-
-        wchar_t buf[MAX_PATH];
-        DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", buf, MAX_PATH);
-        if (n == 0 || n >= MAX_PATH) return false;
-        const auto stagedManifest = std::filesystem::path{ buf, buf + n } /
-                                    L"IntelligentTerminal" / L"claude-plugin-src" /
-                                    L"wt-local" / L".claude-plugin" / L"marketplace.json";
-        return std::filesystem::exists(stagedManifest, ec);
-    }
-
-    bool AIAgentsViewModel::_IsGeminiHookInstalled(const std::wstring& home)
-    {
-        if (home.empty()) return false;
-        std::error_code ec;
-        const auto extDir = std::filesystem::path{ home } /
-                            L".gemini" / L"extensions" / L"wt-agent-hooks";
-        return std::filesystem::is_directory(extDir, ec) &&
-               std::filesystem::exists(extDir / L"gemini-extension.json", ec);
-    }
-
-    winrt::hstring AIAgentsViewModel::_FormatHookStatus(bool cliDetected,
-                                                       const wchar_t* cliDisplayName,
-                                                       bool hookInstalled)
-    {
-        std::wstring text{ cliDisplayName };
-        text += L" — ";
-        if (!cliDetected)
+        if (wtaPath.empty())
         {
-            text += L"CLI not on PATH";
+            return {};
         }
-        else if (hookInstalled)
+
+        SECURITY_ATTRIBUTES sa{};
+        sa.nLength = sizeof(sa);
+        sa.bInheritHandle = TRUE;
+
+        wil::unique_handle readHandle;
+        wil::unique_handle writeHandle;
+        if (!CreatePipe(readHandle.addressof(), writeHandle.addressof(), &sa, 0))
         {
-            text += L"hooks installed";
+            return {};
+        }
+        // The read end must NOT be inherited by the child.
+        if (!SetHandleInformation(readHandle.get(), HANDLE_FLAG_INHERIT, 0))
+        {
+            return {};
+        }
+
+        STARTUPINFOW si{};
+        si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+        si.wShowWindow = SW_HIDE;
+        si.hStdOutput = writeHandle.get();
+        si.hStdError = writeHandle.get();
+        si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+
+        std::wstring cmdline = L"\"" + wtaPath + L"\" " + argsAfterExe;
+        std::wstring mutableCmd = cmdline;
+
+        PROCESS_INFORMATION pi{};
+        const BOOL launched = CreateProcessW(
+            wtaPath.c_str(),
+            mutableCmd.data(),
+            nullptr,
+            nullptr,
+            TRUE, // inherit handles (so the child inherits writeHandle)
+            CREATE_NO_WINDOW,
+            nullptr,
+            nullptr,
+            &si,
+            &pi);
+        if (!launched)
+        {
+            return {};
+        }
+        wil::unique_handle proc{ pi.hProcess };
+        wil::unique_handle thread{ pi.hThread };
+
+        // Close our copy of the write end so the read pipe sees EOF
+        // when the child exits.
+        writeHandle.reset();
+
+        std::string captured;
+        captured.reserve(4096);
+        char buf[4096];
+        for (;;)
+        {
+            DWORD bytesRead = 0;
+            const BOOL ok = ReadFile(readHandle.get(), buf, sizeof(buf), &bytesRead, nullptr);
+            if (!ok || bytesRead == 0)
+            {
+                break;
+            }
+            captured.append(buf, bytesRead);
+        }
+
+        if (WaitForSingleObject(proc.get(), timeoutMs) != WAIT_OBJECT_0)
+        {
+            // Best-effort terminate on timeout — we still return what
+            // we captured (empty in practice).
+            TerminateProcess(proc.get(), 1);
+            WaitForSingleObject(proc.get(), 1000);
+            return {};
+        }
+        DWORD exitCode = 1;
+        GetExitCodeProcess(proc.get(), &exitCode);
+        if (exitCode != 0)
+        {
+            return {};
+        }
+        return captured;
+    }
+
+    void AIAgentsViewModel::_ApplyStatusReport(const std::optional<::Microsoft::Terminal::AgentHooks::StatusReport>& report)
+    {
+        namespace AgentHooks = ::Microsoft::Terminal::AgentHooks;
+        using AgentHooks::CliStatus;
+        using AgentHooks::FindCli;
+        using AgentHooks::FormatCliStatusLine;
+
+        // Display strings + per-CLI detected flags. When the report is
+        // missing (wta failed / not found / parse error) we surface a
+        // single explanatory line per row instead of crashing or
+        // silently leaving the previous text.
+        if (!report.has_value())
+        {
+            const winrt::hstring unavailable{ L"Hook detection unavailable (wta.exe not found or status query failed)" };
+            _copilotHooksStatus = unavailable;
+            _claudeHooksStatus = unavailable;
+            _geminiHooksStatus = unavailable;
+            _copilotCliDetected = false;
+            _claudeCliDetected = false;
+            _geminiCliDetected = false;
         }
         else
         {
-            text += L"hooks not installed";
+            const auto* copilot = FindCli(*report, "copilot");
+            const auto* claude = FindCli(*report, "claude");
+            const auto* gemini = FindCli(*report, "gemini");
+
+            _copilotCliDetected = copilot && copilot->binaryOnPath;
+            _claudeCliDetected = claude && claude->binaryOnPath;
+            _geminiCliDetected = gemini && gemini->binaryOnPath;
+
+            const auto missing = [](std::wstring_view name) {
+                return winrt::hstring{ std::wstring{ name } + L" — not reported by wta" };
+            };
+            _copilotHooksStatus = copilot ? winrt::hstring{ FormatCliStatusLine(*copilot, L"Copilot CLI") } : missing(L"Copilot CLI");
+            _claudeHooksStatus = claude ? winrt::hstring{ FormatCliStatusLine(*claude, L"Claude Code") } : missing(L"Claude Code");
+            _geminiHooksStatus = gemini ? winrt::hstring{ FormatCliStatusLine(*gemini, L"Gemini CLI") } : missing(L"Gemini CLI");
         }
-        return winrt::hstring{ text };
-    }
-
-    void AIAgentsViewModel::RefreshAgentHooksStatus()
-    {
-        _copilotCliDetected = _IsAgentInstalled(L"copilot");
-        _claudeCliDetected = _IsAgentInstalled(L"claude");
-        _geminiCliDetected = _IsAgentInstalled(L"gemini");
-
-        const auto home = _UserHomeDir();
-        _copilotHooksStatus = _FormatHookStatus(_copilotCliDetected, L"Copilot CLI",
-                                                 _IsCopilotHookInstalled(home));
-        _claudeHooksStatus = _FormatHookStatus(_claudeCliDetected, L"Claude Code",
-                                                _IsClaudeHookInstalled(home));
-        _geminiHooksStatus = _FormatHookStatus(_geminiCliDetected, L"Gemini CLI",
-                                                _IsGeminiHookInstalled(home));
 
         _NotifyChanges(L"IsCopilotCliDetected",
                        L"IsClaudeCliDetected",
@@ -667,6 +713,33 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                        L"CopilotHooksStatusText",
                        L"ClaudeHooksStatusText",
                        L"GeminiHooksStatusText");
+    }
+
+    void AIAgentsViewModel::RefreshAgentHooksStatus()
+    {
+        if (_refreshingAgentHooks)
+        {
+            return;
+        }
+        _refreshingAgentHooks = true;
+        _RefreshAgentHooksStatusAsync();
+    }
+
+    winrt::fire_and_forget AIAgentsViewModel::_RefreshAgentHooksStatusAsync()
+    {
+        auto strongThis = get_strong();
+        auto dispatcher = winrt::Windows::UI::Xaml::Window::Current().Dispatcher();
+
+        co_await winrt::resume_background();
+
+        const auto wtaPath = _ResolveWtaExePath();
+        const auto stdoutText = _RunWtaCaptureStdout(wtaPath, L"hooks status --json", 30'000);
+        auto report = ::Microsoft::Terminal::AgentHooks::ParseStatusJson(stdoutText);
+
+        co_await wil::resume_foreground(dispatcher);
+
+        _ApplyStatusReport(report);
+        _refreshingAgentHooks = false;
     }
 
     void AIAgentsViewModel::InstallAgentHooks()

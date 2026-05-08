@@ -7,6 +7,7 @@
 #include "AgentEntry.g.h"
 #include "ViewModelHelpers.h"
 #include "Utils.h"
+#include "../inc/AgentHooksStatus.h"
 
 namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 {
@@ -133,16 +134,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         winrt::hstring _claudeHooksStatus;
         winrt::hstring _geminiHooksStatus;
         bool _installingAgentHooks{ false };
+        bool _refreshingAgentHooks{ false };
         winrt::hstring _agentHooksInstallSummary;
 
         static std::wstring _ResolveWtaExePath();
-        static std::wstring _UserHomeDir();
-        static bool _IsCopilotHookInstalled(const std::wstring& home);
-        static bool _IsClaudeHookInstalled(const std::wstring& home);
-        static bool _IsGeminiHookInstalled(const std::wstring& home);
-        static winrt::hstring _FormatHookStatus(bool cliDetected,
-                                                 const wchar_t* cliDisplayName,
-                                                 bool hookInstalled);
+        static std::string _RunWtaCaptureStdout(const std::wstring& wtaPath,
+                                                const std::wstring& argsAfterExe,
+                                                DWORD timeoutMs);
+        void _ApplyStatusReport(const std::optional<::Microsoft::Terminal::AgentHooks::StatusReport>& report);
+        winrt::fire_and_forget _RefreshAgentHooksStatusAsync();
         winrt::fire_and_forget _RunHooksInstallerAsync();
     };
 };
