@@ -50,16 +50,23 @@ the `Cert:` PSDrive or PKI module.
 ### Step 2: Build wta.exe
 
 ```bash
-# x64
-cargo build --release --manifest-path wta/Cargo.toml
+# x64 (use explicit target — see note below)
+cargo build --release --target x86_64-pc-windows-msvc --manifest-path wta/Cargo.toml
 
 # ARM64 (cross-compile; add target once with: rustup target add aarch64-pc-windows-msvc)
 cargo build --release --target aarch64-pc-windows-msvc --manifest-path wta/Cargo.toml
 ```
 
 MSBuild picks up `wta.exe` automatically from the Cargo output when packaging:
-- x64: `wta/target/release/wta.exe`
+- x64: `wta/target/x86_64-pc-windows-msvc/release/wta.exe`
 - ARM64: `wta/target/aarch64-pc-windows-msvc/release/wta.exe`
+
+> **Always pass `--target` explicitly.** The wapproj's `Content` items prefer
+> `wta\target\<triple>\release\wta.exe` over the bare `wta\target\release\wta.exe`
+> fallback. If a stale binary exists at the explicit-target path (e.g., from a
+> previous `--target` build), bare `cargo build --release` writes to a different
+> directory and MSBuild silently packages the stale one. Using `--target` for
+> both arches keeps the two paths symmetric and avoids this trap.
 
 ### Step 3: Build the Terminal MSIX
 
@@ -204,7 +211,7 @@ Options (pass to `install.cmd`): `/quiet`, `/nopath`, `/noshortcuts`
 | Goal | Command |
 |------|---------|
 | Generate dev cert | `powershell -File build\scripts\New-DevSigningCert.ps1` |
-| Build wta (x64) | `cargo build --release --manifest-path wta/Cargo.toml` |
+| Build wta (x64) | `cargo build --release --target x86_64-pc-windows-msvc --manifest-path wta/Cargo.toml` |
 | Build wta (ARM64) | `cargo build --release --target aarch64-pc-windows-msvc --manifest-path wta/Cargo.toml` |
 | Build MSIX (x64) | MSBuild with `GenerateAppxPackageOnBuild=true` + `SolutionDir` (see Step 3) |
 | Assemble MSIX ZIP | `powershell -File build\scripts\assemble-msix-zip.ps1 -Version X.X.X.X -Arch x64` |

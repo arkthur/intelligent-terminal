@@ -114,8 +114,13 @@ There are two independent build systems. **Both must be built** before F5.
 # Kill stale WTA processes first
 taskkill //f //im wta.exe 2>/dev/null; true
 
-cargo build --manifest-path wta/Cargo.toml
-# Output: wta/target/debug/wta.exe
+cargo build --target x86_64-pc-windows-msvc --manifest-path wta/Cargo.toml
+# Output: wta/target/x86_64-pc-windows-msvc/debug/wta.exe
+#
+# Always pass --target explicitly — the wapproj prefers
+# wta/target/<triple>/<profile>/wta.exe over the bare target/<profile>
+# fallback, and a stale explicit-target binary will silently shadow your
+# fresh bare-target build.
 ```
 
 ### 2. Terminal (C++ / MSBuild)
@@ -137,9 +142,9 @@ cmd.exe //c "tools\razzle.cmd && bcz no_clean"
 ### Full rebuild flow (typical dev cycle)
 
 ```bash
-# 1. Build WTA
+# 1. Build WTA (always use --target — see note above)
 taskkill //f //im wta.exe 2>/dev/null; true
-cargo build --manifest-path wta/Cargo.toml
+cargo build --target x86_64-pc-windows-msvc --manifest-path wta/Cargo.toml
 
 # 2. Build & run Terminal from VS
 #    F5 in Visual Studio (CascadiaPackage project)

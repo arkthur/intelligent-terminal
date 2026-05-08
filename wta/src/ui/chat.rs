@@ -51,8 +51,10 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         }
     }
 
-    for turn in app.current_tab().completed_turns.iter().rev() {
-        let mut turn_lines = build_completed_turn_lines(turn);
+    let selected_idx = app.current_tab().selected_completed_turn_idx;
+    for (idx, turn) in app.current_tab().completed_turns.iter().enumerate().rev() {
+        let is_selected = selected_idx == Some(idx);
+        let mut turn_lines = build_completed_turn_lines(turn, is_selected);
         reversed_lines.extend(turn_lines.drain(..).rev());
         if reversed_lines.len() >= requested_lines {
             break;
@@ -84,14 +86,44 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     });
 }
 
-fn build_completed_turn_lines<'a>(turn: &'a crate::app::CompletedTurn) -> Vec<Line<'a>> {
-    vec![
-        Line::from(vec![
-            Span::styled("> ", theme::USER_PROMPT),
-            Span::styled(truncate_render_text(&turn.prompt), theme::USER_PROMPT),
-        ]),
-        Line::default(),
-    ]
+fn build_completed_turn_lines<'a>(
+    turn: &'a crate::app::CompletedTurn,
+    is_selected: bool,
+) -> Vec<Line<'a>> {
+    let chevron = if turn.expanded { "▼ " } else { "▶ " };
+    // Selected row uses the SELECTED theme (reverse video) to make the
+    // current Tab target visible. Unselected rows render in the standard
+    // dim USER_PROMPT style — same as before this feature existed.
+    let prompt_style = if is_selected {
+        theme::SELECTED
+    } else {
+        theme::USER_PROMPT
+    };
+    let chevron_style = if is_selected {
+        theme::SELECTED
+    } else {
+        theme::DIM
+    };
+
+    let mut lines = vec![Line::from(vec![
+        Span::styled(chevron, chevron_style),
+        Span::styled("> ", prompt_style),
+        Span::styled(truncate_render_text(&turn.prompt), prompt_style),
+    ])];
+
+    if turn.expanded {
+        // Render the captured details — the agent reply, tool calls,
+        // plans, etc. — using the same builder as the active turn so the
+        // formatting matches. `is_last_message=false` and
+        // `agent_streaming=false` together suppress the streaming-cursor
+        // path; details are always finalized by the time they land here.
+        for msg in turn.details.iter() {
+            lines.extend(build_message_lines(msg, false, false));
+        }
+    }
+
+    lines.push(Line::default());
+    lines
 }
 
 fn build_activity_line(app: &App) -> Option<Line<'static>> {

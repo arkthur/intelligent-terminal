@@ -614,7 +614,7 @@ fn requested_model_id(program: &str, args: &[&str]) -> Option<String> {
     crate::agent_registry::extract_model_from_args(args, profile).map(str::to_string)
 }
 
-fn complete_prompt_request<T, E: std::fmt::Display>(
+async fn complete_prompt_request<T, E: std::fmt::Display>(
     result: std::result::Result<T, E>,
     prompt_timing: &PromptTimingState,
     event_tx: &mpsc::UnboundedSender<AppEvent>,
@@ -629,6 +629,21 @@ fn complete_prompt_request<T, E: std::fmt::Display>(
                     note,
                 });
             }
+            // Defensive workaround for ACP-non-compliant agents.
+            //
+            // ACP requires the Agent to send all pending `session/update`
+            // notifications BEFORE responding to `session/prompt` (see ACP
+            // 0.10 agent.rs:80-101 — `prompt` "Returns when the turn is
+            // complete with a stop reason"). In practice GitHub Copilot
+            // occasionally flushes a few trailing AgentMessageChunk
+            // notifications a few hundred microseconds AFTER the
+            // PromptResponse, which leaves `pending_agent_response`
+            // truncated when `AgentMessageEnd` triggers finalize. We sleep
+            // briefly so stragglers land in pending_agent_response before
+            // finalize_agent_response_for takes ownership of it.
+            //
+            // Once Copilot honors the spec, this delay can be removed.
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
             let _ = event_tx.send(AppEvent::AgentMessageEnd { session_id });
         }
         Err(e) => {
@@ -1490,12 +1505,34 @@ pub async fn run_acp_client(
                 continue;
             }
             Err(e) => {
-                startup_probe.log(&format!("run_acp_client failed: {:#}", e));
+                startup_probe.log(&format!(
+                    "run_acp_client failed: {:#} — waiting for /restart",
+                    e
+                ));
                 let _ = event_tx.send(AppEvent::AgentError {
                     session_id: None,
                     message: format!("{:#}", e),
                 });
-                break;
+                // Don't break — a transient failure (e.g. agent crashed
+                // during a self-update race) shouldn't permanently kill
+                // the supervisor. Park here listening for /restart so the
+                // user can recover without restarting the whole terminal.
+                match restart_rx.recv().await {
+                    Some(_) => {
+                        startup_probe.log(
+                            "run_acp_client restart requested after failure — respawning agent",
+                        );
+                        let _ = event_tx.send(AppEvent::ConnectionStage(
+                            "Restarting agent...".to_string(),
+                        ));
+                        continue;
+                    }
+                    None => {
+                        startup_probe
+                            .log("run_acp_client restart channel closed — exiting supervisor");
+                        break;
+                    }
+                }
             }
         }
     }
@@ -2151,7 +2188,8 @@ async fn dispatch_prompt_body(
                         &prompt_timing_task,
                         &event_tx_task,
                         prompt_session_id_str.clone(),
-                    );
+                    )
+                    .await;
                     false
                 }
                 _ = cancel_rx => {
@@ -2228,8 +2266,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn successful_prompt_completion_emits_message_end_only() {
+    #[tokio::test]
+    async fn successful_prompt_completion_emits_message_end_only() {
         let (event_tx, mut event_rx) = mpsc::unbounded_channel();
         let prompt_timing = PromptTimingState::default();
 
@@ -2238,7 +2276,8 @@ mod tests {
             &prompt_timing,
             &event_tx,
             "test-session".to_string(),
-        );
+        )
+        .await;
 
         match event_rx.try_recv() {
             Ok(AppEvent::AgentMessageEnd { session_id }) => {
@@ -2250,8 +2289,8 @@ mod tests {
         assert!(event_rx.try_recv().is_err());
     }
 
-    #[test]
-    fn failed_prompt_completion_emits_error_only() {
+    #[tokio::test]
+    async fn failed_prompt_completion_emits_error_only() {
         let (event_tx, mut event_rx) = mpsc::unbounded_channel();
         let prompt_timing = PromptTimingState::default();
 
@@ -2260,7 +2299,8 @@ mod tests {
             &prompt_timing,
             &event_tx,
             "test-session".to_string(),
-        );
+        )
+        .await;
 
         match event_rx.try_recv() {
             Ok(AppEvent::AgentError { session_id, message }) => {

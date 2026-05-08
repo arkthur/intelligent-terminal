@@ -66,6 +66,10 @@ pub struct CompletedTurn {
     pub prompt: String,
     #[serde(default)]
     pub details: Vec<ChatMessage>,
+    /// Whether the turn's `details` are visible in the UI. Tab to select +
+    /// Enter to toggle. Default false (collapsed) so history stays compact.
+    #[serde(default)]
+    pub expanded: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -376,6 +380,10 @@ pub struct TabSession {
     // Conversation history
     pub messages: Vec<ChatMessage>,
     pub completed_turns: Vec<CompletedTurn>,
+    /// Tab/Shift+Tab selects a past turn (most recent first). Enter then
+    /// toggles `CompletedTurn.expanded`. None means no selection — Enter
+    /// goes to the input/prompt path as before.
+    pub selected_completed_turn_idx: Option<usize>,
     pub scroll_offset: usize,
 
     // Streaming state
@@ -449,6 +457,49 @@ impl TabSession {
         self.clear_recommendations();
     }
 
+    /// Cycle the past-turn selection toward older entries.
+    /// `None → last (most recent) → ... → 0 → None`. No-op when there are
+    /// no completed turns.
+    pub fn select_older_completed_turn(&mut self) {
+        let len = self.completed_turns.len();
+        if len == 0 {
+            self.selected_completed_turn_idx = None;
+            return;
+        }
+        self.selected_completed_turn_idx = match self.selected_completed_turn_idx {
+            None => Some(len - 1),
+            Some(0) => None,
+            Some(i) => Some(i - 1),
+        };
+    }
+
+    /// Cycle the past-turn selection toward newer entries.
+    /// `None → 0 (oldest) → ... → last → None`.
+    pub fn select_newer_completed_turn(&mut self) {
+        let len = self.completed_turns.len();
+        if len == 0 {
+            self.selected_completed_turn_idx = None;
+            return;
+        }
+        self.selected_completed_turn_idx = match self.selected_completed_turn_idx {
+            None => Some(0),
+            Some(i) if i + 1 >= len => None,
+            Some(i) => Some(i + 1),
+        };
+    }
+
+    /// Flip `expanded` on the currently selected past turn. No-op if nothing
+    /// is selected or the index is out of range (defensive — selection
+    /// should track turn count, but a stale index shouldn't panic).
+    pub fn toggle_selected_completed_turn(&mut self) {
+        let Some(idx) = self.selected_completed_turn_idx else {
+            return;
+        };
+        if let Some(turn) = self.completed_turns.get_mut(idx) {
+            turn.expanded = !turn.expanded;
+        }
+    }
+
     pub fn clear_completed_turn_history(&mut self) {
         self.messages.clear();
         self.tool_calls.clear();
@@ -488,7 +539,11 @@ impl TabSession {
 
         let mut details = self.current_turn_details();
         details.push(ChatMessage::Agent(agent_text));
-        self.pending_completed_turn = Some(CompletedTurn { prompt, details });
+        self.pending_completed_turn = Some(CompletedTurn {
+            prompt,
+            details,
+            expanded: false,
+        });
     }
 
     pub fn commit_pending_completed_turn(&mut self) {
@@ -1551,6 +1606,27 @@ impl App {
                     self.current_tab_mut().selected_button = (self.current_tab_mut().selected_button + 1) % button_count;
                 }
             }
+            KeyCode::Tab
+                if self.current_tab().input.is_empty()
+                    && self.current_tab().recommendations.is_none()
+                    && !self.current_tab().completed_turns.is_empty() =>
+            {
+                self.current_tab_mut().select_older_completed_turn();
+            }
+            KeyCode::BackTab
+                if self.current_tab().input.is_empty()
+                    && self.current_tab().recommendations.is_none()
+                    && !self.current_tab().completed_turns.is_empty() =>
+            {
+                self.current_tab_mut().select_newer_completed_turn();
+            }
+            KeyCode::Esc
+                if self.current_tab().selected_completed_turn_idx.is_some() =>
+            {
+                // Esc clears the past-turn selection without any other side
+                // effect. Lets the user back out of the history nav cleanly.
+                self.current_tab_mut().selected_completed_turn_idx = None;
+            }
             KeyCode::Left
                 if self.current_tab().input.is_empty() && self.current_tab_mut().recommendations.is_some() =>
             {
@@ -1675,6 +1751,14 @@ impl App {
                     self.current_tab_mut().clear_input();
                     self.handle_slash_command(parsed);
                 }
+            }
+            KeyCode::Enter
+                if self.current_tab().input.is_empty()
+                    && self.current_tab().selected_completed_turn_idx.is_some() =>
+            {
+                // A past turn is highlighted via Tab — Enter toggles its
+                // expanded state instead of submitting / activating recs.
+                self.current_tab_mut().toggle_selected_completed_turn();
             }
             KeyCode::Enter => {
                 let _tab = self.current_tab();
@@ -1917,6 +2001,7 @@ impl App {
                 let tab = self.current_tab_mut();
                 tab.clear_chat_history();
                 tab.completed_turns.clear();
+                tab.selected_completed_turn_idx = None;
                 tab.scroll_to_bottom();
             }
             CommandKind::Stop => {
@@ -1963,6 +2048,7 @@ impl App {
                 let tab = self.current_tab_mut();
                 tab.clear_chat_history();
                 tab.completed_turns.clear();
+                tab.selected_completed_turn_idx = None;
                 tab.session_id = None;
                 tab.scroll_to_bottom();
             }
@@ -1978,6 +2064,7 @@ impl App {
                 for (_, tab) in self.tab_sessions.iter_mut() {
                     tab.clear_chat_history();
                     tab.completed_turns.clear();
+                    tab.selected_completed_turn_idx = None;
                     tab.session_id = None;
                     tab.prompt_in_flight = false;
                     tab.agent_streaming = false;
@@ -2440,6 +2527,7 @@ impl App {
                     tab.pending_completed_turn = Some(CompletedTurn {
                         prompt: turn_prompt,
                         details,
+                        expanded: false,
                     });
                     tab.commit_pending_completed_turn();
                 }
