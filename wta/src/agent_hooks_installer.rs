@@ -1,7 +1,7 @@
-// wta/src/claude_hooks_installer.rs
+// wta/src/agent_hooks_installer.rs
 //
-// Auto-install the wt-agent-hooks bridge into Claude Code AND Copilot CLI
-// on wta startup.
+// Auto-install the wt-agent-hooks bridge into Claude Code, Copilot CLI,
+// and Gemini CLI on wta startup.
 //
 // Why this exists
 // ===============
@@ -119,8 +119,22 @@ const COPILOT_PLUGIN_DIR_NAME: &str = COPILOT_PLUGIN_NAME;
 const COPILOT_PLUGIN_VERSION: &str = "0.1.0";
 
 /// Embedded copy of the bridge script. Sourced from
-/// `wta/agent-hooks-plugin/hooks/send-event.ps1` at build time.
-const SEND_EVENT_PS1: &str = include_str!("../agent-hooks-plugin/hooks/send-event.ps1");
+/// `wta/wt-agent-hooks/agent-hooks-plugin/hooks/send-event.ps1` at build time.
+const SEND_EVENT_PS1: &str = include_str!("../wt-agent-hooks/agent-hooks-plugin/hooks/send-event.ps1");
+
+/// Folder name installed under `~/.gemini/extensions/` for Gemini CLI.
+const GEMINI_EXTENSION_DIR_NAME: &str = "wt-agent-hooks";
+
+/// Embedded copy of the Gemini extension manifest. Sourced from
+/// `wta/wt-agent-hooks/gemini-extension/gemini-extension.json` at build time.
+const GEMINI_EXTENSION_JSON: &str =
+    include_str!("../wt-agent-hooks/gemini-extension/gemini-extension.json");
+
+/// Embedded copy of the Gemini hook config that points at the bridge script
+/// via `${extensionPath}` (Gemini's templated path token). Sourced from
+/// `wta/wt-agent-hooks/gemini-extension/hooks/hooks.json` at build time.
+const GEMINI_HOOKS_JSON: &str =
+    include_str!("../wt-agent-hooks/gemini-extension/hooks/hooks.json");
 
 /// Human-readable description used in both `plugin.json` and
 /// `marketplace.json`. Kept short on purpose — Copilot CLI surfaces this
@@ -129,7 +143,7 @@ const COPILOT_PLUGIN_DESCRIPTION: &str =
     "Forward CLI agent hook events to Windows Terminal for WTA display";
 
 /// Hook event names → wta-side event-type identifier passed to the script.
-/// Order mirrors `wta/agent-hooks-plugin/hooks/hooks.json` so the on-disk
+/// Order mirrors `wta/wt-agent-hooks/agent-hooks-plugin/hooks/hooks.json` so the on-disk
 /// behavior matches what a plugin install would have produced.
 ///
 /// Only events Claude recognizes natively are listed here. Unknown event
@@ -154,7 +168,7 @@ const HOOK_EVENTS: &[(&str, &str)] = &[
 /// malformed, we leave it alone.
 pub fn ensure_installed() {
     let Some(home) = home_dir() else {
-        tracing::debug!(target: "claude_hooks", "no HOME/USERPROFILE; skipping");
+        tracing::debug!(target: "agent_hooks", "no HOME/USERPROFILE; skipping");
         return;
     };
     ensure_installed_in(&home);
@@ -169,13 +183,66 @@ fn ensure_installed_in(home: &Path) {
     let shared_script_path = match write_bridge_script() {
         Ok(p) => p,
         Err(e) => {
-            tracing::warn!(target: "claude_hooks", err = %e, "failed to write shared bridge script");
+            tracing::warn!(target: "agent_hooks", err = %e, "failed to write shared bridge script");
             return;
         }
     };
 
     install_for_claude(home, &shared_script_path);
     install_for_copilot(home);
+    install_for_gemini(home);
+}
+
+/// Install the Gemini extension by writing the bundled
+/// `wt-agent-hooks` extension into `~/.gemini/extensions/wt-agent-hooks/`.
+///
+/// Layout produced (matches `gemini extensions install <local-path>`):
+///   ~/.gemini/extensions/wt-agent-hooks/
+///     gemini-extension.json   # manifest (name + version + description)
+///     hooks/
+///       hooks.json            # event -> command mapping (uses
+///                             # ${extensionPath} for the script path)
+///       send-event.ps1        # embedded bridge script (same content as
+///                             # the Claude/Copilot one — single source)
+///
+/// Idempotent: only writes when the on-disk content differs.
+/// No-op when `~/.gemini/` is absent (Gemini CLI not installed).
+fn install_for_gemini(home: &Path) {
+    let gemini_dir = home.join(".gemini");
+    if !gemini_dir.is_dir() {
+        tracing::debug!(target: "gemini_hooks", "no ~/.gemini dir; Gemini CLI not present");
+        return;
+    }
+
+    let ext_dir = gemini_dir
+        .join("extensions")
+        .join(GEMINI_EXTENSION_DIR_NAME);
+    let hooks_dir = ext_dir.join("hooks");
+    if let Err(e) = fs::create_dir_all(&hooks_dir) {
+        tracing::warn!(target: "gemini_hooks", err = %e,
+            "failed to create Gemini extension dir");
+        return;
+    }
+
+    let manifest_path = ext_dir.join("gemini-extension.json");
+    let hooks_path = hooks_dir.join("hooks.json");
+    let script_path = hooks_dir.join("send-event.ps1");
+
+    if let Err(e) = write_if_changed(&manifest_path, GEMINI_EXTENSION_JSON) {
+        tracing::warn!(target: "gemini_hooks", err = %e,
+            path = %manifest_path.display(),
+            "failed to write Gemini extension manifest");
+    }
+    if let Err(e) = write_if_changed(&hooks_path, GEMINI_HOOKS_JSON) {
+        tracing::warn!(target: "gemini_hooks", err = %e,
+            path = %hooks_path.display(),
+            "failed to write Gemini hooks.json");
+    }
+    if let Err(e) = write_if_changed(&script_path, SEND_EVENT_PS1) {
+        tracing::warn!(target: "gemini_hooks", err = %e,
+            path = %script_path.display(),
+            "failed to write Gemini bridge script");
+    }
 }
 
 /// Install hooks for Claude Code by merging a tagged `hooks` block into
@@ -183,12 +250,12 @@ fn ensure_installed_in(home: &Path) {
 fn install_for_claude(home: &Path, shared_script_path: &Path) {
     let claude_dir = home.join(".claude");
     if !claude_dir.is_dir() {
-        tracing::debug!(target: "claude_hooks", "no ~/.claude dir; Claude not present");
+        tracing::debug!(target: "agent_hooks", "no ~/.claude dir; Claude not present");
         return;
     }
     let settings_path = claude_dir.join("settings.json");
-    if let Err(e) = ensure_hooks_in_settings(&settings_path, shared_script_path, "claude_hooks") {
-        tracing::warn!(target: "claude_hooks", err = %e, "failed to update settings.json");
+    if let Err(e) = ensure_hooks_in_settings(&settings_path, shared_script_path, "agent_hooks") {
+        tracing::warn!(target: "agent_hooks", err = %e, "failed to update settings.json");
     }
 }
 
@@ -392,7 +459,7 @@ fn copilot_plugin_json_value() -> Value {
 }
 
 /// Build the `hooks.json` document Copilot's plugin loader will read.
-/// Mirrors the on-disk format `wta/agent-hooks-plugin/hooks/hooks.json`
+/// Mirrors the on-disk format `wta/wt-agent-hooks/agent-hooks-plugin/hooks/hooks.json`
 /// uses but generated programmatically from `HOOK_EVENTS` (so we don't ship
 /// stale event names).
 fn copilot_hooks_json_value() -> Value {
@@ -850,7 +917,7 @@ fn write_bridge_script() -> std::io::Result<PathBuf> {
     if needs_write {
         fs::write(&path, SEND_EVENT_PS1)?;
         tracing::info!(
-            target: "claude_hooks",
+            target: "agent_hooks",
             path = %path.display(),
             "wrote bridge script",
         );
@@ -882,7 +949,7 @@ fn ensure_hooks_in_settings(
 
     let changed = merge_wta_hooks(&mut settings, script_path);
     if !changed {
-        tracing::debug!(target: "claude_hooks", cli = log_target, "settings.json already up to date");
+        tracing::debug!(target: "agent_hooks", cli = log_target, "settings.json already up to date");
         return Ok(());
     }
 
@@ -892,7 +959,7 @@ fn ensure_hooks_in_settings(
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
     fs::write(settings_path, serialized)?;
     tracing::info!(
-        target: "claude_hooks",
+        target: "agent_hooks",
         cli = log_target,
         path = %settings_path.display(),
         "merged hooks block",
@@ -1802,6 +1869,74 @@ mod tests {
     }
 
     #[test]
+    fn install_for_gemini_writes_full_extension_layout() {
+        let root = std::env::temp_dir().join(format!(
+            "wta-installer-gemini-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0),
+        ));
+        let gemini_dir = root.join(".gemini");
+        fs::create_dir_all(&gemini_dir).unwrap();
+
+        install_for_gemini(&root);
+
+        let ext_dir = gemini_dir.join("extensions").join("wt-agent-hooks");
+        let manifest = ext_dir.join("gemini-extension.json");
+        let hooks = ext_dir.join("hooks").join("hooks.json");
+        let script = ext_dir.join("hooks").join("send-event.ps1");
+        assert!(manifest.exists(), "manifest missing at {}", manifest.display());
+        assert!(hooks.exists(), "hooks.json missing at {}", hooks.display());
+        assert!(script.exists(), "bridge script missing at {}", script.display());
+
+        let manifest_text = fs::read_to_string(&manifest).unwrap();
+        let mv: Value = serde_json::from_str(&manifest_text).unwrap();
+        assert_eq!(mv["name"], "wt-agent-hooks");
+        assert_eq!(mv["version"], "0.1.0");
+
+        let hooks_text = fs::read_to_string(&hooks).unwrap();
+        let hv: Value = serde_json::from_str(&hooks_text).unwrap();
+        assert!(hv["hooks"]["SessionStart"].is_array(), "Gemini SessionStart hook missing");
+        assert!(hv["hooks"]["AfterAgent"].is_array(), "Gemini AfterAgent hook missing");
+
+        // Idempotency: second run produces no mtime churn.
+        let mt1 = fs::metadata(&manifest).unwrap().modified().unwrap();
+        let mt2 = fs::metadata(&hooks).unwrap().modified().unwrap();
+        let mt3 = fs::metadata(&script).unwrap().modified().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        install_for_gemini(&root);
+        assert_eq!(mt1, fs::metadata(&manifest).unwrap().modified().unwrap());
+        assert_eq!(mt2, fs::metadata(&hooks).unwrap().modified().unwrap());
+        assert_eq!(mt3, fs::metadata(&script).unwrap().modified().unwrap());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn install_for_gemini_is_noop_when_gemini_not_installed() {
+        let root = std::env::temp_dir().join(format!(
+            "wta-installer-gemini-absent-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0),
+        ));
+        // NB: don't create ~/.gemini
+        fs::create_dir_all(&root).unwrap();
+
+        install_for_gemini(&root);
+
+        // Must not have created ~/.gemini from scratch.
+        assert!(!root.join(".gemini").exists(),
+            "install_for_gemini must not create ~/.gemini when Gemini is absent");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
     fn ensure_installed_in_full_flow() {
         // End-to-end: run the installer against a fresh temporary home
         // with realistic .claude/ and .copilot/ subdirs. Verify both code
@@ -1818,8 +1953,10 @@ mod tests {
         // Layout pre-existing user state we want preserved.
         let claude_dir = root.join(".claude");
         let copilot_dir = root.join(".copilot");
+        let gemini_dir = root.join(".gemini");
         fs::create_dir_all(&claude_dir).unwrap();
         fs::create_dir_all(&copilot_dir).unwrap();
+        fs::create_dir_all(&gemini_dir).unwrap();
         fs::write(
             claude_dir.join("settings.json"),
             r#"{"autoUpdatesChannel":"latest"}"#,
@@ -1895,14 +2032,22 @@ mod tests {
         let claude_mtime = fs::metadata(claude_dir.join("settings.json")).unwrap().modified().unwrap();
         let copilot_mtime = fs::metadata(copilot_dir.join("settings.json")).unwrap().modified().unwrap();
         let config_mtime = fs::metadata(&cfg_path).unwrap().modified().unwrap();
+        let gemini_manifest = gemini_dir
+            .join("extensions")
+            .join("wt-agent-hooks")
+            .join("gemini-extension.json");
+        assert!(gemini_manifest.exists(), "Gemini extension manifest missing");
+        let gemini_mtime = fs::metadata(&gemini_manifest).unwrap().modified().unwrap();
         std::thread::sleep(std::time::Duration::from_millis(20));
         ensure_installed_in(&root);
         let claude_mtime2 = fs::metadata(claude_dir.join("settings.json")).unwrap().modified().unwrap();
         let copilot_mtime2 = fs::metadata(copilot_dir.join("settings.json")).unwrap().modified().unwrap();
         let config_mtime2 = fs::metadata(&cfg_path).unwrap().modified().unwrap();
+        let gemini_mtime2 = fs::metadata(&gemini_manifest).unwrap().modified().unwrap();
         assert_eq!(claude_mtime, claude_mtime2, "Claude rewrite on idempotent run");
         assert_eq!(copilot_mtime, copilot_mtime2, "Copilot settings rewrite on idempotent run");
         assert_eq!(config_mtime, config_mtime2, "Copilot config rewrite on idempotent run");
+        assert_eq!(gemini_mtime, gemini_mtime2, "Gemini extension rewrite on idempotent run");
 
         let _ = fs::remove_dir_all(&root);
     }

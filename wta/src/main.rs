@@ -1,6 +1,6 @@
 mod agent_registry;
 mod agent_sessions;
-mod claude_hooks_installer;
+mod agent_hooks_installer;
 mod history_loader;
 mod app;
 mod coordinator;
@@ -367,10 +367,10 @@ async fn main() -> Result<()> {
         // hand, or upgraded from an older wta) running this subcommand
         // resets it without launching the full agent pane.
         Some(Command::InstallHooks) => {
-            claude_hooks_installer::ensure_installed();
+            agent_hooks_installer::ensure_installed();
             println!("wt-agent-hooks install attempted (idempotent). \
-                Inspect ~/.claude/settings.json and ~/.copilot/settings.json \
-                to confirm.");
+                Inspect ~/.claude/settings.json, ~/.copilot/settings.json, \
+                and ~/.gemini/extensions/wt-agent-hooks/ to confirm.");
             Ok(())
         }
 
@@ -1692,12 +1692,18 @@ async fn run_attach_tui(
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
+                        // Pane GUIDs arrive in two cases on the wire:
+                        //   - hook bridge events  → lowercase (WT_SESSION env var)
+                        //   - WT-native events    → uppercase (canonical Windows GUID)
+                        // Normalise here so downstream code (registry,
+                        // is_agent_pane lookup, osc:133;A demote, etc.) all
+                        // compare in the same case.
                         let session_id = event_json
                             .get("params")
                             .and_then(|p| p.get("session_id"))
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
-                            .to_string();
+                            .to_ascii_lowercase();
                         let params = event_json
                             .get("params")
                             .cloned()
@@ -2123,12 +2129,18 @@ async fn run_acp_app(
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
+                        // Pane GUIDs arrive in two cases on the wire:
+                        //   - hook bridge events  → lowercase (WT_SESSION env var)
+                        //   - WT-native events    → uppercase (canonical Windows GUID)
+                        // Normalise here so downstream code (registry,
+                        // is_agent_pane lookup, osc:133;A demote, etc.) all
+                        // compare in the same case.
                         let session_id = event_json
                             .get("params")
                             .and_then(|p| p.get("session_id"))
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
-                            .to_string();
+                            .to_ascii_lowercase();
                         let params = event_json
                             .get("params")
                             .cloned()

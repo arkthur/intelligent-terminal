@@ -82,6 +82,23 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         til::typed_event<Editor::AIAgentsViewModel, Model::ShellIntegrationTarget> InitShellIntegrationRequested;
 
+        // ── Agent Hooks ──────────────────────────────────────────────────
+        bool IsCopilotCliDetected() const noexcept { return _copilotCliDetected; }
+        bool IsClaudeCliDetected() const noexcept { return _claudeCliDetected; }
+        bool IsGeminiCliDetected() const noexcept { return _geminiCliDetected; }
+        bool IsAnyAgentCliDetected() const noexcept
+        {
+            return _copilotCliDetected || _claudeCliDetected || _geminiCliDetected;
+        }
+        winrt::hstring CopilotHooksStatusText() const { return _copilotHooksStatus; }
+        winrt::hstring ClaudeHooksStatusText() const { return _claudeHooksStatus; }
+        winrt::hstring GeminiHooksStatusText() const { return _geminiHooksStatus; }
+        bool IsInstallingAgentHooks() const noexcept { return _installingAgentHooks; }
+        winrt::hstring AgentHooksInstallSummary() const { return _agentHooksInstallSummary; }
+
+        void RefreshAgentHooksStatus();
+        void InstallAgentHooks();
+
     private:
         Model::GlobalAppSettings _GlobalSettings;
         winrt::Windows::Foundation::Collections::IObservableVector<Editor::AgentEntry> _acpAgentList;
@@ -107,6 +124,26 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             winrt::Windows::Foundation::Collections::IObservableVector<Editor::AgentEntry>& list,
             const winrt::hstring& customCommand,
             const winrt::hstring& currentAgentId);
+
+        // Agent Hooks state
+        bool _copilotCliDetected{ false };
+        bool _claudeCliDetected{ false };
+        bool _geminiCliDetected{ false };
+        winrt::hstring _copilotHooksStatus;
+        winrt::hstring _claudeHooksStatus;
+        winrt::hstring _geminiHooksStatus;
+        bool _installingAgentHooks{ false };
+        winrt::hstring _agentHooksInstallSummary;
+
+        static std::wstring _ResolveWtaExePath();
+        static std::wstring _UserHomeDir();
+        static bool _IsCopilotHookInstalled(const std::wstring& home);
+        static bool _IsClaudeHookInstalled(const std::wstring& home);
+        static bool _IsGeminiHookInstalled(const std::wstring& home);
+        static winrt::hstring _FormatHookStatus(bool cliDetected,
+                                                 const wchar_t* cliDisplayName,
+                                                 bool hookInstalled);
+        winrt::fire_and_forget _RunHooksInstallerAsync();
     };
 };
 

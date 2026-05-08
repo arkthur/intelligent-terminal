@@ -2,29 +2,30 @@
 # Copilot/Gemini plugin install locations under the user's profile.
 #
 # Run this from a normal PowerShell prompt (not the agent session) any time
-# the files under wta/agent-hooks-plugin/hooks/ or wta/gemini-extension/hooks/
-# change. Restart the agent CLIs (or close+reopen WT) for the new hooks to
-# take effect.
+# the files under wta/wt-agent-hooks/agent-hooks-plugin/hooks/ or
+# wta/wt-agent-hooks/gemini-extension/hooks/ change. Restart the agent CLIs
+# (or close+reopen WT) for the new hooks to take effect.
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot   # repo root = parent of wta/
 $wta  = Join-Path $repo 'wta'
+$hooksRoot = Join-Path $wta 'wt-agent-hooks'
 
 $pairs = @(
     @{
-        Src = (Join-Path $wta 'agent-hooks-plugin\hooks\send-event.ps1')
+        Src = (Join-Path $hooksRoot 'agent-hooks-plugin\hooks\send-event.ps1')
         Dst = (Join-Path $env:USERPROFILE '.copilot\installed-plugins\wt-local\wt-agent-hooks\hooks\send-event.ps1')
     },
     @{
-        Src = (Join-Path $wta 'gemini-extension\hooks\send-event.ps1')
+        Src = (Join-Path $hooksRoot 'gemini-extension\hooks\send-event.ps1')
         Dst = (Join-Path $env:USERPROFILE '.gemini\extensions\wt-agent-hooks\hooks\send-event.ps1')
     },
     @{
-        Src = (Join-Path $wta 'agent-hooks-plugin\hooks\hooks.json')
+        Src = (Join-Path $hooksRoot 'agent-hooks-plugin\hooks\hooks.json')
         Dst = (Join-Path $env:USERPROFILE '.copilot\installed-plugins\wt-local\wt-agent-hooks\hooks\hooks.json')
     },
     @{
-        Src = (Join-Path $wta 'gemini-extension\hooks\hooks.json')
+        Src = (Join-Path $hooksRoot 'gemini-extension\hooks\hooks.json')
         Dst = (Join-Path $env:USERPROFILE '.gemini\extensions\wt-agent-hooks\hooks\hooks.json')
     }
 )

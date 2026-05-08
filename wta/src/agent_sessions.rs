@@ -151,6 +151,21 @@ impl AgentSessionRegistry {
 
     pub fn apply(&mut self, ev: SessionEvent) {
         let now = SystemTime::now();
+        // Pane GUIDs (`pane_session_id`) arrive in mixed case — hooks emit
+        // lowercase (from the `WT_SESSION` env var), WT-native events emit
+        // uppercase (canonical Windows GUID). Normalise to lowercase here
+        // so `active_by_pane` lookups succeed regardless of source.
+        let ev = match ev {
+            SessionEvent::SessionStarted { key, cli_source, pane_session_id, cwd, title } =>
+                SessionEvent::SessionStarted { key, cli_source, pane_session_id: pane_session_id.to_ascii_lowercase(), cwd, title },
+            SessionEvent::ConnectionFailed { pane_session_id, reason } =>
+                SessionEvent::ConnectionFailed { pane_session_id: pane_session_id.to_ascii_lowercase(), reason },
+            SessionEvent::PaneClosed { pane_session_id } =>
+                SessionEvent::PaneClosed { pane_session_id: pane_session_id.to_ascii_lowercase() },
+            SessionEvent::ResumePaneAssigned { key, pane_session_id } =>
+                SessionEvent::ResumePaneAssigned { key, pane_session_id: pane_session_id.to_ascii_lowercase() },
+            other => other,
+        };
         match ev {
             SessionEvent::SessionStarted { key, cli_source, pane_session_id, cwd, title } => {
                 let entry = self.sessions.entry(key.clone()).or_insert_with(|| AgentSession {
@@ -363,10 +378,11 @@ impl AgentSessionRegistry {
         if !agent_session_id.is_empty() {
             return agent_session_id.to_string();
         }
-        if let Some(existing) = self.active_by_pane.get(pane_session_id) {
+        let pane_lc = pane_session_id.to_ascii_lowercase();
+        if let Some(existing) = self.active_by_pane.get(&pane_lc) {
             return existing.clone();
         }
-        format!("pane:{}", pane_session_id)
+        format!("pane:{}", pane_lc)
     }
 
     pub fn has_session(&self, key: &AgentKey) -> bool {
@@ -379,7 +395,10 @@ impl AgentSessionRegistry {
     /// actually one of our managed agent CLIs exiting — Ctrl+C in Gemini is
     /// not a user command failure that needs auto-fix.
     pub fn is_agent_pane(&self, pane_session_id: &str) -> bool {
-        self.active_by_pane.contains_key(pane_session_id)
+        // Lowercase the lookup key — hooks emit lowercase pane GUIDs but
+        // WT-native vt_sequence/connection_state events emit uppercase.
+        // active_by_pane is keyed by lowercase via apply()'s normaliser.
+        self.active_by_pane.contains_key(&pane_session_id.to_ascii_lowercase())
     }
 
     pub fn remove(&mut self, key: &AgentKey) {
@@ -395,10 +414,11 @@ impl AgentSessionRegistry {
     /// Used when a real `agent.session.started` arrives to clean up the
     /// placeholder created by an earlier tool event with no agent_session_id.
     pub fn drop_synthetic_for_pane(&mut self, pane_session_id: &str) {
-        if let Some(key) = self.active_by_pane.get(pane_session_id).cloned() {
+        let pane_lc = pane_session_id.to_ascii_lowercase();
+        if let Some(key) = self.active_by_pane.get(&pane_lc).cloned() {
             if key.starts_with("pane:") {
                 self.sessions.remove(&key);
-                self.active_by_pane.remove(pane_session_id);
+                self.active_by_pane.remove(&pane_lc);
                 self.dirty = true;
             }
         }
@@ -686,6 +706,58 @@ mod tests {
         reg.apply(SessionEvent::SessionStopped { key: k("s"), reason: "user_exit".into() });
         let s = reg.sessions.get("s").unwrap();
         assert_eq!(s.status, AgentStatus::Ended);
+        assert!(s.pane_session_id.is_none());
+        assert!(reg.active_by_pane.is_empty());
+    }
+
+    /// Regression for the round-24 case-mismatch bug.
+    /// Hooks emit pane GUIDs in lowercase (from `WT_SESSION` env var) but
+    /// WT-native vt_sequence/connection_state events emit uppercase
+    /// (canonical Windows GUID). Before the fix, `is_agent_pane` did a
+    /// case-sensitive lookup so the osc:133;A demotion never fired on the
+    /// uppercase pane GUID, leaving Claude/Gemini rows stuck at IDLE
+    /// after the agent CLI exited but the pane stayed alive.
+    #[test]
+    fn is_agent_pane_is_case_insensitive_for_pane_guid() {
+        let mut reg = AgentSessionRegistry::new();
+        // SessionStarted from a hook bridge → lowercase pane GUID.
+        reg.apply(SessionEvent::SessionStarted {
+            key: k("g"), cli_source: CliSource::Gemini,
+            pane_session_id: "4df493b4-c122-4ae9-96f5-5775c21b8cd8".into(),
+            cwd: PathBuf::from("/x"),
+            title: "t".into(),
+        });
+        // is_agent_pane queried with uppercase (as WT-native events emit) must hit.
+        assert!(
+            reg.is_agent_pane("4DF493B4-C122-4AE9-96F5-5775C21B8CD8"),
+            "is_agent_pane must match regardless of pane GUID case"
+        );
+        assert!(
+            reg.is_agent_pane("4df493b4-c122-4ae9-96f5-5775c21b8cd8"),
+            "is_agent_pane must still match the original lowercase form"
+        );
+    }
+
+    /// Counterpart: PaneClosed via uppercase GUID must demote the row that
+    /// was bound via lowercase. This is the actual end-to-end path that
+    /// fires on osc:133;A (FinalTerm prompt-start emitted by the shell
+    /// after the agent CLI exits but the pane stays alive).
+    #[test]
+    fn pane_closed_with_uppercase_pane_guid_demotes_lowercase_bound_session() {
+        let mut reg = AgentSessionRegistry::new();
+        reg.apply(SessionEvent::SessionStarted {
+            key: k("c"), cli_source: CliSource::Claude,
+            pane_session_id: "abcd1234-aaaa-bbbb-cccc-ddddeeeeffff".into(),
+            cwd: PathBuf::from("/x"),
+            title: "t".into(),
+        });
+        // Now an osc:133;A arrives with uppercase GUID — apply PaneClosed.
+        reg.apply(SessionEvent::PaneClosed {
+            pane_session_id: "ABCD1234-AAAA-BBBB-CCCC-DDDDEEEEFFFF".into(),
+        });
+        let s = reg.sessions.get("c").unwrap();
+        assert_eq!(s.status, AgentStatus::Ended,
+            "uppercase PaneClosed must demote the lowercase-bound session");
         assert!(s.pane_session_id.is_none());
         assert!(reg.active_by_pane.is_empty());
     }

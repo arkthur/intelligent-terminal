@@ -5,7 +5,7 @@ Forward Gemini CLI hook events to Windows Terminal for WTA display.
 ## Installation
 
 ```bash
-gemini extensions install C:\GitRepo\agentic-terminal\wta\gemini-extension
+gemini extensions install C:\GitRepo\agentic-terminal\wta\wt-agent-hooks\gemini-extension
 ```
 
 Or via the path on your machine. Gemini will copy the extension into
@@ -39,7 +39,7 @@ You should see `wt-agent-hooks` with its hooks active.
 ## Notes
 
 - This extension uses `${extensionPath}` (Gemini's variable). The Copilot/Claude
-  plugin (`wta/agent-hooks-plugin/`) uses `${CLAUDE_PLUGIN_ROOT}` instead — both
+  plugin (`../agent-hooks-plugin/`) uses `${CLAUDE_PLUGIN_ROOT}` instead — both
   resolve to the plugin's installed root directory.
 - Event names differ from Claude/Copilot (`BeforeTool`/`AfterTool` vs.
   `PreToolUse`/`PostToolUse`); see the [Gemini hooks reference][hooks-ref].

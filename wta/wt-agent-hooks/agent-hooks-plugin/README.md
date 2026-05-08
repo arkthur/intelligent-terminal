@@ -7,7 +7,7 @@ Forward CLI agent hook events to Windows Terminal for WTA display.
 This plugin bridges agent lifecycle events (Copilot CLI and Claude Code) to
 Windows Terminal's WTA infrastructure, enabling real-time visibility into agent
 tool use and notifications within the Terminal. For Gemini CLI, see the sibling
-[`wta/gemini-extension/`](../gemini-extension/) directory — Gemini uses a
+[`../gemini-extension/`](../gemini-extension/) directory — Gemini uses a
 different manifest format and event names, so it ships as a separate package.
 
 ## Installation
@@ -15,7 +15,7 @@ different manifest format and event names, so it ships as a separate package.
 ### Copilot CLI
 
 ```bash
-copilot plugin install ./wta/agent-hooks-plugin
+copilot plugin install ./wta/wt-agent-hooks/agent-hooks-plugin
 ```
 
 Verifies at `~/.copilot/installed-plugins/_direct/agent-hooks-plugin/`.
@@ -28,9 +28,9 @@ form — point Claude at the plugin directory:
 
 ```bash
 # from the agentic-terminal repo root:
-claude plugin install --local ./wta/agent-hooks-plugin
+claude plugin install --local ./wta/wt-agent-hooks/agent-hooks-plugin
 # or, depending on your Claude CLI version:
-claude /plugin install ./wta/agent-hooks-plugin
+claude /plugin install ./wta/wt-agent-hooks/agent-hooks-plugin
 ```
 
 If your Claude CLI does not expose a direct install command, copy the plugin
@@ -40,7 +40,7 @@ launch.
 
 ### Gemini CLI
 
-Gemini does **not** use this plugin. See [`wta/gemini-extension/`](../gemini-extension/)
+Gemini does **not** use this plugin. See [`../gemini-extension/`](../gemini-extension/)
 for the Gemini equivalent.
 
 ## Configuration
@@ -57,7 +57,7 @@ Then launch WTA with the environment variable set.
 
 - **Copilot CLI** — Fully supported (this package)
 - **Claude Code** — Fully supported (this package, install via `.claude-plugin/`)
-- **Gemini CLI** — Supported via [`wta/gemini-extension/`](../gemini-extension/)
+- **Gemini CLI** — Supported via [`../gemini-extension/`](../gemini-extension/)
 
 ## Requirements
 

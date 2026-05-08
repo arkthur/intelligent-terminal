@@ -148,9 +148,18 @@ try {
     if ($bsRun -gt 0) { [void]$sb.Append([string]'\' * ($bsRun * 2)) }
     $escaped = $sb.ToString()
 
+    # Pass our pane GUID via -p so wtcli stamps the event with this pane's
+    # session_id. Without -p, wtcli falls back to GetActivePane() which is
+    # whichever pane the user is currently focused on — that gives every row
+    # in the F2 list the same (focused) pane GUID, so Enter on any live row
+    # focuses the focused pane instead of its own pane.
+    $paneArg = ''
+    if ($env:WT_SESSION) {
+        $paneArg = " -p `"$($env:WT_SESSION)`""
+    }
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $wtcliPath
-    $psi.Arguments = "send-event -e $EventType `"$escaped`""
+    $psi.Arguments = "send-event -e $EventType$paneArg `"$escaped`""
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     $psi.RedirectStandardError = $true

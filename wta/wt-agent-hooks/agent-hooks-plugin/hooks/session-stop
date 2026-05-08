@@ -48,7 +48,9 @@ print(json.dumps({
   if [ -z "$WRAPPED" ]; then
       WRAPPED="{\"cli_source\":\"$SRC\",\"agent_session_id\":\"\",\"payload\":{}}"
   fi
-  wtcli send-event -e "agent.session.stopped" "$WRAPPED" 2>/dev/null || true
+  PANE_ARG=""
+  [ -n "${WT_SESSION:-}" ] && PANE_ARG="-p $WT_SESSION"
+  wtcli send-event -e "agent.session.stopped" $PANE_ARG "$WRAPPED" 2>/dev/null || true
 else
   # Build the wrapped payload safely via python3 for the no-input case.
   export SRC AGENT_SESSION_ID
@@ -65,6 +67,8 @@ print(json.dumps({
   if [ -z "$WRAPPED" ]; then
       WRAPPED="{\"cli_source\":\"$SRC\",\"agent_session_id\":\"\"}"
   fi
-  wtcli send-event -e "agent.session.stopped" "$WRAPPED" 2>/dev/null || true
+  PANE_ARG=""
+  [ -n "${WT_SESSION:-}" ] && PANE_ARG="-p $WT_SESSION"
+  wtcli send-event -e "agent.session.stopped" $PANE_ARG "$WRAPPED" 2>/dev/null || true
 fi
 exit 0

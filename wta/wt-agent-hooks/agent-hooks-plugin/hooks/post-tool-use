@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Notification hook — forward agent notification to Windows Terminal
+# PostToolUse hook — forward tool-completed event to Windows Terminal
 set -euo pipefail
 
 [ -z "${WT_COM_CLSID:-}" ] && exit 0
@@ -47,5 +47,7 @@ if [ -z "$WRAPPED" ]; then
     WRAPPED="{\"cli_source\":\"$SRC\",\"agent_session_id\":\"\",\"payload\":{}}"
 fi
 
-wtcli send-event -e "agent.notification" "$WRAPPED" 2>/dev/null || true
+PANE_ARG=""
+[ -n "${WT_SESSION:-}" ] && PANE_ARG="-p $WT_SESSION"
+wtcli send-event -e "agent.tool.completed" $PANE_ARG "$WRAPPED" 2>/dev/null || true
 exit 0

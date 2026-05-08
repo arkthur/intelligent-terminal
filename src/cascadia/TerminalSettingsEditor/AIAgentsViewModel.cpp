@@ -157,6 +157,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             _agentPanePositionMap.Insert(winrt::hstring{ value }, entry);
         }
         _agentPanePositionList = winrt::single_threaded_observable_vector<Editor::EnumEntry>(std::move(posEntries));
+
+        // Populate the Agent Hooks section's per-CLI detection + install
+        // state so the UI displays meaningful labels on first paint.
+        RefreshAgentHooksStatus();
     }
 
     Editor::AgentEntry AIAgentsViewModel::_FindEntryById(
@@ -502,5 +506,232 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 _NotifyChanges(L"CurrentAgentPanePosition");
             }
         }
+    }
+
+    // ── Agent Hooks ──────────────────────────────────────────────────────
+    //
+    // Detects each supported agent CLI (Copilot / Claude / Gemini) on PATH
+    // and whether the wt-agent-hooks plugin is installed for it. Drives a
+    // single primary "Install hooks" button that delegates to
+    // `wta.exe install-hooks` (the wta subcommand that runs the same
+    // idempotent installer wta runs at startup). Per-CLI status text is
+    // recomputed before and after each install attempt.
+
+    std::wstring AIAgentsViewModel::_UserHomeDir()
+    {
+        wchar_t buf[MAX_PATH];
+        DWORD n = GetEnvironmentVariableW(L"USERPROFILE", buf, MAX_PATH);
+        if (n > 0 && n < MAX_PATH) return std::wstring{ buf, n };
+        n = GetEnvironmentVariableW(L"HOME", buf, MAX_PATH);
+        if (n > 0 && n < MAX_PATH) return std::wstring{ buf, n };
+        return {};
+    }
+
+    std::wstring AIAgentsViewModel::_ResolveWtaExePath()
+    {
+        // Mirrors TerminalPage::_DetectWtaPath: prefer co-located wta.exe
+        // (MSIX-installed scenario), fall back to walking up the running
+        // module path looking for a dev build, then PATH.
+        const auto modulePath = std::filesystem::path{ wil::GetModuleFileNameW<std::wstring>(nullptr) };
+        const auto moduleDir = modulePath.parent_path();
+        std::error_code ec;
+        {
+            const auto sibling = moduleDir / L"wta.exe";
+            if (std::filesystem::exists(sibling, ec))
+            {
+                return sibling.lexically_normal().wstring();
+            }
+        }
+        auto cursor = moduleDir;
+        while (!cursor.empty())
+        {
+            for (const auto& relative : {
+                     std::filesystem::path{ L"wta\\target\\debug\\wta.exe" },
+                     std::filesystem::path{ L"wta\\target\\release\\wta.exe" },
+                 })
+            {
+                const auto candidate = cursor / relative;
+                if (std::filesystem::exists(candidate, ec))
+                {
+                    return candidate.lexically_normal().wstring();
+                }
+            }
+            const auto parent = cursor.parent_path();
+            if (parent == cursor) break;
+            cursor = parent;
+        }
+        wchar_t buffer[MAX_PATH];
+        if (SearchPathW(nullptr, L"wta", L".exe", MAX_PATH, buffer, nullptr) > 0)
+        {
+            return std::wstring{ buffer };
+        }
+        return {};
+    }
+
+    bool AIAgentsViewModel::_IsCopilotHookInstalled(const std::wstring& home)
+    {
+        if (home.empty()) return false;
+        std::error_code ec;
+        const auto pluginDir = std::filesystem::path{ home } /
+                               L".copilot" / L"installed-plugins" /
+                               L"wt-local" / L"wt-agent-hooks";
+        return std::filesystem::is_directory(pluginDir, ec) &&
+               std::filesystem::exists(pluginDir / L"hooks" / L"hooks.json", ec);
+    }
+
+    bool AIAgentsViewModel::_IsClaudeHookInstalled(const std::wstring& home)
+    {
+        // Claude installs into a tagged hooks block in
+        // ~/.claude/settings.json. As a lightweight proxy, look for the
+        // shared bridge script that the installer always writes, plus any
+        // settings.json under ~/.claude (the install branch only runs when
+        // the dir exists).
+        if (home.empty()) return false;
+        std::error_code ec;
+        const auto settingsPath = std::filesystem::path{ home } / L".claude" / L"settings.json";
+        if (!std::filesystem::exists(settingsPath, ec)) return false;
+
+        wchar_t buf[MAX_PATH];
+        DWORD n = GetEnvironmentVariableW(L"LOCALAPPDATA", buf, MAX_PATH);
+        if (n == 0 || n >= MAX_PATH) return false;
+        const auto bridgePath = std::filesystem::path{ buf, buf + n } /
+                                L"IntelligentTerminal" / L"hooks" / L"send-event.ps1";
+        return std::filesystem::exists(bridgePath, ec);
+    }
+
+    bool AIAgentsViewModel::_IsGeminiHookInstalled(const std::wstring& home)
+    {
+        if (home.empty()) return false;
+        std::error_code ec;
+        const auto extDir = std::filesystem::path{ home } /
+                            L".gemini" / L"extensions" / L"wt-agent-hooks";
+        return std::filesystem::is_directory(extDir, ec) &&
+               std::filesystem::exists(extDir / L"gemini-extension.json", ec);
+    }
+
+    winrt::hstring AIAgentsViewModel::_FormatHookStatus(bool cliDetected,
+                                                       const wchar_t* cliDisplayName,
+                                                       bool hookInstalled)
+    {
+        std::wstring text{ cliDisplayName };
+        text += L" — ";
+        if (!cliDetected)
+        {
+            text += L"CLI not on PATH";
+        }
+        else if (hookInstalled)
+        {
+            text += L"hooks installed";
+        }
+        else
+        {
+            text += L"hooks not installed";
+        }
+        return winrt::hstring{ text };
+    }
+
+    void AIAgentsViewModel::RefreshAgentHooksStatus()
+    {
+        _copilotCliDetected = _IsAgentInstalled(L"copilot");
+        _claudeCliDetected = _IsAgentInstalled(L"claude");
+        _geminiCliDetected = _IsAgentInstalled(L"gemini");
+
+        const auto home = _UserHomeDir();
+        _copilotHooksStatus = _FormatHookStatus(_copilotCliDetected, L"Copilot CLI",
+                                                 _IsCopilotHookInstalled(home));
+        _claudeHooksStatus = _FormatHookStatus(_claudeCliDetected, L"Claude Code",
+                                                _IsClaudeHookInstalled(home));
+        _geminiHooksStatus = _FormatHookStatus(_geminiCliDetected, L"Gemini CLI",
+                                                _IsGeminiHookInstalled(home));
+
+        _NotifyChanges(L"IsCopilotCliDetected",
+                       L"IsClaudeCliDetected",
+                       L"IsGeminiCliDetected",
+                       L"IsAnyAgentCliDetected",
+                       L"CopilotHooksStatusText",
+                       L"ClaudeHooksStatusText",
+                       L"GeminiHooksStatusText");
+    }
+
+    void AIAgentsViewModel::InstallAgentHooks()
+    {
+        if (_installingAgentHooks) return;
+        _installingAgentHooks = true;
+        _agentHooksInstallSummary = winrt::hstring{ L"Installing hooks..." };
+        _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary");
+        _RunHooksInstallerAsync();
+    }
+
+    winrt::fire_and_forget AIAgentsViewModel::_RunHooksInstallerAsync()
+    {
+        auto strongThis = get_strong();
+        // Capture dispatcher synchronously while we're still on the calling
+        // (UI) thread.
+        auto dispatcher = winrt::Windows::UI::Xaml::Window::Current().Dispatcher();
+
+        std::wstring summary;
+        bool ok = false;
+
+        co_await winrt::resume_background();
+
+        const auto wtaPath = _ResolveWtaExePath();
+        if (wtaPath.empty())
+        {
+            summary = L"Failed: could not locate wta.exe";
+        }
+        else
+        {
+            std::wstring cmdline = L"\"" + wtaPath + L"\" install-hooks";
+
+            STARTUPINFOW si{};
+            si.cb = sizeof(si);
+            si.dwFlags = STARTF_USESHOWWINDOW;
+            si.wShowWindow = SW_HIDE;
+            PROCESS_INFORMATION pi{};
+            std::wstring mutableCmd = cmdline;
+            const BOOL launched = CreateProcessW(
+                wtaPath.c_str(),
+                mutableCmd.data(),
+                nullptr,
+                nullptr,
+                FALSE,
+                CREATE_NO_WINDOW,
+                nullptr,
+                nullptr,
+                &si,
+                &pi);
+            if (!launched)
+            {
+                const auto err = GetLastError();
+                summary = L"Failed to launch installer (error " + std::to_wstring(err) + L")";
+            }
+            else
+            {
+                WaitForSingleObject(pi.hProcess, 60'000);
+                DWORD exitCode = 1;
+                GetExitCodeProcess(pi.hProcess, &exitCode);
+                CloseHandle(pi.hThread);
+                CloseHandle(pi.hProcess);
+                if (exitCode == 0)
+                {
+                    ok = true;
+                    summary = L"Hooks installed successfully. Restart any open agent CLIs to pick up the new hooks.";
+                }
+                else
+                {
+                    summary = L"Installer exited with code " + std::to_wstring(exitCode);
+                }
+            }
+        }
+
+        co_await wil::resume_foreground(dispatcher);
+
+        _installingAgentHooks = false;
+        _agentHooksInstallSummary = winrt::hstring{ summary };
+        _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary");
+        // Refresh detection / install state regardless of success so the
+        // status rows reflect what's now on disk.
+        RefreshAgentHooksStatus();
+        (void)ok;
     }
 }

@@ -728,8 +728,8 @@ impl App {
                 // start emitting agent events without a separate manual
                 // `claude plugin install` step. Idempotent across runs.
                 #[cfg(not(test))]
-                if std::env::var("WTA_NO_CLAUDE_HOOKS").ok().as_deref() != Some("1") {
-                    crate::claude_hooks_installer::ensure_installed();
+                if std::env::var("WTA_NO_AGENT_HOOKS").ok().as_deref() != Some("1") {
+                    crate::agent_hooks_installer::ensure_installed();
                 }
                 reg
             },
