@@ -857,10 +857,17 @@ fn print_output(val: &serde_json::Value, json_mode: bool, formatter: fn(&serde_j
 // ─── `wta hooks <action>` handlers ──────────────────────────────────────────
 
 fn run_hooks_install() -> Result<()> {
+    // Initialize logging so the install attempt is observable in
+    // %LOCALAPPDATA%\IntelligentTerminal\logs\wta-install-hooks.log.
+    // Without this, all tracing calls inside the installer (idempotency
+    // hits, marketplace-add failures, etc.) go to /dev/null and nobody
+    // can diagnose what happened.
+    let _guard = logging::init("install-hooks");
     agent_hooks_installer::ensure_installed();
     println!(
         "wt-agent-hooks install attempted (idempotent). \
-         Run `wta hooks status` to inspect the result."
+         Run `wta hooks status` to inspect the result. \
+         Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
     );
     Ok(())
 }

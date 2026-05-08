@@ -367,6 +367,27 @@ fn ensure_installed_in(home: &Path) {
 ///
 /// Idempotent: only writes when the on-disk content differs.
 /// No-op when `~/.gemini/` is absent (Gemini CLI not installed).
+/// Install the Gemini extension by spawning `gemini extensions install
+/// <staging-path> --consent --skip-settings`.
+///
+/// Mirrors the claude/copilot pattern (#17): stage a valid extension
+/// layout under `%LOCALAPPDATA%\IntelligentTerminal\gemini-plugin-src\`
+/// then hand off to the CLI's own extension manager. This replaces the
+/// pre-#17 direct file-write into `~/.gemini/extensions/wt-agent-hooks/`
+/// — both produce a working extension, but the plugin-CLI flow gives
+/// `wta hooks status` a single source of truth (`gemini extensions
+/// list -o json`) instead of two divergent code paths.
+///
+/// `--consent --skip-settings` are required to defuse the security-
+/// consent and config-on-install prompts. Without them, `gemini
+/// extensions install` blocks on stdin and a background install (e.g.
+/// from the Settings UI's "Install hooks" button) hangs the 60-second
+/// timeout. Verified on Gemini 0.41.2 by manual probe.
+///
+/// Idempotency: `gemini extensions install` exits 1 with stderr
+/// "Extension \"wt-agent-hooks\" is already installed. Please uninstall
+/// it first." when the extension is already present. We match the
+/// `already installed` substring to convert that to success.
 fn install_for_gemini(home: &Path) {
     let gemini_dir = home.join(".gemini");
     if !gemini_dir.is_dir() {
@@ -374,35 +395,42 @@ fn install_for_gemini(home: &Path) {
         return;
     }
 
-    let ext_dir = gemini_extension_dir(home);
-    let hooks_dir = ext_dir.join("hooks");
-    if let Err(e) = fs::create_dir_all(&hooks_dir) {
-        tracing::warn!(target: "gemini_hooks", err = %e,
-            "failed to create Gemini extension dir");
+    let Some(source_dir) = gemini_plugin_source_dir() else {
+        tracing::warn!(
+            target: "gemini_hooks",
+            "could not resolve LOCALAPPDATA; skipping Gemini extension install",
+        );
+        return;
+    };
+    if let Err(e) = write_gemini_extension_files(&source_dir) {
+        tracing::warn!(
+            target: "gemini_hooks",
+            err = %e,
+            path = %source_dir.display(),
+            "failed to stage Gemini extension source files",
+        );
         return;
     }
 
-    let manifest_path = ext_dir.join("gemini-extension.json");
-    let hooks_path = hooks_dir.join("hooks.json");
-    let script_path = hooks_dir.join("send-event.ps1");
-
-    let manifest_text = bundle::read(BundleFile::GeminiExtensionJson);
-    if let Err(e) = write_if_changed(&manifest_path, &manifest_text) {
-        tracing::warn!(target: "gemini_hooks", err = %e,
-            path = %manifest_path.display(),
-            "failed to write Gemini extension manifest");
-    }
-    let hooks_text = bundle::read(BundleFile::GeminiHooksJson);
-    if let Err(e) = write_if_changed(&hooks_path, &hooks_text) {
-        tracing::warn!(target: "gemini_hooks", err = %e,
-            path = %hooks_path.display(),
-            "failed to write Gemini hooks.json");
-    }
-    let script_text = bundle::read(BundleFile::SendEventPs1);
-    if let Err(e) = write_if_changed(&script_path, &script_text) {
-        tracing::warn!(target: "gemini_hooks", err = %e,
-            path = %script_path.display(),
-            "failed to write Gemini bridge script");
+    let source_path = source_dir.to_string_lossy().into_owned();
+    if let Err(e) = run_plugin_cli(
+        "gemini",
+        &[
+            "extensions",
+            "install",
+            &source_path,
+            "--consent",
+            "--skip-settings",
+        ],
+        "gemini_hooks",
+        &["already installed"],
+    ) {
+        tracing::warn!(
+            target: "gemini_hooks",
+            err = %e,
+            source = %source_path,
+            "gemini extensions install failed",
+        );
     }
 }
 
@@ -479,11 +507,15 @@ fn install_for_claude(home: &Path) {
     }
 
     // Hand off to Claude CLI for the actual registration + install.
+    // Claude's marketplace add and plugin install are already idempotent
+    // (exit 0 with "already on disk" / "already installed" messages),
+    // so no idempotency_substrings are needed.
     let source_path = source_marketplace_dir.to_string_lossy().into_owned();
     if let Err(e) = run_plugin_cli(
         "claude",
         &["plugin", "marketplace", "add", &source_path],
         "agent_hooks",
+        &[],
     ) {
         tracing::warn!(
             target: "agent_hooks",
@@ -498,6 +530,7 @@ fn install_for_claude(home: &Path) {
         "claude",
         &["plugin", "install", &plugin_ref],
         "agent_hooks",
+        &[],
     ) {
         tracing::warn!(
             target: "agent_hooks",
@@ -569,11 +602,17 @@ fn install_for_copilot(home: &Path) {
     }
 
     // Hand off to Copilot CLI for the actual registration + install.
+    // copilot plugin marketplace add returns exit 1 when the marketplace
+    // is already registered — verified by manual probe with stderr
+    // "Failed to add marketplace: Marketplace \"wt-local\" already
+    // registered". Match that substring to keep the install idempotent.
+    // copilot plugin install is already exit-0 idempotent.
     let source_path = source_marketplace_dir.to_string_lossy().into_owned();
     if let Err(e) = run_plugin_cli(
         "copilot",
         &["plugin", "marketplace", "add", &source_path],
         "copilot_hooks",
+        &["already registered"],
     ) {
         tracing::warn!(
             target: "copilot_hooks",
@@ -588,6 +627,7 @@ fn install_for_copilot(home: &Path) {
         "copilot",
         &["plugin", "install", &plugin_ref],
         "copilot_hooks",
+        &[],
     ) {
         tracing::warn!(
             target: "copilot_hooks",
@@ -645,6 +685,20 @@ fn claude_plugin_source_dir() -> Option<PathBuf> {
     Some(root.join("claude-plugin-src").join(COPILOT_MARKETPLACE_NAME))
 }
 
+/// Resolve the staging directory passed as the `<source>` argument of
+/// `gemini extensions install`. Lives under `gemini-plugin-src/` so it
+/// doesn't collide with the claude/copilot staging dirs.
+///
+/// Note: Gemini's extension layout is **not** marketplace-shaped. The
+/// staging dir holds the extension directly (`gemini-extension.json` +
+/// `hooks/`), not a marketplace wrapper. The `wt-agent-hooks` folder
+/// name matches `GEMINI_EXTENSION_DIR_NAME` so the path is symmetrical
+/// with the `wt-local` marketplace folder used by claude/copilot.
+fn gemini_plugin_source_dir() -> Option<PathBuf> {
+    let root = crate::runtime_paths::intelligent_terminal_root()?;
+    Some(root.join("gemini-plugin-src").join(GEMINI_EXTENSION_DIR_NAME))
+}
+
 /// Path to the Gemini extension directory we install / inspect / remove.
 fn gemini_extension_dir(home: &Path) -> PathBuf {
     home.join(".gemini")
@@ -655,36 +709,77 @@ fn gemini_extension_dir(home: &Path) -> PathBuf {
 /// Spawn `<exe>` with the given args, capture stdout/stderr for the
 /// trace log, and return Err on spawn failure or non-zero exit.
 ///
+/// `idempotency_substrings` is a case-insensitive substring set that
+/// classifies non-zero exits as success when the captured stderr/stdout
+/// contains any entry. This is how we tolerate the "already registered"
+/// / "already installed" responses that some CLIs emit with a non-zero
+/// exit code (verified by manual probe — see PR description for raw
+/// captured output):
+///   * `copilot plugin marketplace add` → exit 1, stderr `already registered`
+///   * `gemini extensions install`      → exit 1, stderr `already installed`
+///
 /// Most-likely failure modes:
-///   * `NotFound` — `<exe>.exe` isn't on PATH (user has the CLI's home
-///     directory from a prior install but not the binary itself).
-///     Logged as warn; caller skips remaining steps.
-///   * Non-zero exit on `marketplace add` when the marketplace is
-///     already registered — the CLI prints a message but the prior
-///     registration is still valid. Logged as warn; caller treats it
-///     as fatal for the current run, but the next wta startup retries.
+///   * `NotFound` — `<exe>` isn't on PATH (after `which::which` resolution
+///     for `.cmd` shims). Caller skips remaining steps; the legacy log
+///     line stays at `warn!` from `run_plugin_cli_capture` since callers
+///     of this wrapper are install paths that will skip the rest of the
+///     flow anyway.
+///   * Non-zero exit not matching `idempotency_substrings` — logged at
+///     `warn!` by `run_plugin_cli_capture`. Caller skips remaining
+///     steps; next wta startup retries.
 ///
 /// On Windows the child is launched with `CREATE_NO_WINDOW` so it
 /// doesn't briefly pop a console when wta is itself running headless
 /// (e.g. invoked from the Settings UI's "Install hooks" button via
 /// `wta install-hooks`).
-fn run_plugin_cli(exe: &str, args: &[&str], _log_target: &str) -> std::io::Result<()> {
+fn run_plugin_cli(
+    exe: &str,
+    args: &[&str],
+    _log_target: &str,
+    idempotency_substrings: &[&str],
+) -> std::io::Result<()> {
     let outcome = run_plugin_cli_capture(exe, args)?;
-    if !outcome.success {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!(
-                "{} {} exited {}",
-                exe,
-                args.join(" "),
-                outcome
-                    .status_code
-                    .map(|c| c.to_string())
-                    .unwrap_or_else(|| "?".into()),
-            ),
-        ));
+    if outcome.success {
+        return Ok(());
     }
-    Ok(())
+    if matches_idempotency_substring(&outcome.stdout, &outcome.stderr, idempotency_substrings) {
+        tracing::info!(
+            target: "agent_hooks",
+            exe = exe,
+            args = ?args,
+            stdout = %outcome.stdout.trim(),
+            stderr = %outcome.stderr.trim(),
+            status = ?outcome.status_code,
+            "plugin CLI returned non-zero exit but output indicates already-installed; treating as success",
+        );
+        return Ok(());
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        format!(
+            "{} {} exited {}",
+            exe,
+            args.join(" "),
+            outcome
+                .status_code
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "?".into()),
+        ),
+    ))
+}
+
+/// Pure helper: return true if any substring in `idempotency_substrings`
+/// appears in either captured stream (case-insensitive). Substrings are
+/// expected to already be lowercase; we only lowercase the haystacks.
+fn matches_idempotency_substring(stdout: &str, stderr: &str, needles: &[&str]) -> bool {
+    if needles.is_empty() {
+        return false;
+    }
+    let stdout_lc = stdout.to_lowercase();
+    let stderr_lc = stderr.to_lowercase();
+    needles
+        .iter()
+        .any(|n| stdout_lc.contains(n) || stderr_lc.contains(n))
 }
 
 /// Outcome of spawning a CLI, with stdout/stderr captured for callers
@@ -851,6 +946,33 @@ fn write_plugin_files(plugin_dir: &Path, cli_source: &str) -> std::io::Result<()
             );
         }
     }
+
+    Ok(())
+}
+
+/// Write the Gemini extension files into the staging dir
+/// (`gemini-extension.json` at the root + `hooks/hooks.json` +
+/// `hooks/send-event.ps1`). Idempotent via `write_if_changed`.
+///
+/// Layout produced (matches what `gemini extensions install <local-path>`
+/// expects):
+///
+///   %LOCALAPPDATA%\IntelligentTerminal\gemini-plugin-src\wt-agent-hooks\
+///     gemini-extension.json
+///     hooks\hooks.json
+///     hooks\send-event.ps1
+fn write_gemini_extension_files(extension_dir: &Path) -> std::io::Result<()> {
+    let hooks_subdir = extension_dir.join("hooks");
+    fs::create_dir_all(&hooks_subdir)?;
+
+    let manifest_text = bundle::read(BundleFile::GeminiExtensionJson);
+    write_if_changed(&extension_dir.join("gemini-extension.json"), &manifest_text)?;
+
+    let hooks_text = bundle::read(BundleFile::GeminiHooksJson);
+    write_if_changed(&hooks_subdir.join("hooks.json"), &hooks_text)?;
+
+    let script_text = bundle::read(BundleFile::SendEventPs1);
+    write_if_changed(&hooks_subdir.join("send-event.ps1"), &script_text)?;
 
     Ok(())
 }
@@ -1806,6 +1928,159 @@ mod tests {
 
     // ---- helper / generator tests ---------------------------------------
 
+    // ---- matches_idempotency_substring (Track 1 #17 task 2) -------------
+
+    /// Captured stderr strings from real CLI runs (see PR description /
+    /// session SQL `probe_findings` table for the raw probe output).
+    /// These are the strings the matcher is built to recognize.
+    const COPILOT_MARKETPLACE_ALREADY: &str =
+        "Failed to add marketplace: Marketplace \"wt-local\" already registered";
+    const GEMINI_INSTALL_ALREADY: &str =
+        "Extension \"wt-agent-hooks\" is already installed. Please uninstall it first.";
+
+    #[test]
+    fn matches_idempotency_substring_matches_real_copilot_output() {
+        assert!(matches_idempotency_substring(
+            "",
+            COPILOT_MARKETPLACE_ALREADY,
+            &["already registered"]
+        ));
+    }
+
+    #[test]
+    fn matches_idempotency_substring_matches_real_gemini_output() {
+        assert!(matches_idempotency_substring(
+            "",
+            GEMINI_INSTALL_ALREADY,
+            &["already installed"]
+        ));
+    }
+
+    #[test]
+    fn matches_idempotency_substring_is_case_insensitive() {
+        assert!(matches_idempotency_substring(
+            "",
+            "ALREADY REGISTERED",
+            &["already registered"]
+        ));
+        assert!(matches_idempotency_substring(
+            "Already Installed",
+            "",
+            &["already installed"]
+        ));
+    }
+
+    #[test]
+    fn matches_idempotency_substring_checks_both_streams() {
+        assert!(matches_idempotency_substring(
+            "Plugin already registered",
+            "",
+            &["already registered"]
+        ));
+        assert!(matches_idempotency_substring(
+            "",
+            "Plugin already registered",
+            &["already registered"]
+        ));
+    }
+
+    #[test]
+    fn matches_idempotency_substring_does_not_match_unrelated_failures() {
+        // Generic failure stderr (path not found) must NOT be
+        // misclassified as "already installed".
+        let unrelated = "Failed to add marketplace: source path does not exist";
+        assert!(!matches_idempotency_substring(
+            "",
+            unrelated,
+            &["already registered"]
+        ));
+    }
+
+    #[test]
+    fn matches_idempotency_substring_empty_needles_never_matches() {
+        // Call sites that pass &[] (claude marketplace add, claude
+        // install, copilot install) must always treat non-zero exit
+        // as Err — the empty-needles short-circuit is the contract.
+        assert!(!matches_idempotency_substring(
+            "anything goes here",
+            "and here",
+            &[]
+        ));
+    }
+
+    #[test]
+    fn matches_idempotency_substring_multi_needle_any_match_succeeds() {
+        // Future-proofing: a single call site can register multiple
+        // substrings (e.g. if a CLI changes wording across versions).
+        assert!(matches_idempotency_substring(
+            "",
+            "Plugin already exists in marketplace",
+            &["already registered", "already exists"]
+        ));
+    }
+
+    // ---- Gemini staging-dir source resolution (Track 1 #17 task 1) ------
+
+    /// Verify the Gemini staging path lives under the expected
+    /// `gemini-plugin-src` subfolder of `intelligent_terminal_root()`.
+    /// We can't easily probe `gemini extensions install` from a unit
+    /// test, but pinning the directory layout catches a future change
+    /// that breaks the path immediately.
+    #[test]
+    fn gemini_plugin_source_dir_lives_under_intelligent_terminal_root() {
+        let Some(p) = gemini_plugin_source_dir() else {
+            // intelligent_terminal_root() may legitimately return None
+            // in CI without LOCALAPPDATA — skip silently.
+            return;
+        };
+        let s = p.to_string_lossy();
+        assert!(
+            s.contains("gemini-plugin-src"),
+            "expected gemini-plugin-src in path: {}",
+            s
+        );
+        assert!(
+            s.ends_with(GEMINI_EXTENSION_DIR_NAME),
+            "expected path to end with {}: {}",
+            GEMINI_EXTENSION_DIR_NAME,
+            s
+        );
+    }
+
+    /// All three `<cli>_plugin_source_dir()` helpers must return
+    /// distinct paths so the staged content for one CLI never
+    /// overwrites another's. Pin this so a future copy/paste typo is
+    /// caught at test time.
+    #[test]
+    fn source_dir_helpers_return_distinct_paths() {
+        let claude = claude_plugin_source_dir();
+        let copilot = copilot_plugin_source_dir();
+        let gemini = gemini_plugin_source_dir();
+        match (claude, copilot, gemini) {
+            (Some(a), Some(b), Some(c)) => {
+                assert_ne!(a, b, "claude and copilot staging paths collide");
+                assert_ne!(a, c, "claude and gemini staging paths collide");
+                assert_ne!(b, c, "copilot and gemini staging paths collide");
+            }
+            _ => {
+                // intelligent_terminal_root() returned None — skip.
+            }
+        }
+    }
+
+    #[test]
+    fn write_gemini_extension_files_creates_layout() {
+        let dir = unique_dir("gemini-stage");
+        write_gemini_extension_files(&dir).unwrap();
+
+        assert!(dir.join("gemini-extension.json").is_file());
+        assert!(dir.join("hooks").join("hooks.json").is_file());
+        assert!(dir.join("hooks").join("send-event.ps1").is_file());
+
+        // Idempotent: running again is a no-op (no panic, no error).
+        write_gemini_extension_files(&dir).unwrap();
+    }
+
     /// `bundle::read_with_roots` resolves loose copies in priority
     /// order and falls back to the embedded blob when nothing matches.
     /// We exercise the inner helper directly (rather than via
@@ -2061,22 +2336,12 @@ mod tests {
 
     // ---- Gemini extension layout ----------------------------------------
 
-    #[test]
-    fn install_for_gemini_writes_full_extension_layout() {
-        let home = unique_dir("gemini-home");
-        fs::create_dir_all(home.join(".gemini")).unwrap();
-
-        install_for_gemini(&home);
-
-        let ext_dir = home
-            .join(".gemini")
-            .join("extensions")
-            .join(GEMINI_EXTENSION_DIR_NAME);
-        assert!(ext_dir.is_dir(), "missing ext dir: {}", ext_dir.display());
-        assert!(ext_dir.join("gemini-extension.json").is_file());
-        assert!(ext_dir.join("hooks").join("hooks.json").is_file());
-        assert!(ext_dir.join("hooks").join("send-event.ps1").is_file());
-    }
+    // (install_for_gemini_writes_full_extension_layout test deleted —
+    //  Track 1 #17 task 1 moved Gemini install to the plugin-CLI flow,
+    //  so install_for_gemini no longer writes into ~/.gemini/extensions/
+    //  directly. Coverage is now: write_gemini_extension_files_creates_
+    //  layout exercises the staging step, and the install spawn itself
+    //  is verified end-to-end manually — see PR description.)
 
     #[test]
     fn install_for_gemini_is_noop_when_gemini_not_installed() {
