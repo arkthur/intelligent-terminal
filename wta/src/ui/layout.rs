@@ -1,5 +1,5 @@
 use ratatui::prelude::*;
-use crate::app::{App, AppMode, View};
+use crate::app::{App, AppMode, View, DEFAULT_TAB_ID};
 
 use super::{agents_view, chat, command_popup, debug_panel, input, permission, recommendations, setup};
 
@@ -13,9 +13,15 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     }
 
     // Agents view (F2) takes over the full pane area; chat / input / debug
-    // panel are not drawn in this mode.
-    if app.current_view == View::Agents {
-        agents_view::render(frame, area, &app.agent_sessions, &mut app.agents_list_state);
+    // panel are not drawn in this mode. Per-tab: the active tab's
+    // TabSession owns the open state and selection cursor. Disjoint-field
+    // borrow (agent_sessions vs. tab_sessions[id]) lets us pass both refs
+    // through without going through current_tab_mut() (which would borrow
+    // the whole App and conflict with &app.agent_sessions).
+    if app.current_tab().current_view == View::Agents {
+        let tab_id = app.tab_id.as_deref().unwrap_or(DEFAULT_TAB_ID).to_string();
+        let tab = app.tab_sessions.entry(tab_id).or_default();
+        agents_view::render(frame, area, &app.agent_sessions, &mut tab.agents_list_state);
         return;
     }
 
@@ -86,7 +92,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
 pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
     // Agents view / Setup view: no input box, so no cursor.
-    if app.current_view == View::Agents || app.mode == AppMode::Setup {
+    if app.current_tab().current_view == View::Agents || app.mode == AppMode::Setup {
         return None;
     }
 

@@ -876,7 +876,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         }
         else
         {
-            std::wstring cmdline = L"\"" + wtaPath + L"\" install-hooks";
+            std::wstring cmdline = L"\"" + wtaPath + L"\" hooks install";
 
             STARTUPINFOW si{};
             si.cb = sizeof(si);
@@ -902,20 +902,32 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             }
             else
             {
-                WaitForSingleObject(pi.hProcess, 60'000);
-                DWORD exitCode = 1;
-                GetExitCodeProcess(pi.hProcess, &exitCode);
-                CloseHandle(pi.hThread);
-                CloseHandle(pi.hProcess);
-                if (exitCode == 0)
+                const DWORD waitResult = WaitForSingleObject(pi.hProcess, 60'000);
+                if (waitResult == WAIT_TIMEOUT)
                 {
-                    ok = true;
-                    summary = L"Hooks installed successfully. Restart any open agent CLIs to pick up the new hooks.";
+                    // Don't leave an orphaned wta.exe blocking on a child CLI
+                    // — terminate it and surface the timeout instead of mis-
+                    // reporting STILL_ACTIVE (259) as an exit code.
+                    TerminateProcess(pi.hProcess, 1);
+                    WaitForSingleObject(pi.hProcess, 1'000);
+                    summary = L"Installer timed out after 60s. Check %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log for the stuck CLI.";
                 }
                 else
                 {
-                    summary = L"Installer exited with code " + std::to_wstring(exitCode);
+                    DWORD exitCode = 1;
+                    GetExitCodeProcess(pi.hProcess, &exitCode);
+                    if (exitCode == 0)
+                    {
+                        ok = true;
+                        summary = L"Hooks installed successfully. Restart any open agent CLIs to pick up the new hooks.";
+                    }
+                    else
+                    {
+                        summary = L"Installer exited with code " + std::to_wstring(exitCode);
+                    }
                 }
+                CloseHandle(pi.hThread);
+                CloseHandle(pi.hProcess);
             }
         }
 

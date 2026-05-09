@@ -15,6 +15,7 @@ pub enum CommandKind {
     Stop,
     New,
     Restart,
+    Sessions,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -58,6 +59,12 @@ pub const REGISTRY: &[CommandSpec] = &[
         name: "stop",
         summary: "Cancel the in-flight prompt",
         kind: CommandKind::Stop,
+        takes_args: false,
+    },
+    CommandSpec {
+        name: "sessions",
+        summary: "Open the historical sessions picker (same as F2)",
+        kind: CommandKind::Sessions,
         takes_args: false,
     },
 ];
@@ -156,6 +163,17 @@ mod tests {
     fn case_insensitive() {
         assert_eq!(parse("/HELP").unwrap().kind, CommandKind::Help);
         assert_eq!(parse("/StOp").unwrap().kind, CommandKind::Stop);
+    }
+
+    #[test]
+    fn sessions_parses() {
+        assert_eq!(parse("/sessions").unwrap().kind, CommandKind::Sessions);
+        // /se prefix-completes to /sessions but full /se is not a registered name.
+        assert!(parse("/se").is_none());
+        // Both /stop and /sessions begin with `s` — matches() should surface both.
+        let s_matches: Vec<&str> = matches("s").into_iter().map(|c| c.name).collect();
+        assert!(s_matches.contains(&"stop"));
+        assert!(s_matches.contains(&"sessions"));
     }
 
     #[test]

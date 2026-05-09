@@ -407,6 +407,7 @@
     <ProjectReference Include="$(OpenConsoleDir)src\types\lib\types.vcxproj" />
     <ProjectReference Include="$(OpenConsoleDir)src\cascadia\TerminalProtocol\TerminalProtocol.vcxproj">
       <Project>{F1A2B3C4-D5E6-4F7A-8B9C-0D1E2F3A4B5D}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
     <ProjectReference Include="$(OpenConsoleDir)src\cascadia\WinRTUtils\WinRTUtils.vcxproj">
       <Project>{CA5CAD1A-039A-4929-BA2A-8BEB2E4106FE}</Project>
@@ -492,6 +493,12 @@
     </Reference>
     <Reference Include="Microsoft.Terminal.UI.Markdown">
       <HintPath>$(OpenConsoleCommonOutDir)Microsoft.Terminal.UI.Markdown\Microsoft.Terminal.UI.Markdown.winmd</HintPath>
+      <IsWinMDFile>true</IsWinMDFile>
+      <Private>false</Private>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+    </Reference>
+    <Reference Include="Microsoft.Terminal.Protocol">
+      <HintPath>$(OpenConsoleCommonOutDir)TerminalProtocol\Microsoft.Terminal.Protocol.winmd</HintPath>
       <IsWinMDFile>true</IsWinMDFile>
       <Private>false</Private>
       <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>

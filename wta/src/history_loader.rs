@@ -259,7 +259,12 @@ fn load_claude(home: &Path) -> Vec<AgentSession> {
             Some(s) if s != "memory" => s.to_string(),
             _ => continue,
         };
-        let cwd = decode_claude_cwd(&proj_name);
+        // Claude's directory-name encoding (`\` -> `-`) is lossy: paths
+        // whose segments contain `-` (e.g. `agentic-terminal`) can't be
+        // recovered from the directory name alone. Use it only as a
+        // fallback — prefer the per-record `cwd` field embedded in the
+        // JSONL itself, which preserves the original path verbatim.
+        let cwd_fallback = decode_claude_cwd(&proj_name);
 
         let Ok(files) = fs::read_dir(&proj_dir) else { continue };
         for f in files.flatten() {
@@ -274,6 +279,7 @@ fn load_claude(home: &Path) -> Vec<AgentSession> {
                 .unwrap_or(SystemTime::UNIX_EPOCH);
             let title = first_user_text_jsonl(&path, ClaudeOrGemini::Claude)
                 .unwrap_or_else(|| short_id(&id, "claude"));
+            let cwd = read_cwd_from_claude_jsonl(&path).unwrap_or_else(|| cwd_fallback.clone());
 
             out.push(AgentSession {
                 key:               id.clone(),
@@ -282,7 +288,7 @@ fn load_claude(home: &Path) -> Vec<AgentSession> {
                 window_id:         None,
                 tab_id:            None,
                 title,
-                cwd:               cwd.clone(),
+                cwd,
                 started_at:        last_activity,
                 last_activity_at:  last_activity,
                 status:            AgentStatus::Historical,
@@ -513,6 +519,28 @@ fn extract_gemini_user_text(v: &serde_json::Value) -> Option<String> {
     for part in arr {
         if let Some(t) = part.get("text").and_then(|t| t.as_str()) {
             return Some(t.to_string());
+        }
+    }
+    None
+}
+
+/// Read the first non-empty `cwd` string from a Claude JSONL session
+/// file. Claude writes a `cwd` field on every assistant/user/system
+/// record, so the first record that carries one gives us the original
+/// working directory verbatim — without going through the lossy
+/// directory-name encoding that maps `\` and `-` to the same character.
+fn read_cwd_from_claude_jsonl(path: &Path) -> Option<PathBuf> {
+    let text = read_first_bytes(path, TITLE_TAIL_BYTES).ok()?;
+    for line in text.lines() {
+        if line.trim().is_empty() { continue; }
+        let val: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if let Some(s) = val.get("cwd").and_then(|v| v.as_str()) {
+            if !s.is_empty() {
+                return Some(PathBuf::from(s));
+            }
         }
     }
     None
@@ -797,6 +825,49 @@ mod tests {
         assert_eq!(s.cli_source, CliSource::Claude);
         assert_eq!(s.cwd, PathBuf::from("C:\\Users\\me\\myproj"));
         assert_eq!(s.title, "Hello there");
+        let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn claude_loader_prefers_in_file_cwd_over_lossy_dirname() {
+        // Real-world: a project whose final segment contains a `-`
+        // (e.g. `agentic-terminal`) round-trips to the same encoded
+        // dirname as `agentic\terminal`, so the dirname alone can't
+        // recover the original path. The JSONL records carry the true
+        // cwd verbatim.
+        let home = tmp_root("claude-cwd-from-jsonl");
+        let projects = home.join(".claude").join("projects");
+        let proj = projects.join("C--Users-me-codes-agentic-terminal");
+        fs::create_dir_all(&proj).unwrap();
+        write_file(&proj.join("ssss-tttt.jsonl"),
+            "{\"type\":\"permission-mode\",\"sessionId\":\"ssss-tttt\"}\n\
+             {\"type\":\"user\",\"cwd\":\"C:\\\\Users\\\\me\\\\codes\\\\agentic-terminal\",\"message\":{\"content\":\"hi\"}}\n");
+
+        let v = load_claude(&home);
+        assert_eq!(v.len(), 1);
+        assert_eq!(
+            v[0].cwd,
+            PathBuf::from("C:\\Users\\me\\codes\\agentic-terminal"),
+            "cwd from JSONL must beat lossy dirname decoding",
+        );
+        let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn claude_loader_falls_back_to_dirname_when_jsonl_has_no_cwd() {
+        // When records carry no `cwd` field the loader still works,
+        // landing on the lossy decoded dirname. Acceptable because no
+        // better source of truth is available.
+        let home = tmp_root("claude-cwd-fallback");
+        let projects = home.join(".claude").join("projects");
+        let proj = projects.join("C--Users-me-myproj");
+        fs::create_dir_all(&proj).unwrap();
+        write_file(&proj.join("oooo-pppp.jsonl"),
+            "{\"type\":\"user\",\"message\":{\"content\":\"hi\"}}\n");
+
+        let v = load_claude(&home);
+        assert_eq!(v.len(), 1);
+        assert_eq!(v[0].cwd, PathBuf::from("C:\\Users\\me\\myproj"));
         let _ = fs::remove_dir_all(&home);
     }
 

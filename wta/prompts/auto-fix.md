@@ -60,6 +60,15 @@ For multi-character / regex-special text, use the shell's standard escapes. Keep
 
 When in doubt about the shell, default to **PowerShell** on Windows and **bash** elsewhere — the `Shell Context` section above is your source of truth.
 
+**Resolve file paths against `Shell Context.cwd`, not against the path the tool printed.** Compiler/build-tool diagnostics (rustc, tsc, cargo, go, msbuild, etc.) print paths relative to the **project root** (where the manifest like `Cargo.toml` / `package.json` lives), which is often a parent of the user's current shell cwd. Before emitting the command:
+
+1. Read `Shell Context.cwd`.
+2. Look at the path the tool printed (e.g. `src\main.rs`).
+3. If the cwd already ends in / contains the leading segments of that path, **strip them** — don't double them up. Example: cwd `…\MyRustApp\src` + tool path `src\main.rs` → use `main.rs`, not `src\main.rs`.
+4. If the cwd is a sibling / unrelated directory, prefer an absolute path or one that's clearly resolvable from the cwd.
+
+A wrong path makes the fix silently no-op or write to the wrong file, which is worse than no fix.
+
 ### 2. `explain` — anything else
 
 ```json
@@ -86,10 +95,16 @@ The `explanation` field is rendered as Markdown. It MUST contain:
 {"action": "fix", "title": "Use Get-ChildItem", "command": "Get-ChildItem", "rationale": "'listdir' is not a PowerShell command — Get-ChildItem is the native equivalent. Multiple shell-native synonyms exist (ls/dir) but that is not ambiguity."}
 ```
 
-**Source-code typo** — Rust `printf!` macro doesn't exist; compiler suggests `println!` (PowerShell, file `src\main.rs`):
+**Source-code typo, cwd at project root** — Rust `printf!` macro doesn't exist; compiler suggests `println!` (PowerShell, cwd `…\MyRustApp`, compiler printed `src\main.rs`):
 
 ```json
 {"action": "fix", "title": "Use println! instead of printf!", "command": "(Get-Content src\\main.rs) -replace 'printf!', 'println!' | Set-Content src\\main.rs", "rationale": "Rust uses println! — printf! is a C/C++ function. Compiler suggested the same fix."}
+```
+
+**Same typo, cwd already inside `src`** — same error, but cwd is `…\MyRustApp\src` (the compiler still prints `src\main.rs` because it's relative to the project root). Strip the redundant `src\` prefix:
+
+```json
+{"action": "fix", "title": "Use println! instead of printf!", "command": "(Get-Content main.rs) -replace 'printf!', 'println!' | Set-Content main.rs", "rationale": "Compiler path src\\main.rs is relative to the cargo project root; cwd is already inside src/, so the file is just main.rs from here."}
 ```
 
 **Missing semicolon** — JS lint pinpoints line 12 (bash, file `app.js`):

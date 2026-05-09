@@ -343,7 +343,7 @@ Activated via `CoCreateInstance(CLSCTX_LOCAL_SERVER)` against a **per-branding h
 |---|---|---|---|---|
 | C-1 | **S** | Any caller with package identity can spoof a legitimate caller (CLSID is publicly known; no caller-PID/identity check; `Authenticate` is a dev-bypass). In-pane processes have package identity trivially via inheritance. | **High** | M-1, M-2 (partial), M-9 |
 | C-2 | **T** | `SetSettings(content)` lets a caller overwrite `settings.json` (replacing `acpAgent`, removing `confirmation.*` prompts) | **Critical** | M-2 (planned), M-7 |
-| C-3 | **T** | `CreateTab` / `SplitPane` accept arbitrary `commandline` → arbitrary process spawn under WT package identity | **Critical** | M-2 (planned), M-7 |
+| C-3 | **T** | `CreateTab` / `SplitPane` accept arbitrary `commandline` → arbitrary process spawn as a child of WT. **Three sub-scenarios:** (a) **Admin WT** (user launched WT elevated): `CreateProcessW` inherits WT's admin token by default → **new tab runs as admin** even when CreateTab caller is non-admin (only requires the caller to clear the COM IL gate; WT does not call `CoInitializeSecurity` so the default is a Windows default-deny which may or may not be tight depending on COM configuration). When the caller is itself admin (the realistic in-admin-WT case), there is no IL boundary to cross and the new tab is admin trivially → **stealthy admin-level persistence** (parent-process EDR allowlists see "Microsoft-signed WT", original shell can exit, `background=true` hides the window). (b) **Elevated profile**: caller picks `profile=<guid-with-elevate=true>` → triggers `_maybeElevate` → UAC prompt with "Microsoft" publisher → user click-yes EoP. (c) **Default (non-elevated WT, normal profile)**: still arbitrary code execution under WT package identity, with detection-evasion / persistence benefits as in (a). | **Critical** | M-2 (planned), M-7 |
 | C-4 | **T** | `SetSessionVariable(paneId, name, value)` writes env into a pane's shell — can prepend `PATH=`, set `LD_PRELOAD`-equivalent | **High** | M-2 (planned), M-7 |
 | C-5 | **R** | No authenticated caller identity; SetSettings creates a backup but the **action attribution** is "some process with package identity" — no PID, no name, no chain of custody | **Medium** | M-3 |
 | C-6 | **I** | `ReadPaneOutput` returns arbitrary scrollback lines including secrets that scrolled through pane | **High** | M-7, M-8 |
@@ -379,7 +379,7 @@ User-facing CLI that calls `IProtocolServer` via COM. Reads `WT_COM_CLSID` for b
 |---|---|---|---|---|
 | W-1 | **S** | Any caller with package identity can spawn `wtcli` (or directly `CoCreateInstance` from a packaged binary) and act as a legitimate caller. `WT_COM_CLSID` is **not** a gate. | **High** | M-1, M-2 |
 | W-2 | **T** | `wtcli set-settings` writes settings.json | **High** | M-2, M-7 |
-| W-3 | **T** | `wtcli new-tab -c '<cmdline>'` spawns arbitrary process | **Critical** | M-2, M-7 |
+| W-3 | **T** | `wtcli new-tab -c '<cmdline>'` spawns arbitrary process as a child of WT. New process inherits WT's token (`CreateProcessW` default). **Critical implication when WT is launched elevated (admin):** an attacker already running inside the admin WT (any in-admin-shell process) gets stealthy admin-level persistence — process tree shows `WindowsTerminal.exe(admin) → backdoor.exe(admin)`, parent-based EDR rules miss it, `background=true` hides the window, original shell can exit and the new tab survives. Cross-integrity activation (non-admin caller → admin WT) is normally blocked by COM defaults but WT does not configure `CoInitializeSecurity` explicitly — depends on Windows COM defaults for packaged LOCAL_SERVER. See C-3 for the elevated-profile UAC variant. | **Critical** | M-2, M-7 |
 | W-4 | **I** | `wtcli capture-pane`, `list-panes`, `info` enumerate state for reconnaissance | **Medium** | M-2, M-7 |
 | W-5 | **D** | `wtcli kill-pane` repeatedly closes panes; can race agent's open-and-send flows | **Low** | (Accepted: pane lifetime is user-controlled; closed pane is immediately observable) |
 | W-6 | **E** | `wtcli` was the canonical path for `send-keys`; **removed in the SendInput hardening** so this row is closed | n/a | Mitigated (M-1) |
@@ -553,7 +553,11 @@ This is intentional and is the asymmetry that delivers the security improvement:
 
 3. **R3 — Settings.json modification.** Until M-2 lands for `SetSettings`, any caller with package identity (most easily, any in-pane process — package context inherits via shell spawn) can call `IProtocolServer::SetSettings` and rewrite the confirmation policy. **This is the single highest residual risk in the document.** Tracking via M-2.
 
-4. **R4 — `CreateTab` with arbitrary `commandline`.** Same reasoning as R3.
+4. **R4 — `CreateTab` / `SplitPane` with arbitrary `commandline`.** Same root cause as R3 (mutation method on ambient COM); separately tracked because of two amplifiers:
+   - **Admin-WT amplifier:** when the user launches WT elevated, `CreateProcessW` inherits the admin token → new tab runs as admin. An in-admin-shell attacker (which is itself admin once it lands in an admin shell) gets stealthy admin-level persistence: parent-process EDR allowlists miss `WindowsTerminal.exe → backdoor.exe`, original shell can exit, `background=true` hides the window. Not a privilege escalation by itself in this scenario (caller was already admin) but a powerful detection-evasion + persistence primitive.
+   - **Elevated-profile amplifier:** caller picks a profile configured with `"elevate": true` → triggers `_maybeElevate` → UAC prompt signed by Microsoft. Click-yes EoP if the user accepts. M-7 (`createOperations` confirmation) helps but is breakable via R3 (settings.json modification flips it to "auto").
+
+   Cross-integrity COM activation (non-admin caller → admin WT) is normally blocked by Windows COM defaults; WT does **not** configure `CoInitializeSecurity` explicitly, so the default applies. Verifying that the default is actually tight for packaged LOCAL_SERVER is **Open Question §12.6**.
 
 5. **R5 — Pane scrollback exfiltration.** `ReadPaneOutput` returns whatever the user typed; the agent may forward it to the LLM provider. Documented behaviour, but worth M-8 (redaction) for sensitive shapes.
 
@@ -589,6 +593,8 @@ This is intentional and is the asymmetry that delivers the security improvement:
 4. **Settings.json file ACL.** Should we tighten the on-disk ACL on `settings.json` (e.g., to current user only, no network share semantics)? Currently inherits from %LOCALAPPDATA%.
 
 5. **Backwards compatibility for third-party scripts that used `wtcli send-keys`.** Ship a deprecation shim that prints a clear error message pointing at the alternative? Or fail silently and let users discover via documentation?
+
+6. **COM cross-integrity activation behaviour for our packaged LOCAL_SERVER.** `TerminalProtocolComServer::s_StartListening` calls `CoRegisterClassObject(CLSCTX_LOCAL_SERVER, REGCLS_MULTIPLEUSE)` but does **not** call `CoInitializeSecurity` to set an explicit security descriptor on the class. Default Windows COM behaviour for packaged LOCAL_SERVER + cross-integrity activation must be verified on a target machine — specifically: when WT is launched elevated (admin), can a non-admin process in the same user session successfully `CoCreateInstance` `IProtocolServer` and invoke methods? If yes, R4's "admin-WT amplifier" becomes a direct EoP rather than just a persistence/evasion primitive. Action: write a repro test (admin WT + medium-IL packaged client) and either confirm default-deny or add an explicit `CoInitializeSecurity` SD that rejects lower IL.
 
 ---
 

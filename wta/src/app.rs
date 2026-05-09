@@ -544,7 +544,7 @@ pub enum AppEvent {
 
 // --- Per-tab session storage ---
 
-const DEFAULT_TAB_ID: &str = "0";
+pub(crate) const DEFAULT_TAB_ID: &str = "0";
 
 /// Everything that conceptually belongs to one tab's conversation: the
 /// message history, the streaming buffer of the in-flight prompt, the
@@ -604,6 +604,11 @@ pub struct TabSession {
     // Filled in Milestone 2 once each tab has its own ACP SessionId.
     #[allow(dead_code)]
     pub session_id: Option<String>,
+
+    // Agents picker view (F2 / `/sessions`) — per-tab so each WT tab keeps
+    // its own open/closed state and selected row across tab switches.
+    pub current_view: View,
+    pub agents_list_state: ratatui::widgets::ListState,
 }
 
 impl TabSession {
@@ -914,7 +919,7 @@ pub struct App {
     // before the first `tab_changed` event arrives. Always contains at
     // least an entry for the active tab; lazily extended on first
     // `tab_changed` to a new tab.
-    tab_sessions: HashMap<String, TabSession>,
+    pub(crate) tab_sessions: HashMap<String, TabSession>,
     // Reverse lookup: ACP `SessionId` → tab id. Populated from
     // `AgentConnected` (the implicit tab "0" session) and `SessionAttached`
     // (lazily-created sessions for other tabs). All ACP-emitted events
@@ -924,12 +929,10 @@ pub struct App {
     session_to_tab: HashMap<String, String>,
     // ── Agent management view state (re-applied on top of theirs) ──
     /// Live & historical CLI agent sessions. Populated from `agent_event`
-    /// hook payloads via `route_agent_event_to_registry`.
+    /// hook payloads via `route_agent_event_to_registry`. Cross-tab — the
+    /// session list itself is global; only the *picker view* (open state
+    /// + selected row) lives per-tab on `TabSession`.
     pub agent_sessions: crate::agent_sessions::AgentSessionRegistry,
-    /// Current top-level view: chat (default) vs the F2 Agents picker.
-    pub current_view: View,
-    /// Selection state for the Agents view list widget.
-    pub agents_list_state: ratatui::widgets::ListState,
     // Onboarding: signals main.rs to install agent hook plugins on demand.
     install_request_tx: Option<mpsc::UnboundedSender<()>>,
     /// Posts `AppEvent::AgentSessionEvent` from background callbacks
@@ -1058,8 +1061,6 @@ impl App {
             tab_sessions,
             session_to_tab: HashMap::new(),
             agent_sessions: crate::agent_sessions::AgentSessionRegistry::new(),
-            current_view: View::Chat,
-            agents_list_state: ratatui::widgets::ListState::default(),
             install_request_tx: None,
             agent_event_tx: None,
             #[cfg(test)]
@@ -2217,21 +2218,25 @@ impl App {
 
         // Agents view (F2): list navigation + Enter to focus pane + Delete
         // to evict an Ended/Historical row. Captures all input while open
-        // — including Esc which closes the view.
-        if self.current_view == View::Agents {
+        // — including Esc which closes the view. View open-state and the
+        // selection cursor are per-tab on `TabSession` so each WT tab
+        // keeps its own picker state across switches.
+        if self.current_tab().current_view == View::Agents {
             let count = self.agent_sessions.iter_sorted().len();
             match key.code {
                 KeyCode::Down => {
-                    let cur = self.agents_list_state.selected().unwrap_or(0);
+                    let cur = self.current_tab().agents_list_state.selected().unwrap_or(0);
                     let next = if count == 0 { 0 } else { (cur + 1).min(count - 1) };
-                    self.agents_list_state.select(Some(next));
+                    self.current_tab_mut().agents_list_state.select(Some(next));
                 }
                 KeyCode::Up => {
-                    let cur = self.agents_list_state.selected().unwrap_or(0);
-                    self.agents_list_state.select(Some(cur.saturating_sub(1)));
+                    let cur = self.current_tab().agents_list_state.selected().unwrap_or(0);
+                    self.current_tab_mut()
+                        .agents_list_state
+                        .select(Some(cur.saturating_sub(1)));
                 }
                 KeyCode::Enter => {
-                    if let Some(idx) = self.agents_list_state.selected() {
+                    if let Some(idx) = self.current_tab().agents_list_state.selected() {
                         let selected = self
                             .agent_sessions
                             .iter_sorted()
@@ -2243,7 +2248,7 @@ impl App {
                     }
                 }
                 KeyCode::Delete => {
-                    if let Some(idx) = self.agents_list_state.selected() {
+                    if let Some(idx) = self.current_tab().agents_list_state.selected() {
                         let target = self
                             .agent_sessions
                             .iter_sorted()
@@ -2258,17 +2263,18 @@ impl App {
                                 self.agent_sessions.remove(&key);
                                 // Keep the cursor in-bounds after eviction.
                                 let new_count = self.agent_sessions.iter_sorted().len();
+                                let tab = self.current_tab_mut();
                                 if new_count == 0 {
-                                    self.agents_list_state.select(None);
+                                    tab.agents_list_state.select(None);
                                 } else if idx >= new_count {
-                                    self.agents_list_state.select(Some(new_count - 1));
+                                    tab.agents_list_state.select(Some(new_count - 1));
                                 }
                             }
                         }
                     }
                 }
                 KeyCode::Esc => {
-                    self.current_view = View::Chat;
+                    self.current_tab_mut().current_view = View::Chat;
                 }
                 _ => {}
             }
@@ -2393,14 +2399,16 @@ impl App {
                 }
             }
             KeyCode::F(2) => {
-                // Toggle between Chat (default) and the Agents picker.
-                self.current_view = match self.current_view {
+                // Toggle between Chat (default) and the Agents picker. Per
+                // tab — the active tab's TabSession holds the open state
+                // so other tabs are unaffected.
+                let has_sessions = !self.agent_sessions.iter_sorted().is_empty();
+                let tab = self.current_tab_mut();
+                tab.current_view = match tab.current_view {
                     View::Chat => {
                         // Seed selection on first open if there's anything to select.
-                        if self.agents_list_state.selected().is_none()
-                            && !self.agent_sessions.iter_sorted().is_empty()
-                        {
-                            self.agents_list_state.select(Some(0));
+                        if tab.agents_list_state.selected().is_none() && has_sessions {
+                            tab.agents_list_state.select(Some(0));
                         }
                         View::Agents
                     }
@@ -2526,7 +2534,8 @@ impl App {
             }
             KeyCode::Enter
                 if self.current_tab().input.is_empty()
-                    && self.current_tab().selected_completed_turn_idx.is_some() =>
+                    && self.current_tab().selected_completed_turn_idx.is_some()
+                    && self.current_tab().recommendations.is_none() =>
             {
                 // A past turn is highlighted via Tab — Enter toggles its
                 // expanded state instead of submitting / activating recs.
@@ -2823,6 +2832,18 @@ impl App {
                 tab.selected_completed_turn_idx = None;
                 tab.session_id = None;
                 tab.scroll_to_bottom();
+            }
+            CommandKind::Sessions => {
+                // Mirror the F2 keybinding's open path: jump straight to
+                // the Agents picker and seed a selection so Enter/Up/Down
+                // are immediately useful. Esc / F2 still close the view.
+                // Per-tab — only flips the active tab's view state.
+                let has_sessions = !self.agent_sessions.iter_sorted().is_empty();
+                let tab = self.current_tab_mut();
+                if tab.agents_list_state.selected().is_none() && has_sessions {
+                    tab.agents_list_state.select(Some(0));
+                }
+                tab.current_view = View::Agents;
             }
             CommandKind::Restart => {
                 // Full reconnect. Reset every tab: drop session_id (the
@@ -3237,6 +3258,9 @@ impl App {
                 tab.selected_recommendation = rec_idx;
                 tab.recommendations = Some(recommendations);
                 tab.selection_visible_pending = true;
+                // Drop any leftover completed-turn selection so Enter routes
+                // to the new card instead of toggling a stale highlight.
+                tab.selected_completed_turn_idx = None;
                 self.log_selection_phase_for(
                     session_id,
                     "selection_ready",
@@ -4095,8 +4119,8 @@ mod tests {
             cwd: PathBuf::from("/x"),
             title: "t".into(),
         });
-        app.current_view = View::Agents;
-        app.agents_list_state.select(Some(0));
+        app.current_tab_mut().current_view = View::Agents;
+        app.current_tab_mut().agents_list_state.select(Some(0));
 
         app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
         let cmd = app
@@ -4127,8 +4151,8 @@ mod tests {
             reason: "user_exit".into(),
         });
 
-        app.current_view = View::Agents;
-        app.agents_list_state.select(Some(0));
+        app.current_tab_mut().current_view = View::Agents;
+        app.current_tab_mut().agents_list_state.select(Some(0));
         app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
 
         let cmd = app
@@ -4172,8 +4196,8 @@ mod tests {
             key: "k".into(),
             reason: "".into(),
         });
-        app.current_view = View::Agents;
-        app.agents_list_state.select(Some(0));
+        app.current_tab_mut().current_view = View::Agents;
+        app.current_tab_mut().agents_list_state.select(Some(0));
 
         app.handle_key(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE));
         assert!(!app.agent_sessions.has_session(&"k".to_string()));
@@ -4192,11 +4216,52 @@ mod tests {
             cwd: PathBuf::from("/x"),
             title: "t".into(),
         });
-        app.current_view = View::Agents;
-        app.agents_list_state.select(Some(0));
+        app.current_tab_mut().current_view = View::Agents;
+        app.current_tab_mut().agents_list_state.select(Some(0));
 
         app.handle_key(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE));
         assert!(app.agent_sessions.has_session(&"k".to_string()));
+    }
+
+    #[test]
+    fn agents_view_state_is_isolated_per_tab() {
+        // Regression: opening the Agents picker in tab A should not show
+        // up as opened (or with the same selection) when the user switches
+        // to tab B. `current_view` and `agents_list_state` live on
+        // TabSession exactly to keep these states independent.
+        use crate::agent_sessions::{CliSource, SessionEvent};
+        use std::path::PathBuf;
+        let mut app = test_app();
+        for k in ["a", "b", "c"] {
+            app.agent_sessions.apply(SessionEvent::SessionStarted {
+                key: k.into(),
+                cli_source: CliSource::Claude,
+                pane_session_id: format!("p-{}", k),
+                cwd: PathBuf::from("/x"),
+                title: format!("t-{}", k),
+            });
+        }
+
+        // Tab "0" (the seeded default): open picker, select row 2.
+        app.tab_id = Some("0".into());
+        app.current_tab_mut().current_view = View::Agents;
+        app.current_tab_mut().agents_list_state.select(Some(2));
+
+        // Switch to tab "1" — its TabSession is lazily created with
+        // defaults: View::Chat and no selection.
+        app.tab_id = Some("1".into());
+        let tab1 = app.current_tab_mut();
+        assert_eq!(tab1.current_view, View::Chat, "new tab must start in Chat");
+        assert_eq!(tab1.agents_list_state.selected(), None);
+
+        // Mutating tab 1 must not bleed back into tab 0.
+        tab1.current_view = View::Agents;
+        tab1.agents_list_state.select(Some(0));
+
+        app.tab_id = Some("0".into());
+        let tab0 = app.current_tab();
+        assert_eq!(tab0.current_view, View::Agents);
+        assert_eq!(tab0.agents_list_state.selected(), Some(2));
     }
 
     // ─── Autofix suppression for agent CLI panes ───────────────────────────

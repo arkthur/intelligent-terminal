@@ -172,15 +172,6 @@
                 </StackPanel>
             </local:SettingContainer>
 
-            <!--  Delegate Model (only for built-in agents)  -->
-            <local:SettingContainer x:Name="DelegateModel"
-                                    x:Uid="AIAgents_DelegateModel"
-                                    Visibility="{x:Bind ViewModel.ShowDelegateModel, Mode=OneWay}">
-                <TextBox Text="{x:Bind ViewModel.DelegateModel, Mode=TwoWay}"
-                         PlaceholderText="default"
-                         Style="{StaticResource TextBoxSettingStyle}" />
-            </local:SettingContainer>
-
             <!--  ═══ Agent Hooks ═══  -->
             <TextBlock x:Uid="AIAgents_HooksGroupHeader"
                        Style="{StaticResource SubtitleTextBlockStyle}"
