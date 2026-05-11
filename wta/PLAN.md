@@ -100,24 +100,32 @@ Steps 1–9 refactored WTA from an ACP-only client into the dual-mode architectu
 
 ---
 
-## Part 2: Windows Terminal Integration (DONE, named-pipe-first)
+## Part 2: Windows Terminal Integration (DONE, COM-first)
 
-The current implementation talks to Windows Terminal primarily through the named-pipe protocol server.
-VT OSC 9001 is still relevant, but mainly for pipe discovery/bootstrap and future in-pane integration, not as the main control channel.
+The current implementation talks to Windows Terminal primarily through a local
+COM server. WTA shells out to `wtcli.exe`, which calls `CoCreateInstance` on
+the `IProtocolServer` interface registered by Windows Terminal. An inherited
+duplex anonymous-pipe pair carries `send_input` only — every other method
+goes through COM.
+
+> Historical note: this part of the doc originally planned an OSC 9001 / named-pipe
+> protocol (see "Wire Format" and "WT C++ Side" sections below). That approach was
+> abandoned in favour of COM activation; sections describing the OSC route are
+> kept for historical context but no longer reflect what was shipped.
 
 ```
 WTA (Rust, child process)                Windows Terminal (C++)
 ─────────────────────────                ─────────────────────────
 
- ShellManager                         ProtocolRequestHandler
-    │                                        │
-    ├── Local (existing)                     │ named pipe server
-    │                                        ▼
-    └── WtChannel (trait)              \\.\pipe\WindowsTerminal-<PID>
+ ShellManager                         TerminalProtocolComServer
+    │                                        ▲
+    ├── Local (existing)                     │ CoCreateInstance(WT_COM_CLSID)
+    │                                        │ via wtcli.exe subprocess
+    └── WtChannel (trait)                    │
+         │                                   │
+         ├── CliChannel  ────────────────────┘  (primary, all methods)
          │
-         ├── PipeChannel (primary transport)
-         │
-         └── VtChannel (discovery/future integration)
+         └── PipeChannel (inherited duplex pipe pair, send_input only)
 ```
 
 ### WTA Rust-Side Steps
@@ -246,8 +254,9 @@ serde = { version = "1", features = ["derive"] }
 
 ### Part 2 (Done)
 - [x] `cargo build` — compiles with wt_channel module
-- [x] VT OSC 9001 pipe discovery works
-- [x] PipeChannel named pipe transport works
+- [x] `WT_COM_CLSID` discovery via inherited env var works
+- [x] CliChannel (wtcli + COM) carries all methods
+- [x] PipeChannel (inherited duplex pipe pair) carries `send_input`
 
 ### Part 3: CLI Subcommands (Done)
 - [x] `cargo build` — compiles with all subcommands
@@ -258,8 +267,8 @@ serde = { version = "1", features = ["derive"] }
 - [x] `wta split-pane -v` — splits active pane vertically
 - [x] `wta` (no args) — still launches ACP TUI mode
 - [x] `wta --mcp` — still works (backward compat)
-- [x] `wta pipe-id` — prints discovered pipe name
-- [x] `wta set-env` — prints eval-able export commands
+- [x] `wta pipe-id` — prints the discovered `WT_COM_CLSID`
+- [x] `wta set-env` — prints eval-able `WT_COM_CLSID` export commands
 
 ### Future
 - [ ] WT C++ side: build WT, verify DoWTAction receives WtaReq
