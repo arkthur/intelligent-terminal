@@ -9,8 +9,11 @@
 
 #include <json/json.h>
 #include <til/io.h>
+#include "../TerminalProtocol/ProtocolParsing.h"
 
 #include <thread>
+
+namespace ProtocolParsing = Microsoft::Terminal::Protocol::Parsing;
 
 namespace Protocol = winrt::Microsoft::Terminal::Protocol;
 
@@ -527,30 +530,10 @@ Protocol::TabCreationResult TerminalProtocolComServer::SplitPane(
     THROW_HR_IF(E_NOT_VALID_STATE, !s_emperor);
     THROW_HR_IF(E_INVALIDARG, paneId == 0);
 
-    // Map direction string to SplitDirection enum.
-    // Accepts: "right" (default), "left", "up", "down", "auto"/"automatic".
-    // Legacy values "horizontal"/"vertical" are honoured as down/right respectively
-    // so older callers (early wtcli builds) keep working instead of silently
-    // collapsing into the default Right.
-    auto splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Right;
-    if (!direction.empty())
-    {
-        const auto dirStr = winrt::to_string(direction);
-        if (dirStr == "right")
-            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Right;
-        else if (dirStr == "left")
-            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Left;
-        else if (dirStr == "up")
-            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Up;
-        else if (dirStr == "down")
-            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Down;
-        else if (dirStr == "auto" || dirStr == "automatic")
-            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Automatic;
-        else if (dirStr == "horizontal")
-            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Down;
-        else if (dirStr == "vertical")
-            splitDir = winrt::Microsoft::Terminal::Settings::Model::SplitDirection::Right;
-    }
+    // Map direction string to SplitDirection enum via shared parsing logic.
+    const auto parsedDir = ProtocolParsing::ParseSplitDirection(winrt::to_string(direction));
+    auto splitDir = static_cast<winrt::Microsoft::Terminal::Settings::Model::SplitDirection>(
+        static_cast<int>(parsedDir));
 
     // Build NewTerminalArgs.
     winrt::Microsoft::Terminal::Settings::Model::NewTerminalArgs newTermArgs;
@@ -660,11 +643,7 @@ winrt::hstring TerminalProtocolComServer::SetSettings(
     winrt::hstring const& settingsContent)
 {
     const auto contentStr = winrt::to_string(settingsContent);
-    THROW_HR_IF(E_INVALIDARG, contentStr.empty());
-
-    // Validate that it's valid JSON.
-    Json::Value parsedSettings;
-    THROW_HR_IF(E_INVALIDARG, !_parseJson(contentStr, parsedSettings));
+    THROW_HR_IF(E_INVALIDARG, !ProtocolParsing::ValidateSettingsJson(contentStr));
 
     // Get the settings path and create a backup.
     const std::filesystem::path settingsPath{
@@ -775,40 +754,29 @@ void TerminalProtocolComServer::SendEvent(winrt::hstring const& eventJson)
 {
     THROW_HR_IF(E_ACCESSDENIED, !_authenticated);
 
-    // Parse and validate the incoming JSON
     auto jsonStr = winrt::to_string(eventJson);
     Json::Value evt;
-    THROW_HR_IF(E_INVALIDARG, !_parseJson(jsonStr, evt));
+    const auto route = ProtocolParsing::ClassifySendEvent(jsonStr, evt);
+    THROW_HR_IF(E_INVALIDARG, route == ProtocolParsing::SendEventRoute::Invalid);
 
-    // autofix_state is a direct WTA → TerminalPage signal (no broadcast to
-    // other wtcli clients). Marshal to the UI thread and call the page.
-    if (evt.isMember("method") && evt["method"].isString() &&
-        evt["method"].asString() == "autofix_state")
+    switch (route)
     {
+    case ProtocolParsing::SendEventRoute::AutofixState:
         _dispatchAutofixStateToPage(eventJson);
         return;
-    }
-
-    // agent_status carries name/version/model/state for the XAML AgentBar.
-    // Same dispatch shape as autofix_state — direct to TerminalPage, no broadcast.
-    if (evt.isMember("method") && evt["method"].isString() &&
-        evt["method"].asString() == "agent_status")
-    {
+    case ProtocolParsing::SendEventRoute::AgentStatus:
         _dispatchAgentStatusToPage(eventJson);
         return;
+    case ProtocolParsing::SendEventRoute::Broadcast:
+    {
+        Json::StreamWriterBuilder wb;
+        wb["indentation"] = "";
+        s_NotifyEventToComClients(Json::writeString(wb, evt));
+        return;
     }
-
-    // Legacy path: params.event is required for agent_event broadcasts.
-    THROW_HR_IF(E_INVALIDARG, !evt.isMember("params") || !evt["params"].isMember("event"));
-
-    // Normalize the envelope
-    evt["type"] = "event";
-    evt["method"] = "agent_event";
-
-    // Broadcast to all subscribed clients via the existing path
-    Json::StreamWriterBuilder wb;
-    wb["indentation"] = "";
-    s_NotifyEventToComClients(Json::writeString(wb, evt));
+    default:
+        return;
+    }
 }
 
 void TerminalProtocolComServer::_dispatchAutofixStateToPage(const winrt::hstring& eventJson)

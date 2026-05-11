@@ -18,6 +18,9 @@
 
 #include <json/json.h>
 #include <wil/resource.h>
+#include "../TerminalProtocol/ProtocolParsing.h"
+
+namespace ProtocolParsing = Microsoft::Terminal::Protocol::Parsing;
 
 using namespace winrt;
 using namespace winrt::Windows::Foundation;
@@ -252,6 +255,7 @@ namespace winrt::TerminalApp::implementation
     {
         auto strong = get_strong();
         const auto sourceStr = winrt::to_string(source);
+        const auto sourceRoute = ProtocolParsing::ClassifyPaneOutputSource(sourceStr);
         const auto effectiveMaxLines = (maxLines <= 0) ? 200 : maxLines;
 
         co_await wil::resume_foreground(Dispatcher());
@@ -281,7 +285,7 @@ namespace winrt::TerminalApp::implementation
 
             try
             {
-                if (sourceStr == "last_prompt")
+                if (sourceRoute == ProtocolParsing::PaneOutputSource::LastPrompt)
                 {
                     // Special path: return only the most recent completed
                     // shell prompt (command + output, bracketed by FTCS
@@ -343,7 +347,7 @@ namespace winrt::TerminalApp::implementation
             lines.push_back(line);
         }
 
-        if (sourceStr == "screen")
+        if (sourceRoute == ProtocolParsing::PaneOutputSource::Screen)
         {
             const auto startIdx = lines.size() > static_cast<size_t>(viewHeight)
                                       ? lines.size() - viewHeight
@@ -739,11 +743,8 @@ namespace winrt::TerminalApp::implementation
         // Parse choices on the calling thread — no UI needed.
         Json::Value choices;
         {
-            Json::CharReaderBuilder rb;
-            std::string errors;
             auto choicesStr = winrt::to_string(choicesJson);
-            std::istringstream stream(choicesStr);
-            if (!Json::parseFromStream(rb, stream, &choices, &errors) || !choices.isArray())
+            if (!ProtocolParsing::ValidateQuickPickChoices(choicesStr, choices))
             {
                 co_return L"";
             }
