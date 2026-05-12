@@ -853,6 +853,7 @@ namespace winrt::TerminalApp::implementation
     {
         if (auto overlay = FindName(L"FreOverlayElement").try_as<winrt::TerminalApp::FreOverlay>())
         {
+            overlay.ResetDragOffset();
             overlay.Completed({ get_weak(), &TerminalPage::_OnFreCompleted });
             overlay.Visibility(Visibility::Visible);
         }

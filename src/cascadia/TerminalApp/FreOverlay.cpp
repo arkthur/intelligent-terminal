@@ -9,6 +9,7 @@
 
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::UI::Xaml;
+using namespace winrt::Windows::UI::Xaml::Input;
 using namespace winrt::Windows::UI::Xaml::Media;
 using namespace winrt::Windows::UI::Xaml::Controls;
 
@@ -17,6 +18,16 @@ namespace winrt::TerminalApp::implementation
     FreOverlay::FreOverlay()
     {
         InitializeComponent();
+
+        // When the overlay (or its parent window) resizes, clamp the dialog
+        // so it doesn't end up off-screen.
+        _rootSizeChangedToken = RootGrid().SizeChanged(
+            [weakThis = get_weak()](const auto& /*sender*/, const SizeChangedEventArgs& /*args*/) {
+                if (auto self = weakThis.get())
+                {
+                    self->_ClampDialogPosition();
+                }
+            });
 
         // Pre-load per-section detail strings.
         _detailTitles = {
@@ -114,5 +125,107 @@ namespace winrt::TerminalApp::implementation
                                          const RoutedEventArgs& /*args*/)
     {
         Completed.raise(*this, nullptr);
+    }
+
+    // ── Drag-to-move handlers ───────────────────────────────────────────
+
+    void FreOverlay::_OnTitleBarPointerPressed(const IInspectable& /*sender*/,
+                                               const PointerRoutedEventArgs& e)
+    {
+        const auto point = e.GetCurrentPoint(RootGrid());
+        // Only react to the primary button (left-click / touch / pen primary).
+        if (point.Properties().IsRightButtonPressed() || point.Properties().IsMiddleButtonPressed())
+        {
+            return;
+        }
+
+        _titleBarDragging = TitleBarDragArea().CapturePointer(e.Pointer());
+        if (!_titleBarDragging)
+        {
+            return;
+        }
+
+        _dragStartPointer = point.Position();
+        _dragStartTranslateX = DialogTranslate().X();
+        _dragStartTranslateY = DialogTranslate().Y();
+        e.Handled(true);
+    }
+
+    void FreOverlay::_OnTitleBarPointerMoved(const IInspectable& /*sender*/,
+                                             const PointerRoutedEventArgs& e)
+    {
+        if (!_titleBarDragging)
+        {
+            return;
+        }
+
+        const auto point = e.GetCurrentPoint(RootGrid()).Position();
+        const auto deltaX = point.X - _dragStartPointer.X;
+        const auto deltaY = point.Y - _dragStartPointer.Y;
+
+        DialogTranslate().X(_dragStartTranslateX + deltaX);
+        DialogTranslate().Y(_dragStartTranslateY + deltaY);
+
+        _ClampDialogPosition();
+
+        e.Handled(true);
+    }
+
+    void FreOverlay::_OnTitleBarPointerReleased(const IInspectable& /*sender*/,
+                                                const PointerRoutedEventArgs& e)
+    {
+        if (_titleBarDragging)
+        {
+            TitleBarDragArea().ReleasePointerCapture(e.Pointer());
+        }
+        _titleBarDragging = false;
+        e.Handled(true);
+    }
+
+    void FreOverlay::_OnTitleBarPointerCaptureLost(const IInspectable& /*sender*/,
+                                                   const PointerRoutedEventArgs& /*e*/)
+    {
+        _titleBarDragging = false;
+    }
+
+    // ── Clamping & reset ────────────────────────────────────────────────
+
+    void FreOverlay::_ClampDialogPosition()
+    {
+        const auto gridW = RootGrid().ActualWidth();
+        const auto gridH = RootGrid().ActualHeight();
+        const auto dlgW = DialogViewbox().ActualWidth();
+        const auto dlgH = DialogViewbox().ActualHeight();
+
+        if (gridW <= 0 || gridH <= 0)
+        {
+            return;
+        }
+
+        // The dialog is HorizontalAlignment=Center, VerticalAlignment=Center,
+        // so at TranslateTransform (0,0) it sits in the middle.  The maximum
+        // offset in each direction before the dialog leaves the visible area:
+        const auto maxX = (gridW - dlgW) / 2.0;
+        const auto maxY = (gridH - dlgH) / 2.0;
+
+        // If the window is smaller than the dialog, allow zero offset.
+        const auto clampX = (std::max)(0.0, maxX);
+        const auto clampY = (std::max)(0.0, maxY);
+
+        auto x = DialogTranslate().X();
+        auto y = DialogTranslate().Y();
+
+        x = (std::max)(-clampX, (std::min)(x, clampX));
+        y = (std::max)(-clampY, (std::min)(y, clampY));
+
+        DialogTranslate().X(x);
+        DialogTranslate().Y(y);
+    }
+
+    void FreOverlay::ResetDragOffset()
+    {
+        DialogTranslate().X(0);
+        DialogTranslate().Y(0);
+        _titleBarDragging = false;
     }
 }

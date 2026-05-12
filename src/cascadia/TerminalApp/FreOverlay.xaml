@@ -12,11 +12,27 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d">
 
-    <!--  Backdrop: semi-transparent  -->
+    <!--  Backdrop: semi-transparent, proportional layout like CommandPalette  -->
     <Grid x:Name="RootGrid" Background="#80000000">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1*" />
+            <ColumnDefinition Width="6*" MaxWidth="782" />
+            <ColumnDefinition Width="1*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="1*" />
+            <RowDefinition Height="6*" MaxHeight="556" />
+            <RowDefinition Height="1*" />
+        </Grid.RowDefinitions>
 
-        <!--  Dialog: 782×556, rounded-[7px], bg #202020  -->
-        <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+        <!--  Dialog: proportional sizing, Viewbox scales content uniformly  -->
+        <Viewbox x:Name="DialogViewbox" Grid.Row="1" Grid.Column="1"
+                 Stretch="Uniform"
+                 StretchDirection="DownOnly">
+            <Viewbox.RenderTransform>
+                <TranslateTransform x:Name="DialogTranslate" X="0" Y="0" />
+            </Viewbox.RenderTransform>
+        <Border x:Name="DialogBorder"
                 Width="782" Height="556"
                 Background="#FF202020" CornerRadius="7"
                 BorderBrush="#66757575" BorderThickness="1">
@@ -24,8 +40,13 @@
                 <!--  App surface overlay: bg rgba(255,255,255,0.05), rounded-[7px]  -->
                 <Border Background="#0DFFFFFF" CornerRadius="7" />
 
-                <!--  Title Bar: h-[32px], top-0  -->
-                <Border Height="32" VerticalAlignment="Top">
+                <!--  Title Bar: h-[32px], top-0, draggable  -->
+                <Border x:Name="TitleBarDragArea" Height="32" VerticalAlignment="Top"
+                        Background="Transparent"
+                        PointerPressed="_OnTitleBarPointerPressed"
+                        PointerMoved="_OnTitleBarPointerMoved"
+                        PointerReleased="_OnTitleBarPointerReleased"
+                        PointerCaptureLost="_OnTitleBarPointerCaptureLost">
                     <!--  Close button: 48×32, right-0  -->
                     <Button x:Name="CloseButton"
                             HorizontalAlignment="Right" Width="48" Height="32"
@@ -236,5 +257,6 @@
                 </Grid>
             </Grid>
         </Border>
+        </Viewbox>
     </Grid>
 </UserControl>

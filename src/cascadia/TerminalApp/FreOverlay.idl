@@ -22,6 +22,9 @@ namespace TerminalApp
         String DetailLink{ get; };
         String NextButtonText{ get; };
 
+        // Reset drag offset so the dialog appears centered.
+        void ResetDragOffset();
+
         // Raised when the user clicks "Start exploring" or the close button.
         event Windows.Foundation.TypedEventHandler<FreOverlay, Object> Completed;
     }
