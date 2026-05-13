@@ -1,0 +1,16 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "AIAgentsViewModel.idl";
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    [default_interface] runtimeclass AIAgents : Windows.UI.Xaml.Controls.Page
+    {
+        AIAgents();
+        AIAgentsViewModel ViewModel { get; };
+
+        static Double InstalledOpacity(Boolean isInstalled);
+        static Windows.UI.Text.FontStyle AddNewFontStyle(Boolean isAddNew);
+    }
+}

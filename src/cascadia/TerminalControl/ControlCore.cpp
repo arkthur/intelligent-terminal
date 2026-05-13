@@ -139,6 +139,10 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         auto pfnSearchMissingCommand = [this](auto&& PH1, auto&& PH2) { _terminalSearchMissingCommand(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2)); };
         _terminal->SetSearchMissingCommandCallback(pfnSearchMissingCommand);
 
+        _terminal->SetVtSequenceCallback([this](std::wstring_view seq) {
+            VtSequenceReceived.raise(*this, winrt::hstring{ seq });
+        });
+
         auto pfnClearQuickFix = [this] { ClearQuickFix(); };
         _terminal->SetClearQuickFixCallback(pfnClearQuickFix);
 
@@ -2249,9 +2253,24 @@ namespace winrt::Microsoft::Terminal::Control::implementation
     {
         try
         {
+            // Collect VT sequences while the lock is held, raise events after releasing.
+            std::vector<winrt::hstring> vtSequences;
             {
                 const auto lock = _terminal->LockForWriting();
+                _terminal->SetVtSequenceCallback([&vtSequences](std::wstring_view seq) {
+                    vtSequences.emplace_back(seq);
+                });
                 _terminal->Write(winrt_array_to_wstring_view(str));
+                _terminal->SetVtSequenceCallback([this](std::wstring_view seq) {
+                    // Restore the original callback for non-output-handler callers.
+                    VtSequenceReceived.raise(*this, winrt::hstring{ seq });
+                });
+            }
+
+            // Now outside the lock — safe to raise events that may block on pipe I/O.
+            for (const auto& seq : vtSequences)
+            {
+                VtSequenceReceived.raise(*this, seq);
             }
 
             if (!_pendingResponses.empty())
@@ -2376,6 +2395,70 @@ namespace winrt::Microsoft::Terminal::Control::implementation
         }
 
         return hstring{ str };
+    }
+
+    // Returns the most recent *finished* shell prompt — the command typed
+    // at an OSC 133;B mark plus its output, sliced exactly between the
+    // command-start and command-end markers. Used by external agents
+    // (wtcli / wta) to fetch a tightly-scoped pane snapshot instead of an
+    // arbitrary tail of the buffer (which may contain unrelated commands
+    // and secrets).
+    //
+    // Behavior (walking marks in reverse, picking the first match):
+    //   * Finished command, with output       → [B..D] exact slice.
+    //   * Finished command, no output (`cd`)  → [B..C] (command text only).
+    //   * In-flight (no exitCode yet)         → skip; keep walking back.
+    //                              Always treat the live/most-recent mark as
+    //                              "not yet a result". Avoids the degenerate
+    //                              self-query case (agent would otherwise
+    //                              see only its own command line) and the
+    //                              "Start-Sleep right after Enter" case;
+    //                              long-running commands streaming partial
+    //                              output also fall through to the prior
+    //                              completed prompt rather than returning a
+    //                              half-baked truncated read.
+    //   * No marks present, or no finished command found
+    //                                         → empty hstring (caller may
+    //                                           fall back to a line-count
+    //                                           read).
+    //
+    // We key the "finished" decision off the FTCS CommandEnd / OSC 133;D
+    // marker, which the buffer surfaces as ScrollbarData::exitCode. Note
+    // outputEnd alone is not reliable: it grows as Output cells stream in,
+    // so an in-flight long-running command will already have outputEnd set
+    // pointing at the latest streamed output line.
+    hstring ControlCore::ReadLastPrompt() const
+    {
+        const auto lock = _terminal->LockForReading();
+        const auto& marks = _terminal->GetMarkExtents();
+        if (marks.empty())
+        {
+            return {};
+        }
+
+        const auto& textBuffer = _terminal->GetTextBuffer();
+
+        for (auto it = marks.rbegin(); it != marks.rend(); ++it)
+        {
+            if (!it->HasCommand())
+            {
+                continue;
+            }
+
+            // Skip until we find a finished command (saw FTCS CommandEnd).
+            if (!it->data.exitCode.has_value())
+            {
+                continue;
+            }
+
+            // Finished. Prefer [B..D]; if no output region was ever produced
+            // (e.g. `cd`), outputEnd is unset → fall back to [B..C] for the
+            // command text only.
+            const auto endPoint = it->outputEnd.value_or(*it->commandEnd);
+            return hstring{ textBuffer.GetPlainText(it->end, endPoint) };
+        }
+
+        return {};
     }
 
     // Get all of our recent commands. This will only really work if the user has enabled shell integration.

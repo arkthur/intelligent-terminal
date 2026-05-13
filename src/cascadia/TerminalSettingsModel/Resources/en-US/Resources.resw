@@ -456,6 +456,9 @@
   <data name="ToggleCommandPaletteCommandKey" xml:space="preserve">
     <value>Toggle command palette</value>
   </data>
+  <data name="ShowProtocolInfoCommandKey" xml:space="preserve">
+    <value>Show Terminal Protocol Info</value>
+  </data>
   <data name="SuggestionsCommandKey" xml:space="preserve">
     <value>Open suggestions</value>
   </data>
@@ -492,6 +495,9 @@
   </data>
   <data name="TogglePaneZoomCommandKey" xml:space="preserve">
     <value>Toggle pane zoom</value>
+  </data>
+  <data name="TogglePaneVisibilityCommandKey" xml:space="preserve">
+    <value>Toggle pane visibility</value>
   </data>
   <data name="TogglePaneReadOnlyCommandKey" xml:space="preserve">
     <value>Toggle pane read-only mode</value>
@@ -740,6 +746,18 @@
   <data name="OpenCWDCommandKey" xml:space="preserve">
     <value>Open current working directory</value>
   </data>
+  <data name="OpenAgentPaneCommandKey" xml:space="preserve">
+    <value>Toggle AI assistant</value>
+  </data>
+  <data name="FocusAgentPaneCommandKey" xml:space="preserve">
+    <value>Focus AI assistant pane</value>
+  </data>
+  <data name="OpenAgentSessionsCommandKey" xml:space="preserve">
+    <value>Open AI assistant sessions list</value>
+  </data>
+  <data name="TriggerAutofixCommandKey" xml:space="preserve">
+    <value>Trigger autofix</value>
+  </data>
   <data name="CloseTab" xml:space="preserve">
     <value>Close tab</value>
   </data>
@@ -975,5 +993,8 @@
   </data>
   <data name="SplitSizeActionArgumentLocalized" xml:space="preserve">
     <value>Split size</value>
+  </data>
+  <data name="PromptActionArgumentLocalized" xml:space="preserve">
+    <value>Prompt</value>
   </data>
 </root>

@@ -196,6 +196,27 @@ void BackendD2D::_drawBackground(const RenderingPayload& p)
             1u + p.s->viewportCellCount.y,
         };
         THROW_IF_FAILED(_backgroundBitmap->CopyFromMemory(&rect, p.backgroundBitmap.data(), gsl::narrow_cast<UINT32>(p.colorBitmapRowStride * sizeof(u32))));
+
+        // Fix the right-edge clamp: update the right border column to match each row's
+        // last cell color, so fractional pixels at the pane's right edge show the adjacent
+        // cell's background color rather than the terminal's default backgroundColor.
+        const auto bitmapRows = static_cast<UINT32>(p.s->viewportCellCount.y);
+        const auto bitmapCols = static_cast<UINT32>(p.s->viewportCellCount.x);
+        if (bitmapCols > 0 && bitmapRows > 0)
+        {
+            std::vector<u32> rightBorder(bitmapRows);
+            for (UINT32 r = 0; r < bitmapRows; ++r)
+            {
+                rightBorder[r] = p.backgroundBitmap.data()[r * p.colorBitmapRowStride + (bitmapCols - 1)];
+            }
+            const D2D1_RECT_U rightBorderRect{
+                1u + bitmapCols, 1u,
+                2u + bitmapCols,
+                1u + bitmapRows,
+            };
+            THROW_IF_FAILED(_backgroundBitmap->CopyFromMemory(&rightBorderRect, rightBorder.data(), sizeof(u32)));
+        }
+
         _backgroundBitmapGeneration = p.colorBitmapGenerations[0];
     }
 

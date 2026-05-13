@@ -38,6 +38,7 @@
     ON_ALL_ACTIONS(SplitPane)               \
     ON_ALL_ACTIONS(ToggleSplitOrientation)  \
     ON_ALL_ACTIONS(TogglePaneZoom)          \
+    ON_ALL_ACTIONS(TogglePaneVisibility)    \
     ON_ALL_ACTIONS(SwitchToTab)             \
     ON_ALL_ACTIONS(AdjustFontSize)          \
     ON_ALL_ACTIONS(ResetFontSize)           \
@@ -113,7 +114,12 @@
     ON_ALL_ACTIONS(OpenScratchpad)          \
     ON_ALL_ACTIONS(OpenAbout)               \
     ON_ALL_ACTIONS(QuickFix)                \
-    ON_ALL_ACTIONS(OpenCWD)
+    ON_ALL_ACTIONS(OpenCWD)                 \
+    ON_ALL_ACTIONS(OpenAgentPane)           \
+    ON_ALL_ACTIONS(FocusAgentPane)          \
+    ON_ALL_ACTIONS(OpenAgentSessions)       \
+    ON_ALL_ACTIONS(TriggerAutofix)          \
+    ON_ALL_ACTIONS(ShowProtocolInfo)
 
 #define ALL_SHORTCUT_ACTIONS_WITH_ARGS             \
     ON_ALL_ACTIONS_WITH_ARGS(AdjustFontSize)       \

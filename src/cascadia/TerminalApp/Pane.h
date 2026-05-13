@@ -57,6 +57,7 @@ struct PaneResources
     winrt::Windows::UI::Xaml::Media::SolidColorBrush focusedBorderBrush{ nullptr };
     winrt::Windows::UI::Xaml::Media::SolidColorBrush unfocusedBorderBrush{ nullptr };
     winrt::Windows::UI::Xaml::Media::SolidColorBrush broadcastBorderBrush{ nullptr };
+    winrt::Windows::UI::Xaml::Media::SolidColorBrush agentFocusedBorderBrush{ nullptr };
 };
 
 class Pane : public std::enable_shared_from_this<Pane>
@@ -134,10 +135,15 @@ public:
                                      winrt::Microsoft::Terminal::Settings::Model::SplitDirection splitType);
     std::shared_ptr<Pane> DetachPane(std::shared_ptr<Pane> pane);
 
+    bool RepositionAgentPane(winrt::Microsoft::Terminal::Settings::Model::SplitDirection splitDirection);
+
     int GetLeafPaneCount() const noexcept;
 
     void Maximize(std::shared_ptr<Pane> zoomedPane);
     void Restore(std::shared_ptr<Pane> zoomedPane);
+
+    void HidePane(std::shared_ptr<Pane> hiddenPane);
+    void RestorePane(std::shared_ptr<Pane> hiddenPane);
 
     std::optional<uint32_t> Id() noexcept;
     void Id(uint32_t id) noexcept;
@@ -145,9 +151,28 @@ public:
     bool FocusPane(const std::shared_ptr<Pane> pane);
     std::shared_ptr<Pane> FindPane(const uint32_t id);
 
+    // Globally unique content ID for the terminal protocol. Assigned at
+    // leaf pane creation and transferred with content across tree mutations.
+    // Only leaf panes have IDs; parent panes have std::nullopt.
+    // Separate from Id() which is per-tab and can be reassigned.
+    std::optional<uint32_t> ContentId() const noexcept { return _contentId; }
+    std::shared_ptr<Pane> FindPaneByContentId(const uint32_t contentId);
+    std::shared_ptr<Pane> FindPaneBySessionId(const winrt::guid& sessionId);
+
+    // Session variables for protocol support
+    std::optional<winrt::hstring> GetSessionVariable(const winrt::hstring& name) const;
+    void SetSessionVariable(const winrt::hstring& name, const winrt::hstring& value);
+    void RemoveSessionVariable(const winrt::hstring& name);
+
     void FinalizeConfigurationGivenDefault();
 
     bool ContainsReadOnly() const;
+
+    bool IsAgentPane() const noexcept;
+    void IsAgentPane(bool value) noexcept;
+    bool IsSourceOfAgentPane() const noexcept;
+    void SetSourceOfAgentPane(bool value) noexcept;
+    bool IsHidden() const noexcept { return _hidden; }
 
     void EnableBroadcast(bool enabled);
     void BroadcastKey(const winrt::Microsoft::Terminal::Control::TermControl& sourceControl, const WORD vkey, const WORD scanCode, const winrt::Microsoft::Terminal::Core::ControlKeyStates modifiers, const bool keyDown);
@@ -234,6 +259,9 @@ private:
     winrt::Windows::UI::Xaml::Controls::Grid _root{};
     winrt::Windows::UI::Xaml::Controls::Border _borderFirst{};
     winrt::Windows::UI::Xaml::Controls::Border _borderSecond{};
+    // Thin transparent overlay on the split boundary that handles mouse
+    // drag-to-resize. Lazily created the first time we need it.
+    winrt::Windows::UI::Xaml::Controls::Border _splitter{ nullptr };
 
     PaneResources _themeResources;
 
@@ -247,8 +275,14 @@ private:
 #pragma endregion
 
     std::optional<uint32_t> _id;
+    std::optional<uint32_t> _contentId;
     std::weak_ptr<Pane> _parentChildPath{};
     bool _lastActive{ false };
+
+    // Session variables for protocol support (per-pane key-value store)
+    std::unordered_map<std::wstring, std::wstring> _sessionVariables;
+
+    static std::atomic<uint32_t> s_nextContentId;
     winrt::event_token _firstClosedToken{ 0 };
     winrt::event_token _secondClosedToken{ 0 };
 
@@ -259,13 +293,22 @@ private:
     Borders _borders{ Borders::None };
 
     bool _zoomed{ false };
+    bool _hidden{ false };
     bool _broadcastEnabled{ false };
+    bool _isAgentPane{ false };
+    bool _isSourceOfAgentPane{ false };
+
+    // Mouse drag-to-resize state on the splitter.
+    bool _splitterDragging{ false };
+    float _splitterDragStartPosition{ 0.0f };
+    winrt::Windows::Foundation::Point _splitterDragStartPointer{ 0.0f, 0.0f };
+    winrt::Windows::UI::Core::CoreCursor _splitterPriorCursor{ nullptr };
 
     bool _IsLeaf() const noexcept;
     bool _HasFocusedChild() const noexcept;
     void _SetupChildCloseHandlers();
     winrt::TerminalApp::IPaneContent _takePaneContent();
-    void _setPaneContent(winrt::TerminalApp::IPaneContent content);
+    void _setPaneContent(winrt::TerminalApp::IPaneContent content, std::optional<uint32_t> contentId = std::nullopt);
     bool _HasChild(const std::shared_ptr<Pane> child);
     winrt::TerminalApp::TerminalPaneContent _getTerminalContent() const;
 
@@ -314,6 +357,17 @@ private:
     SplitState _convertAutomaticOrDirectionalSplitState(const winrt::Microsoft::Terminal::Settings::Model::SplitDirection& splitType) const;
 
     void _borderTappedHandler(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Input::TappedRoutedEventArgs& e);
+
+    void _InstallSplitter();
+    void _PositionSplitter();
+    void _SetSplitterCursor(bool resizing);
+    void _RestoreSplitterCursor();
+    void _splitterPointerEntered(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _splitterPointerExited(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _splitterPointerPressed(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _splitterPointerMoved(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _splitterPointerReleased(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
+    void _splitterPointerCaptureLost(const winrt::Windows::Foundation::IInspectable& sender, const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e);
 
     // Function Description:
     // - Returns true if the given direction can be used with the given split

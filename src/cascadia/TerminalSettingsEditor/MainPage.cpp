@@ -18,6 +18,8 @@
 #include "EditColorScheme.h"
 #include "AddProfile.h"
 #include "InteractionViewModel.h"
+#include "AIAgents.h"
+#include "AIAgentsViewModel.h"
 #include "LaunchViewModel.h"
 #include "NewTabMenuViewModel.h"
 #include "NewTabMenu.h"
@@ -296,6 +298,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _Navigate(firstItem.Tag(), BreadcrumbSubPage::None);
 
         _UpdateSearchIndex();
+    }
+
+    void MainPage::NavigateToAIAgents()
+    {
+        // Select the AI Agents nav item and navigate to it.
+        if (auto navItem = AIAgentsNavItem())
+        {
+            SettingsNav().SelectedItem(navItem);
+            _Navigate(navItem.Tag(), BreadcrumbSubPage::None);
+        }
     }
 
     void MainPage::SetHostingWindow(uint64_t hostingWindow) noexcept
@@ -615,6 +627,18 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                     contentFrame().Navigate(xaml_typename<Editor::Extensions>(), winrt::make<NavigateToPageArgs>(_extensionsVM, *this, elementToFocus));
                     _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_Extensions/Content"), BreadcrumbSubPage::None));
                 }
+            }
+            else if (*clickedItemTag == aiAgentsTag)
+            {
+                auto aiAgentsVm = winrt::make<AIAgentsViewModel>(_settingsClone.GlobalSettings());
+                aiAgentsVm.InitShellIntegrationRequested([weak = get_weak()](auto&&, auto target) {
+                    if (auto s = weak.get())
+                    {
+                        s->InitShellIntegrationRequested.raise(*s, target);
+                    }
+                });
+                contentFrame().Navigate(xaml_typename<Editor::AIAgents>(), winrt::make<NavigateToPageArgs>(aiAgentsVm, *this, elementToFocus));
+                _breadcrumbs.Append(winrt::make<Breadcrumb>(vm, RS_(L"Nav_AIAgents/Content"), BreadcrumbSubPage::None));
             }
             else if (*clickedItemTag == globalProfileTag)
             {

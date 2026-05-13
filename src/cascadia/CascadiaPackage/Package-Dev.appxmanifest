@@ -18,13 +18,13 @@
   IgnorableNamespaces="uap mp rescap uap3 uap17 desktop6 virtualization">
 
   <Identity
-    Name="WindowsTerminalDev"
-    Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
-    Version="0.0.1.0" />
+    Name="IntelligentTerminal"
+    Publisher="CN=Intelligent Terminal Dev"
+    Version="0.7.0.8" />
 
   <Properties>
     <DisplayName>ms-resource:AppStoreNameDev</DisplayName>
-    <PublisherDisplayName>A Lone Developer</PublisherDisplayName>
+    <PublisherDisplayName>Intelligent Terminal</PublisherDisplayName>
     <Logo>Images\StoreLogo.png</Logo>
     <!-- Older versions of Windows 10 respect this -->
     <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
@@ -69,9 +69,9 @@
       </uap:VisualElements>
 
       <Extensions>
-        <uap3:Extension Category="windows.appExecutionAlias" Executable="wtd.exe" EntryPoint="Windows.FullTrustApplication">
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="wtai.exe" EntryPoint="Windows.FullTrustApplication">
           <uap3:AppExecutionAlias>
-            <desktop:ExecutionAlias Alias="wtd.exe" />
+            <desktop:ExecutionAlias Alias="wtai.exe" />
           </uap3:AppExecutionAlias>
         </uap3:Extension>
         <uap5:Extension Category="windows.startupTask">
@@ -88,8 +88,8 @@
         <uap3:Extension Category="windows.appExtension">
             <uap3:AppExtension Name="com.microsoft.windows.console.host"
                 Id="OpenConsole-Dev"
-                DisplayName="OpenConsole Dev"
-                Description="Console host built from microsoft/terminal open source repository"
+                DisplayName="OpenConsole"
+                Description="Console host for Intelligent Terminal"
                 PublicFolder="Public">
                 <uap3:Properties>
                     <Clsid>{1F9F2BF5-5BC3-4F17-B0E6-912413F1F451}</Clsid>
@@ -99,8 +99,8 @@
         <uap3:Extension Category="windows.appExtension">
             <uap3:AppExtension Name="com.microsoft.windows.terminal.host"
                 Id="Terminal-Dev"
-                DisplayName="Terminal Dev"
-                Description="Terminal host built from microsoft/terminal open source repository"
+                DisplayName="Intelligent Terminal"
+                Description="AI-native terminal host"
                 PublicFolder="Public">
                 <uap3:Properties>
                     <Clsid>{051F34EE-C1FD-4B19-AF75-9BA54648434C}</Clsid>
@@ -122,6 +122,7 @@
                 </com:ExeServer>
                 <com:ExeServer DisplayName="WindowsTerminal" Executable="WindowsTerminal.exe">
                     <com:Class Id="051F34EE-C1FD-4B19-AF75-9BA54648434C"/>
+                    <com:Class Id="D5B7C9E1-4F6A-4B8C-D9E0-F1A2B3C4D5E6"/> <!-- TerminalProtocolComServer (Dev) -->
                 </com:ExeServer>
                 <com:SurrogateServer DisplayName="WindowsTerminalShellExt">
                     <com:Class Id="52065414-e077-47ec-a3ac-1cc5455e1b54" Path="WindowsTerminalShellExt.dll" ThreadingModel="STA"/>

@@ -3872,6 +3872,33 @@ void AdaptDispatch::DoWTAction(const std::wstring_view string)
             _api.SearchMissingCommand(missingCmd);
         }
     }
+    else if (action == L"WtaReq")
+    {
+        // WTA (Windows Terminal Agent) protocol request via VT escape sequence.
+        // Format: \x1b]9001;WtaReq;{json}\x07
+        // Supports: {"method":"discover"} → returns pipe name + token for protocol access.
+        // The response is injected back as \x1b]9001;WtaRes;{json}\x1b\\ via stdin.
+        if (parts.size() >= 2)
+        {
+            const auto payload = til::at(parts, 1);
+
+            // Check if this is a "discover" request
+            if (payload.find(L"discover") != std::wstring_view::npos)
+            {
+                // Compute pipe name from current PID — matches what WindowEmperor creates.
+                const auto pid = GetCurrentProcessId();
+                const auto pipeName = fmt::format(FMT_COMPILE(L"\\\\\\\\.\\\\pipe\\\\WindowsTerminal-{}"), pid);
+                const auto response = fmt::format(FMT_COMPILE(L"9001;WtaRes;{{\"status\":\"ok\",\"pipe\":\"{}\",\"token\":\"\"}}"), pipeName);
+                _ReturnOscResponse(response);
+            }
+            else
+            {
+                // Default ack for other methods (e.g. "identify")
+                const auto response = fmt::format(FMT_COMPILE(L"9001;WtaRes;{{\"status\":\"ok\",\"vt_supported\":true}}"));
+                _ReturnOscResponse(response);
+            }
+        }
+    }
 }
 
 // Method Description:
@@ -4862,4 +4889,9 @@ void AdaptDispatch::PlaySounds(const VTParameters parameters)
 void AdaptDispatch::SetOptionalFeatures(const til::enumset<OptionalFeature> features) noexcept
 {
     _optionalFeatures = features;
+}
+
+void AdaptDispatch::NotifyVtSequence(const std::wstring_view sequence)
+{
+    _api.NotifyVtSequence(sequence);
 }

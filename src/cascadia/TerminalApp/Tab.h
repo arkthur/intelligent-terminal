@@ -41,6 +41,9 @@ namespace winrt::TerminalApp::implementation
                                                                           const float splitSize,
                                                                           std::shared_ptr<Pane> newPane);
 
+        std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> SplitPaneAtRoot(winrt::Microsoft::Terminal::Settings::Model::SplitDirection splitType,
+                                                                                 std::shared_ptr<Pane> newPane);
+
         void ToggleSplitOrientation();
         void UpdateIcon(const winrt::hstring& iconPath, const winrt::Microsoft::Terminal::Settings::Model::IconStyle iconStyle);
         void HideIcon(const bool hide);
@@ -80,6 +83,11 @@ namespace winrt::TerminalApp::implementation
         void EnterZoom();
         void ExitZoom();
 
+        void TogglePaneVisibility();
+        void HidePane();
+        void ShowPane();
+        bool HasHiddenPane();
+
         std::vector<Microsoft::Terminal::Settings::Model::ActionAndArgs> BuildStartupActions(BuildStartupKind kind) const;
 
         int GetLeafPaneCount() const noexcept;
@@ -93,6 +101,13 @@ namespace winrt::TerminalApp::implementation
 
         std::shared_ptr<Pane> GetRootPane() const { return _rootPane; }
         std::vector<uint32_t> GetMruPanes() const { return _mruPanes; }
+
+        // Per-tab "user wants the agent pane open here" flag. The agent pane
+        // itself is a single shared resource that follows the active tab; this
+        // flag is the source of truth for whether reconciliation should make
+        // it visible when this tab is active.
+        bool AgentPaneOpen() const noexcept { return _agentPaneOpen; }
+        void AgentPaneOpen(bool value) noexcept { _agentPaneOpen = value; }
 
         winrt::TerminalApp::TerminalTabStatus TabStatus()
         {
@@ -165,6 +180,7 @@ namespace winrt::TerminalApp::implementation
         std::shared_ptr<Pane> _rootPane{ nullptr };
         std::shared_ptr<Pane> _activePane{ nullptr };
         std::shared_ptr<Pane> _zoomedPane{ nullptr };
+        std::shared_ptr<Pane> _hiddenPane{ nullptr };
 
         winrt::Microsoft::Terminal::Settings::Model::IconStyle _lastIconStyle;
         winrt::hstring _lastIconPath{};
@@ -205,6 +221,7 @@ namespace winrt::TerminalApp::implementation
         bool _receivedKeyDown{ false };
         bool _iconHidden{ false };
         bool _changingActivePane{ false };
+        bool _agentPaneOpen{ false };
 
         winrt::hstring _runtimeTabText{};
         bool _inRename{ false };

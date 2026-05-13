@@ -196,6 +196,9 @@
 
                             <SolidColorBrush x:Key="BroadcastPaneBorderColor"
                                              Color="{StaticResource SystemAccentColorDark2}" />
+
+                            <SolidColorBrush x:Key="AgentPaneBorderColor"
+                                             Color="#10893E" />
                         </ResourceDictionary>
 
                         <ResourceDictionary x:Key="Light">
@@ -215,6 +218,9 @@
 
                             <SolidColorBrush x:Key="BroadcastPaneBorderColor"
                                              Color="{StaticResource SystemAccentColorLight2}" />
+
+                            <SolidColorBrush x:Key="AgentPaneBorderColor"
+                                             Color="#107C10" />
                         </ResourceDictionary>
 
                         <ResourceDictionary x:Key="HighContrast">
@@ -237,6 +243,9 @@
                                             ResourceKey="SystemColorWindowBrush" />
 
                             <SolidColorBrush x:Key="BroadcastPaneBorderColor"
+                                             Color="{StaticResource SystemColorHighlightColor}" />
+
+                            <SolidColorBrush x:Key="AgentPaneBorderColor"
                                              Color="{StaticResource SystemColorHighlightColor}" />
                         </ResourceDictionary>
 

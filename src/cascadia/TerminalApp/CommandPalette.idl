@@ -34,5 +34,7 @@ namespace TerminalApp
         event Windows.Foundation.TypedEventHandler<CommandPalette, Microsoft.Terminal.Settings.Model.Command> DispatchCommandRequested;
         event Windows.Foundation.TypedEventHandler<CommandPalette, String> CommandLineExecutionRequested;
         event Windows.Foundation.TypedEventHandler<Object, Microsoft.Terminal.Settings.Model.Command> PreviewAction;
+        event Windows.Foundation.TypedEventHandler<CommandPalette, String> AgentForegroundPromptRequested;
+        event Windows.Foundation.TypedEventHandler<CommandPalette, String> AgentBackgroundTaskRequested;
     }
 }

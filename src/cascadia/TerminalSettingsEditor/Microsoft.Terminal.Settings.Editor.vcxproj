@@ -80,6 +80,13 @@
     <ClInclude Include="Interaction.h">
       <DependentUpon>Interaction.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="AIAgents.h">
+      <DependentUpon>AIAgents.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="AIAgentsViewModel.h">
+      <DependentUpon>AIAgentsViewModel.idl</DependentUpon>
+      <SubType>Code</SubType>
+    </ClInclude>
     <ClInclude Include="Compatibility.h">
       <DependentUpon>Compatibility.xaml</DependentUpon>
     </ClInclude>
@@ -210,6 +217,9 @@
     <Page Include="Interaction.xaml">
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="AIAgents.xaml">
+      <SubType>Designer</SubType>
+    </Page>
     <Page Include="Compatibility.xaml">
       <SubType>Designer</SubType>
     </Page>
@@ -290,6 +300,13 @@
     </ClCompile>
     <ClCompile Include="Interaction.cpp">
       <DependentUpon>Interaction.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="AIAgents.cpp">
+      <DependentUpon>AIAgents.xaml</DependentUpon>
+    </ClCompile>
+    <ClCompile Include="AIAgentsViewModel.cpp">
+      <DependentUpon>AIAgentsViewModel.idl</DependentUpon>
+      <SubType>Code</SubType>
     </ClCompile>
     <ClCompile Include="Compatibility.cpp">
       <DependentUpon>Compatibility.xaml</DependentUpon>
@@ -437,6 +454,13 @@
     </Midl>
     <Midl Include="Interaction.idl">
       <DependentUpon>Interaction.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Midl>
+    <Midl Include="AIAgents.idl">
+      <DependentUpon>AIAgents.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Midl>
+    <Midl Include="AIAgentsViewModel.idl">
       <SubType>Code</SubType>
     </Midl>
     <Midl Include="Compatibility.idl">

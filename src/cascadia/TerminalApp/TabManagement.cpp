@@ -62,7 +62,7 @@ namespace winrt::TerminalApp::implementation
     // - existingConnection: An optional connection that is already established to a PTY
     //   for this tab to host instead of creating one.
     //   If not defined, the tab will create the connection.
-    HRESULT TerminalPage::_OpenNewTab(const INewContentArgs& newContentArgs)
+    HRESULT TerminalPage::_OpenNewTab(const INewContentArgs& newContentArgs, bool openInBackground)
     try
     {
         if (const auto& newTerminalArgs{ newContentArgs.try_as<NewTerminalArgs>() })
@@ -88,7 +88,7 @@ namespace winrt::TerminalApp::implementation
 
         // This call to _MakePane won't return nullptr, we already checked that
         // case above with the _maybeElevate call.
-        _CreateNewTabFromPane(_MakePane(newContentArgs, nullptr));
+        _CreateNewTabFromPane(_MakePane(newContentArgs, nullptr), -1, openInBackground);
         return S_OK;
     }
     CATCH_RETURN();
@@ -98,7 +98,7 @@ namespace winrt::TerminalApp::implementation
     // Arguments:
     // - newTabImpl: the uninitialized tab.
     // - insertPosition: Optional parameter to indicate the position of tab.
-    void TerminalPage::_InitializeTab(winrt::com_ptr<Tab> newTabImpl, uint32_t insertPosition)
+    void TerminalPage::_InitializeTab(winrt::com_ptr<Tab> newTabImpl, uint32_t insertPosition, bool openInBackground)
     {
         newTabImpl->Initialize();
 
@@ -204,7 +204,38 @@ namespace winrt::TerminalApp::implementation
 
         // This kicks off TabView::SelectionChanged, in response to which
         // we'll attach the terminal's Xaml control to the Xaml root.
-        _tabView.SelectedItem(tabViewItem);
+        if (!openInBackground)
+        {
+            _tabView.SelectedItem(tabViewItem);
+        }
+        else
+        {
+            // Add to visual tree hidden so TermControl initializes
+            // (gets layout, creates TextBuffer, starts connection).
+            // Cleaned up by _UpdatedSelectedTab on next tab switch.
+            auto content = newTabImpl->Content();
+            content.Opacity(0);
+            content.IsHitTestVisible(false);
+            _tabContent.Children().Append(content);
+        }
+
+        // Auto-start the single shared wta pane (hidden) the first time a
+        // terminal tab is created in this window.
+        //
+        // Previously we deferred this via Dispatcher().RunAsync() to avoid
+        // interfering with COM callers, but both Low and Normal priorities
+        // were observed to be starved during WT startup — wta would not
+        // actually spawn until the user pressed Ctrl+Shift+. (which drained
+        // the dispatcher queue). That defeats the purpose of pre-warming.
+        //
+        // _InitializeTab itself already runs on the UI thread dispatcher,
+        // and _AutoCreateHiddenAgentPane only does local work (filesystem
+        // path detection + creating + hiding a child pane), so it is safe
+        // to call synchronously here.
+        if (!_agentPane.lock())
+        {
+            _AutoCreateHiddenAgentPane(newTabImpl);
+        }
     }
 
     // Method Description:
@@ -212,12 +243,12 @@ namespace winrt::TerminalApp::implementation
     // Arguments:
     // - pane: The pane to use as the root.
     // - insertPosition: Optional parameter to indicate the position of tab.
-    TerminalApp::Tab TerminalPage::_CreateNewTabFromPane(std::shared_ptr<Pane> pane, uint32_t insertPosition)
+    TerminalApp::Tab TerminalPage::_CreateNewTabFromPane(std::shared_ptr<Pane> pane, uint32_t insertPosition, bool openInBackground)
     {
         if (pane)
         {
             auto newTabImpl = winrt::make_self<Tab>(pane);
-            _InitializeTab(newTabImpl, insertPosition);
+            _InitializeTab(newTabImpl, insertPosition, openInBackground);
             return *newTabImpl;
         }
         return nullptr;
@@ -230,6 +261,11 @@ namespace winrt::TerminalApp::implementation
     // - tab: the Tab to update the title for.
     void TerminalPage::_UpdateTabIcon(Tab& tab)
     {
+        // Don't change the icon when an agent pane has focus — same as title.
+        if (const auto activePane = tab.GetActivePane(); activePane && activePane->IsAgentPane())
+        {
+            return;
+        }
         if (const auto content{ tab.GetActiveContent() })
         {
             const auto& icon{ content.Icon() };
@@ -450,6 +486,48 @@ namespace winrt::TerminalApp::implementation
         auto actions = t->BuildStartupActions(BuildStartupKind::None);
         _AddPreviouslyClosedPaneOrTab(std::move(actions));
 
+        // If this tab contains the agent pane, rescue it to another tab before
+        // closing so the wta process keeps running.
+        const auto agentTab = _FindTabContainingAgentPane();
+        if (agentTab && agentTab.get() == t)
+        {
+            const auto existingPane = _FindAgentPane();
+            const auto agentTabRoot = agentTab->GetRootPane();
+            // Only rescue if the agent pane is not the sole content of the tab
+            // (if it is, DetachPane would leave nothing behind — let it close).
+            if (existingPane && agentTabRoot && agentTabRoot != existingPane)
+            {
+                winrt::com_ptr<Tab> rescueTab;
+                for (const auto& candidate : _tabs)
+                {
+                    if (auto impl = _GetTabImpl(candidate))
+                    {
+                        if (impl.get() != t)
+                        {
+                            rescueTab = impl;
+                            break;
+                        }
+                    }
+                }
+                if (rescueTab)
+                {
+                    agentTabRoot->DetachPane(existingPane);
+                    const auto splitDir = _AgentPanePositionToSplitDirection(
+                        _settings.GlobalSettings().AgentPanePosition());
+                    rescueTab->SplitPaneAtRoot(splitDir, existingPane);
+                    // Keep it hidden in the rescue tab.
+                    if (const auto rescueRoot = rescueTab->GetRootPane())
+                    {
+                        if (!existingPane->IsHidden())
+                        {
+                            rescueRoot->HidePane(existingPane);
+                        }
+                    }
+                    // agent pane rescued from closing tab
+                }
+            }
+        }
+
         tab.Close();
     }
 
@@ -554,6 +632,11 @@ namespace winrt::TerminalApp::implementation
             _rearrangeFrom = std::nullopt;
             _rearrangeTo = std::nullopt;
         }
+
+        // The _removing guard on _OnTabSelectionChanged suppresses the bottom-bar
+        // refresh during tab removal. Ensure it runs here so the bar's visibility
+        // matches the newly-focused tab (e.g. shows again after closing Settings).
+        _UpdateBottomBarState();
     }
 
     // Method Description:
@@ -1074,7 +1157,10 @@ namespace winrt::TerminalApp::implementation
         try
         {
             _tabContent.Children().Clear();
-            _tabContent.Children().Append(tab.Content());
+            auto content = tab.Content();
+            content.Opacity(1.0);
+            content.IsHitTestVisible(true);
+            _tabContent.Children().Append(content);
 
             // GH#7409: If the tab switcher is open, then we _don't_ want to
             // automatically focus the new tab here. The tab switcher wants
@@ -1138,6 +1224,10 @@ namespace winrt::TerminalApp::implementation
                 const auto tab{ _tabs.GetAt(selectedIndex) };
                 _UpdatedSelectedTab(tab);
             }
+            // Reconcile the shared agent pane against the newly active tab's
+            // AgentPaneOpen() flag — makes per-tab open/closed state independent.
+            // Also refreshes the bottom bar internally.
+            _ReconcileAgentPaneForActiveTab();
         }
     }
 

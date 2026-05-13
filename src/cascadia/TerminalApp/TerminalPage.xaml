@@ -19,6 +19,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <local:TabRowControl x:Name="TabRow"
@@ -56,6 +57,16 @@
             </mux:InfoBar>
         </StackPanel>
 
+        <!-- Solid filler behind TabContent so any transparent edge pixels
+             (pane border, padding rounding, etc.) between the pane and the
+             BottomBar read as a seamless continuation of the BottomBar
+             instead of showing the desktop behind the window. Uses the
+             BottomBar color so the gap — if any — visually merges into
+             the bar. Declared before TabContent so it sits behind. -->
+        <Border Grid.Row="2"
+                Background="#161616"
+                IsHitTestVisible="False" />
+
         <Grid x:Name="TabContent"
               Grid.Row="2"
               HorizontalAlignment="Stretch"
@@ -63,6 +74,99 @@
             <Grid.Background>
                 <ImageBrush />
             </Grid.Background>
+        </Grid>
+
+        <!-- Bottom Bar: AI agent toolbar. VerticalAlignment="Top" is required
+             — without it, the Grid's default stretch-with-explicit-height
+             behavior leaves a transparent strip at the top of Row 3. -->
+        <Grid x:Name="BottomBar"
+              Grid.Row="3"
+              Height="31"
+              Padding="12,0,12,0"
+              HorizontalAlignment="Stretch"
+              VerticalAlignment="Top">
+            <Grid.Background>
+                <SolidColorBrush Color="#161616" />
+            </Grid.Background>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Button 1: AI toggle (dock/collapse bottom pane) -->
+            <Button x:Name="AgentToggleButton"
+                    Grid.Column="0"
+                    Width="30"
+                    Height="30"
+                    Padding="0"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    Click="_AgentToggleButtonOnClick">
+                <ToolTipService.ToolTip>
+                    <ToolTip>
+                        <StackPanel>
+                            <TextBlock Text="Toggle agent chat pane"
+                                       FontFamily="Segoe UI Variable"
+                                       FontSize="12"
+                                       FontWeight="Normal"
+                                       LineHeight="16" />
+                            <TextBlock Text="Ctrl+Shift+."
+                                       FontFamily="Segoe UI Variable"
+                                       FontSize="12"
+                                       FontWeight="Normal"
+                                       LineHeight="16"
+                                       Opacity="0.7" />
+                        </StackPanel>
+                    </ToolTip>
+                </ToolTipService.ToolTip>
+                <Grid>
+                    <PathIcon x:Name="AgentToggleIconBottom"
+                              Width="16"
+                              Height="16"
+                              Data="M1 4.625C1 3.17526 2.17526 2 3.625 2H12.375C13.8248 2 15 3.17526 15 4.625V10.75C15 12.1998 13.8248 13.375 12.375 13.375H3.625C2.17526 13.375 1 12.1998 1 10.75V4.625ZM3.625 2.875C2.6585 2.875 1.875 3.6585 1.875 4.625V9H14.125V4.625C14.125 3.6585 13.3415 2.875 12.375 2.875H3.625Z" />
+                    <PathIcon x:Name="AgentToggleIconRight"
+                              Width="14"
+                              Height="11"
+                              Visibility="Collapsed"
+                              Data="M11.1667 0C12.3633 0 13.3333 0.970047 13.3333 2.16667V8.5C13.3333 9.6966 12.3633 10.6667 11.1667 10.6667H2.16667C0.970047 10.6667 0 9.6966 0 8.5V2.16667C0 0.970047 0.970047 0 2.16667 0H11.1667ZM2.16667 1C1.52233 1 1 1.52233 1 2.16667V8.5C1 9.14433 1.52233 9.66667 2.16667 9.66667H8.33333V1H2.16667Z" />
+                </Grid>
+            </Button>
+
+            <!-- Button 2: Diagnostics / Warning — clickable once a fix is armed -->
+            <StackPanel x:Name="DiagnosticsGroup"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        VerticalAlignment="Center"
+                        Spacing="6">
+                <Button x:Name="DiagnosticsButton"
+                        Width="30"
+                        Height="30"
+                        Padding="0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        Opacity="0.5"
+                        IsEnabled="False"
+                        ToolTipService.ToolTip="Diagnostics"
+                        Click="_DiagnosticsButtonOnClick">
+                    <Button.Resources>
+                        <SolidColorBrush x:Key="ButtonBackground" Color="Transparent" />
+                        <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent" />
+                        <SolidColorBrush x:Key="ButtonBorderBrush" Color="Transparent" />
+                        <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="Transparent" />
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="Transparent" />
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="Transparent" />
+                    </Button.Resources>
+                    <FontIcon x:Name="DiagnosticsIcon"
+                              FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                              FontSize="16"
+                              Glyph="&#xE7BA;" />
+                </Button>
+                <TextBlock x:Name="DiagnosticsLabel"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Visibility="Collapsed" />
+            </StackPanel>
+
         </Grid>
 
         <!--
@@ -169,6 +273,15 @@
                                   x:Load="False"
                                   PreviewKeyDown="_KeyDownHandler"
                                   Visibility="Collapsed" />
+
+        <!--  First-run experience overlay. Covers the terminal content area
+              until the user clicks Next. Lazy-loaded to avoid startup cost.  -->
+        <local:FreOverlay x:Name="FreOverlayElement"
+                          Grid.Row="2"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          x:Load="False"
+                          Visibility="Collapsed" />
 
         <!--
             A TeachingTip with IsLightDismissEnabled="True" will immediately

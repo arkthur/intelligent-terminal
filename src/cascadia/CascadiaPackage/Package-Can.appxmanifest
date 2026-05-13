@@ -20,7 +20,7 @@
   <Identity
     Name="Microsoft.WindowsTerminalCanary"
     Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
-    Version="0.0.1.0" />
+    Version="0.0.2.1" />
 
   <Properties>
     <DisplayName>ms-resource:AppStoreNameCan</DisplayName>
@@ -122,6 +122,7 @@
                 </com:ExeServer>
                 <com:ExeServer DisplayName="WindowsTerminal" Executable="WindowsTerminal.exe">
                     <com:Class Id="1706609C-A4CE-4C0D-B7D2-C19BF66398A5"/>
+                    <com:Class Id="C4A6B8D0-3E5F-4A7B-C8D9-E0F1A2B3C4D5"/> <!-- TerminalProtocolComServer (Canary) -->
                 </com:ExeServer>
                 <com:SurrogateServer DisplayName="WindowsTerminalShellExt">
                     <com:Class Id="6119575F-6918-4392-AF16-C2C627AF9416" Path="WindowsTerminalShellExt.dll" ThreadingModel="STA"/>

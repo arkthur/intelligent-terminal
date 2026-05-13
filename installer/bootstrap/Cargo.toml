@@ -1,0 +1,9 @@
+[package]
+name = "intelligent-terminal-installer-bootstrap"
+version = "0.1.0"
+edition = "2021"
+description = "Target-architecture bootstrap for the local Intelligent Terminal installer"
+
+[[bin]]
+name = "intelligent-terminal-installer-bootstrap"
+path = "src/main.rs"

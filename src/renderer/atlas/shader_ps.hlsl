@@ -38,7 +38,7 @@ Output main(PSData data) : SV_Target
     case SHADING_TYPE_TEXT_BACKGROUND:
     {
         float2 cell = data.position.xy / backgroundCellSize;
-        color = all(cell < backgroundCellCount) ? background[cell] : backgroundColor;
+        color = background[(uint2)clamp(cell, float2(0, 0), backgroundCellCount - float2(1, 1))];
         weights = float4(1, 1, 1, 1);
         break;
     }

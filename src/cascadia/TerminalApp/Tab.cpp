@@ -13,6 +13,7 @@
 using namespace winrt;
 using namespace winrt::Windows::UI::Xaml;
 using namespace winrt::Windows::UI::Core;
+
 using namespace winrt::Microsoft::Terminal::Control;
 using namespace winrt::Microsoft::Terminal::TerminalConnection;
 using namespace winrt::Microsoft::Terminal::Settings::Model;
@@ -472,6 +473,12 @@ namespace winrt::TerminalApp::implementation
         {
             return _runtimeTabText;
         }
+        // When an agent pane has focus, freeze the tab title at its current value
+        // rather than showing the agent process's working directory.
+        if (_activePane->IsAgentPane())
+        {
+            return Title();
+        }
         if (!_activePane->_IsLeaf())
         {
             return RS_(L"MultiplePanes");
@@ -665,6 +672,80 @@ namespace winrt::TerminalApp::implementation
         _UpdateActivePane(newPane);
 
         return { original, newPane };
+    }
+
+    // Method Description:
+    // - Splits the root pane of this tab, placing the new pane at the edge of
+    //   the entire pane tree. This is used for the agent pane so it appears at
+    //   the bottom/right of ALL panes, not just the active pane.
+    // Arguments:
+    // - splitType: The direction to split (Down, Right, etc.)
+    // - pane: The new pane to add at the root level
+    // Return Value:
+    // - a pair of (the Pane wrapping the original tree, the new Pane)
+    std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Tab::SplitPaneAtRoot(SplitDirection splitType,
+                                                                                  std::shared_ptr<Pane> pane)
+    {
+        ASSERT_UI_THREAD();
+
+        // Add the new event handlers to the new pane(s) and update their ids.
+        pane->WalkTree([&](const auto& p) {
+            _AttachEventHandlersToPane(p);
+            if (p->_IsLeaf())
+            {
+                p->Id(_nextPaneId);
+                if (const auto& content{ p->GetContent() })
+                {
+                    _AttachEventHandlersToContent(p->Id().value(), content);
+                }
+                _nextPaneId++;
+            }
+            return false;
+        });
+        pane->EnableBroadcast(_tabStatus.IsInputBroadcastActive());
+
+        // Save the root's pane ID before the split clears it. If the root
+        // was a leaf, we need to transfer the ID to the new wrapper pane so
+        // that content event handlers (keyed by pane ID) continue to work.
+        const auto rootPaneId = _rootPane->Id();
+
+        // AttachPane splits the root pane in-place: the existing tree becomes
+        // _firstChild and the new pane becomes _secondChild. Because _rootPane
+        // is modified in-place, Content() (which points to _rootPane->GetRootElement())
+        // remains valid without any re-parenting.
+        auto originalTree = _rootPane->AttachPane(pane, splitType);
+
+        // The split created a new wrapper pane for the original tree. Attach
+        // Tab event handlers so that focus changes are tracked correctly —
+        // without this, clicking the original pane won't update _activePane.
+        _AttachEventHandlersToPane(originalTree);
+        if (originalTree->_IsLeaf() && rootPaneId)
+        {
+            originalTree->Id(rootPaneId.value());
+        }
+
+        // Redirect active-pane tracking back into the original tree.
+        // AttachPane mutates _rootPane in place: when the old root was a
+        // single leaf, _activePane pointed at that Pane object, which is
+        // now a non-leaf parent — causing Tab::_GetActiveTitle() to return
+        // "Multiple panes". Note: we deliberately do NOT restore XAML
+        // focus here. Callers that hide the new pane (HidePane) will
+        // re-parent the visible subtree, wiping any focus we set. Focus
+        // restoration is the caller's responsibility and must happen after
+        // HidePane.
+        if (_activePane && !_activePane->_IsLeaf())
+        {
+            auto originalLeaf = originalTree->_IsLeaf() ? originalTree : originalTree->GetActivePane();
+            if (originalLeaf && originalLeaf->_IsLeaf())
+            {
+                _UpdateActivePane(originalLeaf);
+            }
+        }
+
+        // After split, Close Pane Menu Item should be visible
+        _closePaneMenuItem.Visibility(WUX::Visibility::Visible);
+
+        return { originalTree, pane };
     }
 
     // Method Description:
@@ -1309,10 +1390,23 @@ namespace winrt::TerminalApp::implementation
     // - <none>
     void Tab::_UpdateActivePane(std::shared_ptr<Pane> pane)
     {
+        // Remember previous active pane for source-of-agent tracking.
+        auto previousActive = _activePane;
+
         // Clear the active state of the entire tree, and mark only the pane as active.
+        // NOTE: ClearActive() also clears _isSourceOfAgentPane on all panes.
         _rootPane->ClearActive();
         _activePane = pane;
         _activePane->SetActive();
+
+        // If the newly focused pane is an agent pane and the previously
+        // focused pane was a normal (non-agent) pane, mark it as the
+        // "source" so it retains a blue border while the agent pane is green.
+        if (pane->IsAgentPane() && previousActive && !previousActive->IsAgentPane())
+        {
+            previousActive->SetSourceOfAgentPane(true);
+            previousActive->UpdateVisuals();
+        }
 
         // Update our own title text to match the newly-active pane.
         UpdateTitle();
@@ -1347,9 +1441,17 @@ namespace winrt::TerminalApp::implementation
         // If the new active pane is a terminal, tell other interested panes
         // what the new active pane is.
         const auto content{ pane->GetContent() };
+        TermControl termControl{ nullptr };
         if (const auto termContent{ content.try_as<winrt::TerminalApp::TerminalPaneContent>() })
         {
-            const auto& termControl{ termContent.GetTermControl() };
+            termControl = termContent.GetTermControl();
+        }
+        else if (const auto agentContent{ content.try_as<winrt::TerminalApp::AgentPaneContent>() })
+        {
+            termControl = agentContent.GetTermControl();
+        }
+        if (termControl)
+        {
             _rootPane->WalkTree([termControl](const auto& p) {
                 if (const auto& taskPane{ p->GetContent().try_as<SnippetsPaneContent>() })
                 {
@@ -2010,6 +2112,12 @@ namespace winrt::TerminalApp::implementation
     {
         ASSERT_UI_THREAD();
 
+        // Agent panes are fixed panels and should not be zoomed.
+        if (_activePane && _activePane->IsAgentPane())
+        {
+            return;
+        }
+
         // Clear the content first, because with parent focusing it is possible
         // to zoom the root pane, but setting the content will not trigger the
         // property changed event since it is the same and you would end up with
@@ -2040,6 +2148,96 @@ namespace winrt::TerminalApp::implementation
         return _zoomedPane != nullptr;
     }
 
+    // Method Description:
+    // - Toggle the visibility of a pane in this tab.
+    //   * If no pane is hidden, hide the currently active pane. Its sibling
+    //     will expand to fill the space.
+    //   * If a pane is already hidden, restore it to its original position.
+    void Tab::TogglePaneVisibility()
+    {
+        ASSERT_UI_THREAD();
+
+        if (_hiddenPane)
+        {
+            ShowPane();
+        }
+        else
+        {
+            HidePane();
+        }
+    }
+
+    // Method Description:
+    // - Hide the currently active pane. The pane's sibling will expand to fill
+    //   the parent's space. The pane tree structure is preserved in memory.
+    void Tab::HidePane()
+    {
+        ASSERT_UI_THREAD();
+
+        // Can't hide if there's only one pane, or if we're the root pane.
+        if (_rootPane->_IsLeaf())
+        {
+            return;
+        }
+
+        // Find the parent of the active pane.
+        const auto parent = _rootPane->_FindParentOfPane(_activePane);
+        if (!parent)
+        {
+            return;
+        }
+
+        _hiddenPane = _activePane;
+
+        // Determine the sibling that will remain visible.
+        const auto& sibling = (parent->_firstChild == _hiddenPane) ?
+                                  parent->_secondChild :
+                                  parent->_firstChild;
+
+        // Hide the pane in the XAML tree.
+        parent->HidePane(_hiddenPane);
+
+        // Move focus to the sibling (find the last-active leaf within it).
+        const auto focusTarget = sibling->GetActivePane();
+        if (focusTarget)
+        {
+            _UpdateActivePane(focusTarget);
+            focusTarget->SetActive();
+        }
+    }
+
+    // Method Description:
+    // - Show the previously hidden pane, restoring it to its original position
+    //   with the original split ratio.
+    void Tab::ShowPane()
+    {
+        ASSERT_UI_THREAD();
+
+        if (!_hiddenPane)
+        {
+            return;
+        }
+
+        // Find the parent that owns the hidden pane.
+        const auto parent = _rootPane->_FindParentOfPane(_hiddenPane);
+        if (!parent)
+        {
+            _hiddenPane = nullptr;
+            return;
+        }
+
+        // Restore the pane in the XAML tree.
+        parent->RestorePane(_hiddenPane);
+        _hiddenPane = nullptr;
+    }
+
+    bool Tab::HasHiddenPane()
+    {
+        ASSERT_UI_THREAD();
+
+        return _hiddenPane != nullptr;
+    }
+
     TermControl _termControlFromPane(const auto& pane)
     {
         if (const auto content{ pane->GetContent() })
@@ -2047,6 +2245,11 @@ namespace winrt::TerminalApp::implementation
             if (const auto termContent{ content.try_as<winrt::TerminalApp::TerminalPaneContent>() })
             {
                 return termContent.GetTermControl();
+            }
+            // Agent pane wraps a TerminalPaneContent — reach through.
+            if (const auto agentContent{ content.try_as<winrt::TerminalApp::AgentPaneContent>() })
+            {
+                return agentContent.GetTermControl();
             }
         }
         return nullptr;

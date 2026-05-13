@@ -80,6 +80,12 @@
     <Page Include="MarkdownPaneContent.xaml">
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="AgentPaneContent.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="FreOverlay.xaml">
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
   <!-- ========================= Headers ======================== -->
   <ItemGroup>
@@ -182,7 +188,15 @@
     <ClInclude Include="MarkdownPaneContent.h">
       <DependentUpon>MarkdownPaneContent.xaml</DependentUpon>
     </ClInclude>
+    <ClInclude Include="AgentPaneContent.h">
+      <DependentUpon>AgentPaneContent.xaml</DependentUpon>
+    </ClInclude>
+    <ClInclude Include="FreOverlay.h">
+      <DependentUpon>FreOverlay.xaml</DependentUpon>
+    </ClInclude>
     <ClInclude Include="WindowsPackageManagerFactory.h" />
+    <ClInclude Include="WtaProcessLauncher.h" />
+    <ClInclude Include="TerminalProtocolPipeServer.h" />
   </ItemGroup>
   <!-- ========================= Cpp Files ======================== -->
   <ItemGroup>
@@ -221,6 +235,12 @@
       <DependentUpon>TerminalPage.xaml</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
+    <ClCompile Include="TerminalPage.Protocol.cpp">
+      <DependentUpon>TerminalPage.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </ClCompile>
+    <ClCompile Include="WtaProcessLauncher.cpp" />
+    <ClCompile Include="TerminalProtocolPipeServer.cpp" />
     <ClCompile Include="TerminalTabStatus.cpp">
       <DependentUpon>TerminalTabStatus.idl</DependentUpon>
       <SubType>Code</SubType>
@@ -297,6 +317,14 @@
       <DependentUpon>MarkdownPaneContent.xaml</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
+    <ClCompile Include="AgentPaneContent.cpp">
+      <DependentUpon>AgentPaneContent.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </ClCompile>
+    <ClCompile Include="FreOverlay.cpp">
+      <DependentUpon>FreOverlay.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </ClCompile>
 
   </ItemGroup>
   <!-- ========================= idl Files ======================== -->
@@ -368,6 +396,14 @@
       <DependentUpon>MarkdownPaneContent.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Midl>
+    <Midl Include="AgentPaneContent.idl">
+      <DependentUpon>AgentPaneContent.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Midl>
+    <Midl Include="FreOverlay.idl">
+      <DependentUpon>FreOverlay.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Midl>
   </ItemGroup>
   <!-- ========================= Misc Files ======================== -->
   <ItemGroup>
@@ -385,6 +421,10 @@
       you also update all the consumers
     -->
     <ProjectReference Include="$(OpenConsoleDir)src\types\lib\types.vcxproj" />
+    <ProjectReference Include="$(OpenConsoleDir)src\cascadia\TerminalProtocol\TerminalProtocol.vcxproj">
+      <Project>{F1A2B3C4-D5E6-4F7A-8B9C-0D1E2F3A4B5D}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="$(OpenConsoleDir)src\cascadia\WinRTUtils\WinRTUtils.vcxproj">
       <Project>{CA5CAD1A-039A-4929-BA2A-8BEB2E4106FE}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
@@ -469,6 +509,12 @@
     </Reference>
     <Reference Include="Microsoft.Terminal.UI.Markdown">
       <HintPath>$(OpenConsoleCommonOutDir)Microsoft.Terminal.UI.Markdown\Microsoft.Terminal.UI.Markdown.winmd</HintPath>
+      <IsWinMDFile>true</IsWinMDFile>
+      <Private>false</Private>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+    </Reference>
+    <Reference Include="Microsoft.Terminal.Protocol">
+      <HintPath>$(OpenConsoleCommonOutDir)TerminalProtocol\Microsoft.Terminal.Protocol.winmd</HintPath>
       <IsWinMDFile>true</IsWinMDFile>
       <Private>false</Private>
       <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>

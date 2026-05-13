@@ -18,6 +18,13 @@ using namespace winrt::TerminalApp;
 static const int PaneBorderSize = 2;
 static const int CombinedPaneBorderSize = 2 * PaneBorderSize;
 
+// Total hit-test thickness (in DIPs) of the transparent overlay used for
+// mouse drag-resize. Split evenly on both sides of the pane boundary.
+static constexpr double SplitterHitThickness = 8.0;
+
+// Process-global counter for content IDs (assigned to leaf panes only).
+std::atomic<uint32_t> Pane::s_nextContentId{ 1 };
+
 // WARNING: Don't do this! This won't work
 //   Duration duration{ std::chrono::milliseconds{ 200 } };
 // Instead, make a duration from a TimeSpan from the time in millis
@@ -30,7 +37,7 @@ static const Duration AnimationDuration = DurationHelper::FromTimeSpan(winrt::Wi
 Pane::Pane(IPaneContent content, const bool lastFocused) :
     _lastActive{ lastFocused }
 {
-    _setPaneContent(std::move(content));
+    _setPaneContent(std::move(content), s_nextContentId.fetch_add(1));
     _root.Children().Append(_borderFirst);
 
     const auto& control{ _content.GetRoot() };
@@ -130,6 +137,20 @@ Pane::BuildStartupState Pane::BuildStartupActions(uint32_t currentId, uint32_t n
         }
 
         return { .args = {}, .firstPane = shared_from_this(), .focusedPaneId = std::nullopt, .panesCreated = 0 };
+    }
+
+    // If one of our children is an agent pane, skip it entirely and serialize
+    // only the non-agent subtree. Agent panes are transient and not persisted.
+    if (_firstChild && _secondChild)
+    {
+        if (_secondChild->_isAgentPane)
+        {
+            return _firstChild->BuildStartupActions(currentId, nextId, kind);
+        }
+        if (_firstChild->_isAgentPane)
+        {
+            return _secondChild->BuildStartupActions(currentId, nextId, kind);
+        }
     }
 
     auto buildSplitPane = [&](auto newPane) {
@@ -586,6 +607,12 @@ bool Pane::SwapPanes(std::shared_ptr<Pane> first, std::shared_ptr<Pane> second)
 {
     // If there is nothing to swap, just return.
     if (first == second || _IsLeaf())
+    {
+        return false;
+    }
+
+    // Agent panes are fixed and cannot be swapped.
+    if (first->_isAgentPane || second->_isAgentPane)
     {
         return false;
     }
@@ -1128,6 +1155,7 @@ TermControl Pane::GetTerminalControl() const
 void Pane::ClearActive()
 {
     _lastActive = false;
+    _isSourceOfAgentPane = false;
     if (!_IsLeaf())
     {
         _firstChild->ClearActive();
@@ -1321,6 +1349,116 @@ std::shared_ptr<Pane> Pane::AttachPane(std::shared_ptr<Pane> pane, SplitDirectio
 }
 
 // Method Description:
+// - Repositions an agent pane child by changing the split direction
+//   in-place (no detach/reattach). Used when the AgentPanePosition
+//   setting changes at runtime.
+// Arguments:
+// - splitDirection: The new desired split direction for the agent pane.
+// Return Value:
+// - true if the layout was changed, false if no change was needed or
+//   this pane doesn't have an agent child.
+bool Pane::RepositionAgentPane(SplitDirection splitDirection)
+{
+    if (_IsLeaf())
+    {
+        return false;
+    }
+
+    const bool firstIsAgent = _firstChild && _firstChild->_isAgentPane;
+    const bool secondIsAgent = _secondChild && _secondChild->_isAgentPane;
+    if (!firstIsAgent && !secondIsAgent)
+    {
+        return false;
+    }
+
+    const auto newSplitState = _convertAutomaticOrDirectionalSplitState(splitDirection);
+    const bool agentShouldBeFirst = (splitDirection == SplitDirection::Up ||
+                                     splitDirection == SplitDirection::Left);
+
+    // Early exit if the layout already matches the desired state.
+    if (_splitState == newSplitState && firstIsAgent == agentShouldBeFirst)
+    {
+        return false;
+    }
+
+    const auto& agentChild = firstIsAgent ? _firstChild : _secondChild;
+
+    if (agentChild->IsHidden())
+    {
+        // The agent pane is hidden — HidePane removed one border from
+        // _root.Children() and collapsed the grid to a single track.
+        // Only update logical state here; RestorePane will do a full
+        // visual tree rebuild when the pane is later toggled visible.
+
+        // Determine which border is currently visible BEFORE any swap.
+        // HidePane keeps the non-agent border in _root.Children().
+        const auto& visibleBorder = firstIsAgent ? _borderSecond : _borderFirst;
+
+        if (firstIsAgent != agentShouldBeFirst)
+        {
+            std::swap(_firstChild, _secondChild);
+            _desiredSplitPosition = 1.0f - _desiredSplitPosition;
+        }
+
+        _splitState = newSplitState;
+
+        // Rebuild the single-track grid in the new split direction so the
+        // visible child continues to fill the full space correctly.
+        _root.ColumnDefinitions().Clear();
+        _root.RowDefinitions().Clear();
+        if (newSplitState == SplitState::Vertical)
+        {
+            auto colDef = Controls::ColumnDefinition();
+            colDef.Width(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
+            _root.ColumnDefinitions().Append(colDef);
+            Controls::Grid::SetColumn(visibleBorder, 0);
+            Controls::Grid::SetRow(visibleBorder, 0);
+        }
+        else
+        {
+            auto rowDef = Controls::RowDefinition();
+            rowDef.Height(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
+            _root.RowDefinitions().Append(rowDef);
+            Controls::Grid::SetRow(visibleBorder, 0);
+            Controls::Grid::SetColumn(visibleBorder, 0);
+        }
+
+        return true;
+    }
+
+    // Swap children if the agent needs to move to the other side.
+    if (firstIsAgent != agentShouldBeFirst)
+    {
+        std::swap(_firstChild, _secondChild);
+        _desiredSplitPosition = 1.0f - _desiredSplitPosition;
+    }
+
+    _splitState = newSplitState;
+
+    // Full XAML visual tree rebuild (matching RestorePane pattern).
+    // Without the clear + re-append cycle, the XAML rendering engine may
+    // not process the layout change correctly — especially when the tab
+    // is off-screen (e.g. user is on the Settings tab).
+    _root.Children().Clear();
+    _borderFirst.Child(nullptr);
+    _borderSecond.Child(nullptr);
+
+    _borderFirst.Child(_firstChild->GetRootElement());
+    _borderSecond.Child(_secondChild->GetRootElement());
+
+    _root.Children().Append(_borderFirst);
+    _root.Children().Append(_borderSecond);
+
+    _borders = _GetCommonBorders();
+    _root.ColumnDefinitions().Clear();
+    _root.RowDefinitions().Clear();
+    _CreateRowColDefinitions();
+    _ApplySplitDefinitions();
+
+    return true;
+}
+
+// Method Description:
 // - Attempts to find the parent of the target pane,
 //   if found remove the pane from the tree and return it.
 // - If the removed pane was (or contained the focus) the first sibling will
@@ -1414,8 +1552,12 @@ void Pane::_CloseChild(const bool closeFirst)
         // Find what borders need to persist after we close the child
         _borders = _GetCommonBorders();
 
-        // take the control, profile, id and isDefTermSession of the pane that _wasn't_ closed.
-        _setPaneContent(remainingChild->_takePaneContent());
+        // take the control, content ID, and per-tab id from the remaining child.
+        // _takePaneContent extracts the content and clears the child's contentId;
+        // we pass the child's contentId to _setPaneContent so it transfers with
+        // the content automatically.
+        auto remainingContentId = remainingChild->_contentId;
+        _setPaneContent(remainingChild->_takePaneContent(), remainingContentId);
         if (!_content)
         {
             // GH#18071: our content is still null after taking the other pane's content,
@@ -1596,11 +1738,20 @@ void Pane::_CloseChildRoutine(const bool closeFirst)
 
     // GH#7252: If either child is zoomed, just skip the animation. It won't work.
     const auto eitherChildZoomed = _firstChild->_zoomed || _secondChild->_zoomed;
+    // Agent panes close synchronously: TerminalPage's rebuild path
+    // (_TeardownAgentPane → _AutoCreateHiddenAgentPane) mutates this same
+    // parent's children on the very next line, so a deferred _CloseChild
+    // would land on a tree that's already been re-split and crash inside
+    // its XAML re-parenting (observed: TerminalApp.dll AV / 0xC000041D on
+    // model switch). The close animation is barely visible on the small
+    // agent bar anyway, so dropping it for all agent-pane closes (not
+    // just the rebuild path) is an acceptable trade.
+    const auto closingChildIsAgent = (closeFirst ? _firstChild : _secondChild)->_isAgentPane;
     // If animations are disabled, just skip this and go straight to
     // _CloseChild. Curiously, the pane opening animation doesn't need this,
     // and will skip straight to Completed when animations are disabled, but
     // this one doesn't seem to.
-    if (!animationsEnabledInOS || !animationsEnabledInApp || eitherChildZoomed)
+    if (!animationsEnabledInOS || !animationsEnabledInApp || eitherChildZoomed || closingChildIsAgent)
     {
         _CloseChild(closeFirst);
         return;
@@ -1727,18 +1878,22 @@ void Pane::_SetupChildCloseHandlers()
     });
 }
 
-// With this method you take ownership of the control from this Pane.
+// With this method you take ownership of the control and content ID from
+// this Pane. The content ID moves with the content so that protocol lookups
+// continue to find the same content after tree mutations.
 // Assign it to another Pane with _setPaneContent() or Close() it.
 IPaneContent Pane::_takePaneContent()
 {
     _closeRequestedRevoker.revoke();
+    _contentId = std::nullopt;
     return std::move(_content);
 }
 
 // This method safely sets the content of the Pane. It'll ensure to revoke and
 // assign event handlers, and to Close() the existing content if there's any.
 // The new content can be nullptr to remove any content.
-void Pane::_setPaneContent(IPaneContent content)
+// The contentId parameter transfers the content's identity to this pane.
+void Pane::_setPaneContent(IPaneContent content, std::optional<uint32_t> contentId)
 {
     // The IPaneContent::Close() implementation may be buggy and raise the CloseRequested event again.
     // _takePaneContent() avoids this as it revokes the event handler.
@@ -1750,6 +1905,7 @@ void Pane::_setPaneContent(IPaneContent content)
     if (content)
     {
         _content = std::move(content);
+        _contentId = contentId;
         _closeRequestedRevoker = _content.CloseRequested(winrt::auto_revoke, [this](auto&&, auto&&) { Close(); });
     }
 }
@@ -1889,6 +2045,9 @@ void Pane::_ApplySplitDefinitions()
     {
         Controls::Grid::SetColumn(_borderFirst, 0);
         Controls::Grid::SetColumn(_borderSecond, 1);
+        // Reset stale Row values from a previous Horizontal layout.
+        Controls::Grid::SetRow(_borderFirst, 0);
+        Controls::Grid::SetRow(_borderSecond, 0);
 
         _firstChild->_borders = _borders | Borders::Right;
         _secondChild->_borders = _borders | Borders::Left;
@@ -1901,6 +2060,9 @@ void Pane::_ApplySplitDefinitions()
     {
         Controls::Grid::SetRow(_borderFirst, 0);
         Controls::Grid::SetRow(_borderSecond, 1);
+        // Reset stale Column values from a previous Vertical layout.
+        Controls::Grid::SetColumn(_borderFirst, 0);
+        Controls::Grid::SetColumn(_borderSecond, 0);
 
         _firstChild->_borders = _borders | Borders::Bottom;
         _secondChild->_borders = _borders | Borders::Top;
@@ -1909,6 +2071,7 @@ void Pane::_ApplySplitDefinitions()
         _firstChild->_ApplySplitDefinitions();
         _secondChild->_ApplySplitDefinitions();
     }
+    _PositionSplitter();
     _UpdateBorders();
 }
 
@@ -2175,6 +2338,12 @@ std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Pane::Split(SplitDirecti
                                                                     const float splitSize,
                                                                     std::shared_ptr<Pane> newPane)
 {
+    // Agent panes are fixed and cannot be split.
+    if (_isAgentPane)
+    {
+        return { nullptr, nullptr };
+    }
+
     if (!_lastActive)
     {
         if (_firstChild && _firstChild->_HasFocusedChild())
@@ -2202,6 +2371,12 @@ bool Pane::ToggleSplitOrientation()
 {
     // If we are a leaf there is no split to toggle.
     if (_IsLeaf())
+    {
+        return false;
+    }
+
+    // Don't toggle orientation on the root split that contains an agent pane.
+    if (_firstChild->_isAgentPane || _secondChild->_isAgentPane)
     {
         return false;
     }
@@ -2303,9 +2478,13 @@ std::pair<std::shared_ptr<Pane>, std::shared_ptr<Pane>> Pane::_Split(SplitDirect
     }
     else
     {
-        //   Move our control, guid, isDefTermSession into the first one.
+        //   Move our content and content ID into the first child.
+        auto originalContentId = _contentId;
         _firstChild = std::make_shared<Pane>(_takePaneContent());
         _firstChild->_broadcastEnabled = _broadcastEnabled;
+        // Overwrite the fresh content ID with the original so protocol
+        // lookups continue to find this content after the split.
+        _firstChild->_contentId = originalContentId;
     }
 
     _splitState = actualSplitType;
@@ -2409,12 +2588,105 @@ void Pane::Restore(std::shared_ptr<Pane> zoomedPane)
 
             _root.Children().Append(_borderFirst);
             _root.Children().Append(_borderSecond);
+
+            _PositionSplitter();
         }
 
         // Always recurse into both children. If the (un)zoomed pane was one of
         // our direct children, we'll still want to update its borders.
         _firstChild->Restore(zoomedPane);
         _secondChild->Restore(zoomedPane);
+    }
+}
+
+// Method Description:
+// - Hide a pane within the tree. The parent of the hidden pane removes it from
+//   the UI tree and gives all space to the remaining sibling. The tree structure
+//   (split state, split position, child pointers) is preserved in memory.
+// Arguments:
+// - hiddenPane: The pane to hide. Must be a direct child of this pane.
+// Return Value:
+// - <none>
+void Pane::HidePane(std::shared_ptr<Pane> hiddenPane)
+{
+    hiddenPane->_hidden = true;
+    if (!_IsLeaf())
+    {
+        if (hiddenPane == _firstChild || hiddenPane == _secondChild)
+        {
+            // Remove both children from the UI tree, then re-add only the
+            // visible one so it fills all the space.
+            _root.Children().Clear();
+            _borderFirst.Child(nullptr);
+            _borderSecond.Child(nullptr);
+
+            const auto& visibleChild = (hiddenPane == _firstChild) ? _secondChild : _firstChild;
+            const auto& visibleBorder = (hiddenPane == _firstChild) ? _borderSecond : _borderFirst;
+
+            visibleBorder.Child(visibleChild->GetRootElement());
+            _root.Children().Append(visibleBorder);
+
+            // Give the visible child the full space by collapsing the grid
+            // definitions to a single star-sized track.
+            if (_splitState == SplitState::Vertical)
+            {
+                _root.ColumnDefinitions().Clear();
+                auto colDef = Controls::ColumnDefinition();
+                colDef.Width(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
+                _root.ColumnDefinitions().Append(colDef);
+                Controls::Grid::SetColumn(visibleBorder, 0);
+            }
+            else if (_splitState == SplitState::Horizontal)
+            {
+                _root.RowDefinitions().Clear();
+                auto rowDef = Controls::RowDefinition();
+                rowDef.Height(GridLengthHelper::FromValueAndType(1.0, GridUnitType::Star));
+                _root.RowDefinitions().Append(rowDef);
+                Controls::Grid::SetRow(visibleBorder, 0);
+            }
+
+            // Update borders so the visible child gets the full border set.
+            visibleChild->_borders = _borders;
+            visibleChild->_ApplySplitDefinitions();
+
+            // Reset the parent's wrapper border thickness. During _Split,
+            // _ApplySplitDefinitions runs while _lastActive is still true,
+            // leaving stale non-zero thickness on the border elements.
+            // With only one child visible the split border should be invisible.
+            visibleBorder.BorderThickness(ThicknessHelper::FromLengths(0, 0, 0, 0));
+        }
+    }
+}
+
+// Method Description:
+// - Restore a previously hidden pane. The parent re-adds both children to the
+//   UI tree and restores the original split ratio from _desiredSplitPosition.
+// Arguments:
+// - hiddenPane: The pane to restore. Must be a direct child of this pane.
+// Return Value:
+// - <none>
+void Pane::RestorePane(std::shared_ptr<Pane> hiddenPane)
+{
+    hiddenPane->_hidden = false;
+    if (!_IsLeaf())
+    {
+        if (hiddenPane == _firstChild || hiddenPane == _secondChild)
+        {
+            // Re-add both children in the correct order.
+            _root.Children().Clear();
+            _borderFirst.Child(nullptr);
+            _borderSecond.Child(nullptr);
+
+            _borderFirst.Child(_firstChild->GetRootElement());
+            _borderSecond.Child(_secondChild->GetRootElement());
+
+            _root.Children().Append(_borderFirst);
+            _root.Children().Append(_borderSecond);
+
+            // Restore the original split ratio.
+            _CreateRowColDefinitions();
+            _ApplySplitDefinitions();
+        }
     }
 }
 
@@ -2437,6 +2709,26 @@ std::optional<uint32_t> Pane::Id() noexcept
 void Pane::Id(uint32_t id) noexcept
 {
     _id = id;
+}
+
+std::optional<winrt::hstring> Pane::GetSessionVariable(const winrt::hstring& name) const
+{
+    const auto it = _sessionVariables.find(std::wstring{ name });
+    if (it != _sessionVariables.end())
+    {
+        return winrt::hstring{ it->second };
+    }
+    return std::nullopt;
+}
+
+void Pane::SetSessionVariable(const winrt::hstring& name, const winrt::hstring& value)
+{
+    _sessionVariables[std::wstring{ name }] = std::wstring{ value };
+}
+
+void Pane::RemoveSessionVariable(const winrt::hstring& name)
+{
+    _sessionVariables.erase(std::wstring{ name });
 }
 
 // Method Description:
@@ -2501,7 +2793,23 @@ bool Pane::_HasChild(const std::shared_ptr<Pane> child)
 
 winrt::TerminalApp::TerminalPaneContent Pane::_getTerminalContent() const
 {
-    return _IsLeaf() ? _content.try_as<winrt::TerminalApp::TerminalPaneContent>() : nullptr;
+    if (!_IsLeaf())
+    {
+        return nullptr;
+    }
+    if (auto term = _content.try_as<winrt::TerminalApp::TerminalPaneContent>())
+    {
+        return term;
+    }
+    // The agent pane wraps a TerminalPaneContent inside an AgentPaneContent
+    // so the leaf can render an XAML agent bar above the term control.
+    // Unwrap it so all the existing Pane internals (focus, broadcast,
+    // resize, etc.) keep operating on the underlying TermControl.
+    if (auto agent = _content.try_as<winrt::TerminalApp::AgentPaneContent>())
+    {
+        return agent.GetTerminalContent();
+    }
+    return nullptr;
 }
 
 // Method Description:
@@ -2513,6 +2821,34 @@ winrt::TerminalApp::TerminalPaneContent Pane::_getTerminalContent() const
 std::shared_ptr<Pane> Pane::FindPane(const uint32_t id)
 {
     return _FindPane([=](const auto& p) { return p->_IsLeaf() && p->_id == id; });
+}
+
+std::shared_ptr<Pane> Pane::FindPaneByContentId(const uint32_t contentId)
+{
+    return _FindPane([=](const auto& p) { return p->_contentId.has_value() && *p->_contentId == contentId; });
+}
+
+std::shared_ptr<Pane> Pane::FindPaneBySessionId(const winrt::guid& sessionId)
+{
+    if (sessionId == winrt::guid{})
+    {
+        return nullptr;
+    }
+    return _FindPane([&](const auto& p) {
+        if (!p->_IsLeaf() || !p->_content)
+            return false;
+        if (const auto termContent = p->_content.try_as<winrt::TerminalApp::TerminalPaneContent>())
+        {
+            if (const auto control = termContent.GetTermControl())
+            {
+                if (const auto conn = control.Connection())
+                {
+                    return conn.SessionId() == sessionId;
+                }
+            }
+        }
+        return false;
+    });
 }
 
 // Method Description:
@@ -2637,7 +2973,11 @@ Pane::SnapSizeResult Pane::_CalcSnappedDimension(const bool widthOrHeight, const
     if (_IsLeaf())
     {
         const auto& snappable{ _content.try_as<ISnappable>() };
-        if (!snappable)
+        // Agent panes are fixed-position and don't participate in the terminal
+        // character grid. Their TermControl may also be uninitialized, which
+        // makes GridUnitSize/SnapDownToGrid return inf/NaN and poisons the
+        // whole snap calculation via parent aggregation.
+        if (!snappable || _isAgentPane)
         {
             return { dimension, dimension };
         }
@@ -2724,7 +3064,9 @@ void Pane::_AdvanceSnappedDimension(const bool widthOrHeight, LayoutSizeNode& si
     if (_IsLeaf())
     {
         const auto& snappable{ _content.try_as<ISnappable>() };
-        if (snappable)
+        // Same reasoning as _CalcSnappedDimension: treat agent panes as
+        // non-snappable so we never touch their (uninitialized) GridUnitSize.
+        if (snappable && !_isAgentPane)
         {
             // We're a leaf pane, so just add one more row or column (unless isMinimumSize
             // is true, see below).
@@ -2967,6 +3309,26 @@ bool Pane::ContainsReadOnly() const
                        (_firstChild->ContainsReadOnly() || _secondChild->ContainsReadOnly());
 }
 
+bool Pane::IsAgentPane() const noexcept
+{
+    return _isAgentPane;
+}
+
+void Pane::IsAgentPane(bool value) noexcept
+{
+    _isAgentPane = value;
+}
+
+bool Pane::IsSourceOfAgentPane() const noexcept
+{
+    return _isSourceOfAgentPane;
+}
+
+void Pane::SetSourceOfAgentPane(bool value) noexcept
+{
+    _isSourceOfAgentPane = value;
+}
+
 // Method Description:
 // - If we're a parent, place the taskbar state for all our leaves into the
 //   provided vector.
@@ -2992,6 +3354,10 @@ void Pane::CollectTaskbarStates(std::vector<winrt::TerminalApp::TaskbarState>& s
 
 void Pane::EnableBroadcast(bool enabled)
 {
+    if (_isAgentPane)
+    {
+        return;
+    }
     if (_IsLeaf())
     {
         _broadcastEnabled = enabled;
@@ -3017,6 +3383,10 @@ void Pane::BroadcastKey(const winrt::Microsoft::Terminal::Control::TermControl& 
                         const bool keyDown)
 {
     WalkTree([&](const auto& pane) {
+        if (pane->_isAgentPane)
+        {
+            return;
+        }
         if (const auto& termControl{ pane->GetTerminalControl() })
         {
             if (termControl != sourceControl && !termControl.ReadOnly())
@@ -3033,6 +3403,10 @@ void Pane::BroadcastChar(const winrt::Microsoft::Terminal::Control::TermControl&
                          const winrt::Microsoft::Terminal::Core::ControlKeyStates modifiers)
 {
     WalkTree([&](const auto& pane) {
+        if (pane->_isAgentPane)
+        {
+            return;
+        }
         if (const auto& termControl{ pane->GetTerminalControl() })
         {
             if (termControl != sourceControl && !termControl.ReadOnly())
@@ -3047,6 +3421,10 @@ void Pane::BroadcastString(const winrt::Microsoft::Terminal::Control::TermContro
                            const winrt::hstring& text)
 {
     WalkTree([&](const auto& pane) {
+        if (pane->_isAgentPane)
+        {
+            return;
+        }
         if (const auto& termControl{ pane->GetTerminalControl() })
         {
             if (termControl != sourceControl && !termControl.ReadOnly())
@@ -3076,4 +3454,205 @@ void Pane::_borderTappedHandler(const winrt::Windows::Foundation::IInspectable& 
 {
     _FocusFirstChild();
     e.Handled(true);
+}
+
+// Lazily creates the transparent splitter overlay and wires up its pointer
+// handlers. Called from the parent-pane constructor before the first layout.
+void Pane::_InstallSplitter()
+{
+    if (_splitter)
+    {
+        return;
+    }
+
+    _splitter = Controls::Border{};
+    // Transparent brush (not null) — required for the element to receive
+    // pointer hit-tests.
+    _splitter.Background(Media::SolidColorBrush{ winrt::Windows::UI::Colors::Transparent() });
+    _splitter.IsHitTestVisible(true);
+
+    _splitter.PointerEntered({ this, &Pane::_splitterPointerEntered });
+    _splitter.PointerExited({ this, &Pane::_splitterPointerExited });
+    _splitter.PointerPressed({ this, &Pane::_splitterPointerPressed });
+    _splitter.PointerMoved({ this, &Pane::_splitterPointerMoved });
+    _splitter.PointerReleased({ this, &Pane::_splitterPointerReleased });
+    _splitter.PointerCaptureLost({ this, &Pane::_splitterPointerCaptureLost });
+    _splitter.PointerCanceled({ this, &Pane::_splitterPointerCaptureLost });
+}
+
+// Places the splitter overlay centered on the current split boundary and
+// ensures it sits on top of the child borders in z-order.
+void Pane::_PositionSplitter()
+{
+    if (_splitState == SplitState::None)
+    {
+        if (_splitter)
+        {
+            uint32_t idx = 0;
+            if (_root.Children().IndexOf(_splitter, idx))
+            {
+                _root.Children().RemoveAt(idx);
+            }
+        }
+        return;
+    }
+
+    // A leaf pane transformed into a parent via `_Split` never runs the parent
+    // constructor, so create the splitter lazily here the first time we need it.
+    _InstallSplitter();
+
+    const auto half = SplitterHitThickness / 2.0;
+
+    if (_splitState == SplitState::Vertical)
+    {
+        // Sit in the first column, hugging its right edge, with a negative
+        // right margin so the hit area straddles the column boundary.
+        Controls::Grid::SetColumn(_splitter, 0);
+        Controls::Grid::SetRow(_splitter, 0);
+        _splitter.HorizontalAlignment(winrt::Windows::UI::Xaml::HorizontalAlignment::Right);
+        _splitter.VerticalAlignment(winrt::Windows::UI::Xaml::VerticalAlignment::Stretch);
+        _splitter.Width(SplitterHitThickness);
+        _splitter.Height(std::numeric_limits<double>::quiet_NaN());
+        _splitter.Margin(winrt::Windows::UI::Xaml::Thickness{ 0, 0, -half, 0 });
+    }
+    else // Horizontal
+    {
+        Controls::Grid::SetRow(_splitter, 0);
+        Controls::Grid::SetColumn(_splitter, 0);
+        _splitter.VerticalAlignment(winrt::Windows::UI::Xaml::VerticalAlignment::Bottom);
+        _splitter.HorizontalAlignment(winrt::Windows::UI::Xaml::HorizontalAlignment::Stretch);
+        _splitter.Height(SplitterHitThickness);
+        _splitter.Width(std::numeric_limits<double>::quiet_NaN());
+        _splitter.Margin(winrt::Windows::UI::Xaml::Thickness{ 0, 0, 0, -half });
+    }
+
+    // Re-append so the splitter is on top of the two child borders.
+    uint32_t idx = 0;
+    if (_root.Children().IndexOf(_splitter, idx))
+    {
+        _root.Children().RemoveAt(idx);
+    }
+    _root.Children().Append(_splitter);
+}
+
+void Pane::_SetSplitterCursor(bool /*resizing*/)
+{
+    const auto cw = winrt::Windows::UI::Core::CoreWindow::GetForCurrentThread();
+    if (!cw)
+    {
+        return;
+    }
+    const auto cursorType = (_splitState == SplitState::Vertical)
+                                ? winrt::Windows::UI::Core::CoreCursorType::SizeWestEast
+                                : winrt::Windows::UI::Core::CoreCursorType::SizeNorthSouth;
+    if (!_splitterPriorCursor)
+    {
+        _splitterPriorCursor = cw.PointerCursor();
+    }
+    cw.PointerCursor(winrt::Windows::UI::Core::CoreCursor{ cursorType, 0 });
+}
+
+void Pane::_RestoreSplitterCursor()
+{
+    if (!_splitterPriorCursor)
+    {
+        return;
+    }
+    if (const auto cw = winrt::Windows::UI::Core::CoreWindow::GetForCurrentThread())
+    {
+        cw.PointerCursor(_splitterPriorCursor);
+    }
+    _splitterPriorCursor = nullptr;
+}
+
+void Pane::_splitterPointerEntered(const winrt::Windows::Foundation::IInspectable& /*sender*/,
+                                   const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& /*e*/)
+{
+    _SetSplitterCursor(false);
+}
+
+void Pane::_splitterPointerExited(const winrt::Windows::Foundation::IInspectable& /*sender*/,
+                                  const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& /*e*/)
+{
+    if (!_splitterDragging)
+    {
+        _RestoreSplitterCursor();
+    }
+}
+
+void Pane::_splitterPointerPressed(const winrt::Windows::Foundation::IInspectable& /*sender*/,
+                                   const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
+{
+    if (_splitState == SplitState::None || !_splitter)
+    {
+        return;
+    }
+
+    const auto point = e.GetCurrentPoint(_root);
+    // Only react to the left mouse button (or touch/pen primary).
+    if (point.Properties().IsRightButtonPressed() || point.Properties().IsMiddleButtonPressed())
+    {
+        return;
+    }
+
+    _splitterDragging = _splitter.CapturePointer(e.Pointer());
+    if (!_splitterDragging)
+    {
+        return;
+    }
+
+    _splitterDragStartPosition = _desiredSplitPosition;
+    _splitterDragStartPointer = point.Position();
+    _SetSplitterCursor(true);
+    e.Handled(true);
+}
+
+void Pane::_splitterPointerMoved(const winrt::Windows::Foundation::IInspectable& /*sender*/,
+                                 const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
+{
+    if (!_splitterDragging || _splitState == SplitState::None)
+    {
+        return;
+    }
+
+    const auto point = e.GetCurrentPoint(_root).Position();
+    const auto changeWidth = _splitState == SplitState::Vertical;
+    const auto totalSize = changeWidth ? _root.ActualWidth() : _root.ActualHeight();
+    if (totalSize <= 0)
+    {
+        return;
+    }
+
+    const auto delta = changeWidth
+                           ? (point.X - _splitterDragStartPointer.X)
+                           : (point.Y - _splitterDragStartPointer.Y);
+
+    const auto requested = _splitterDragStartPosition + static_cast<float>(delta / totalSize);
+    const auto clamped = _ClampSplitPosition(changeWidth, requested, static_cast<float>(totalSize));
+
+    if (clamped != _desiredSplitPosition)
+    {
+        _desiredSplitPosition = clamped;
+        _CreateRowColDefinitions();
+    }
+    e.Handled(true);
+}
+
+void Pane::_splitterPointerReleased(const winrt::Windows::Foundation::IInspectable& /*sender*/,
+                                    const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& e)
+{
+    if (_splitterDragging && _splitter)
+    {
+        _splitter.ReleasePointerCapture(e.Pointer());
+    }
+    _splitterDragging = false;
+    _RestoreSplitterCursor();
+    e.Handled(true);
+}
+
+void Pane::_splitterPointerCaptureLost(const winrt::Windows::Foundation::IInspectable& /*sender*/,
+                                       const winrt::Windows::UI::Xaml::Input::PointerRoutedEventArgs& /*e*/)
+{
+    _splitterDragging = false;
+    _RestoreSplitterCursor();
 }

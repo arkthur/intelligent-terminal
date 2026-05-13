@@ -483,5 +483,10 @@ namespace Microsoft.Terminal.Settings.Model
         SelectOutputDirection Direction { get; };
     }
 
+    enum ShellIntegrationTarget
+    {
+        Pwsh = 0,
+        WindowsPowerShell
+    };
 
 }

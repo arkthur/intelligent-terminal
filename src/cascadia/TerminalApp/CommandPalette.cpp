@@ -350,11 +350,14 @@ namespace winrt::TerminalApp::implementation
 
             e.Handled(true);
         }
-        else if (key == VirtualKey::Back && _searchBox().Text().empty() && _lastFilterTextWasEmpty && _currentMode == CommandPaletteMode::ActionMode)
+        else if (key == VirtualKey::Back && _searchBox().Text().empty() && _lastFilterTextWasEmpty &&
+                 (_currentMode == CommandPaletteMode::ActionMode ||
+                  _currentMode == CommandPaletteMode::AgentForegroundMode ||
+                  _currentMode == CommandPaletteMode::AgentBackgroundMode))
         {
             // If the last filter text was empty, and we're backspacing from
-            // that state, then the user "backspaced" the virtual '>' we're
-            // using as the action mode indicator. Switch into commandline mode.
+            // that state, then the user "backspaced" the virtual prefix we're
+            // using as the mode indicator. Switch into commandline mode.
             _switchToMode(CommandPaletteMode::CommandlineMode);
             e.Handled(true);
         }
@@ -735,6 +738,10 @@ namespace winrt::TerminalApp::implementation
             return _tabSwitcherMode == TabSwitcherMode::MostRecentlyUsed ? _mruTabActions : _tabActions;
         case CommandPaletteMode::CommandlineMode:
             return _loadRecentCommands();
+        case CommandPaletteMode::AgentForegroundMode:
+        case CommandPaletteMode::AgentBackgroundMode:
+            // Agent modes are free-text input; no list to filter
+            return winrt::single_threaded_vector<winrt::TerminalApp::FilteredCommand>();
         default:
             return _allCommands;
         }
@@ -754,6 +761,10 @@ namespace winrt::TerminalApp::implementation
         if (_currentMode == CommandPaletteMode::CommandlineMode)
         {
             _dispatchCommandline(filteredCommand);
+        }
+        else if (_currentMode == CommandPaletteMode::AgentForegroundMode || _currentMode == CommandPaletteMode::AgentBackgroundMode)
+        {
+            _dispatchAgentPrompt();
         }
         else if (_currentMode == CommandPaletteMode::TabSwitchMode || _currentMode == CommandPaletteMode::TabSearchMode)
         {
@@ -887,6 +898,42 @@ namespace winrt::TerminalApp::implementation
         }
     }
 
+    // Method Description:
+    // - Dispatch the user's free-text input as an agent prompt.
+    //   In foreground mode, raise AgentForegroundPromptRequested.
+    //   In background mode, raise AgentBackgroundTaskRequested.
+    // Arguments:
+    // - <none>
+    // Return Value:
+    // - <none>
+    void CommandPalette::_dispatchAgentPrompt()
+    {
+        const auto promptText = winrt::hstring(_getTrimmedInput());
+        if (promptText.empty())
+        {
+            return;
+        }
+
+        TraceLoggingWrite(
+            g_hTerminalAppProvider,
+            "CommandPaletteDispatchedAgentPrompt",
+            TraceLoggingDescription("Event emitted when the user submits an agent prompt via the Command Palette"),
+            TraceLoggingBoolean(_currentMode == CommandPaletteMode::AgentBackgroundMode, "IsBackgroundMode", "Whether this is a background agent task"),
+            TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
+            TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
+
+        if (_currentMode == CommandPaletteMode::AgentForegroundMode)
+        {
+            AgentForegroundPromptRequested.raise(*this, promptText);
+        }
+        else if (_currentMode == CommandPaletteMode::AgentBackgroundMode)
+        {
+            AgentBackgroundTaskRequested.raise(*this, promptText);
+        }
+
+        _close();
+    }
+
     std::optional<TerminalApp::FilteredCommand> CommandPalette::_buildCommandLineCommand(const hstring& commandLine)
     {
         if (commandLine.empty())
@@ -962,8 +1009,11 @@ namespace winrt::TerminalApp::implementation
 
         _updateFilteredActions();
 
-        // In the command line mode we want the user to explicitly select the command
-        _filteredActionsView().SelectedIndex(_currentMode == CommandPaletteMode::CommandlineMode ? -1 : 0);
+        // In the command line mode and agent modes we want the user to explicitly select the command
+        _filteredActionsView().SelectedIndex(
+            (_currentMode == CommandPaletteMode::CommandlineMode ||
+             _currentMode == CommandPaletteMode::AgentForegroundMode ||
+             _currentMode == CommandPaletteMode::AgentBackgroundMode) ? -1 : 0);
 
         if (_currentMode == CommandPaletteMode::TabSearchMode || _currentMode == CommandPaletteMode::ActionMode)
         {
@@ -1028,6 +1078,14 @@ namespace winrt::TerminalApp::implementation
             if (inputText[0] == L'>')
             {
                 newMode = CommandPaletteMode::ActionMode;
+            }
+            else if (inputText[0] == L'?')
+            {
+                newMode = CommandPaletteMode::AgentForegroundMode;
+            }
+            else if (inputText[0] == L'&')
+            {
+                newMode = CommandPaletteMode::AgentBackgroundMode;
             }
         }
 
@@ -1144,6 +1202,20 @@ namespace winrt::TerminalApp::implementation
             ControlName(RS_(L"CommandPaletteControlName"));
             PrefixCharacter(L"");
             modeAnnouncementResourceKey = USES_RESOURCE(L"CommandPaletteModeAnnouncement_CommandlineMode");
+            break;
+        case CommandPaletteMode::AgentForegroundMode:
+            SearchBoxPlaceholderText(RS_(L"CmdPalAgentForegroundPrompt"));
+            NoMatchesText(L"");
+            ControlName(RS_(L"CommandPaletteControlName"));
+            PrefixCharacter(L"?");
+            modeAnnouncementResourceKey = USES_RESOURCE(L"CommandPaletteModeAnnouncement_AgentForegroundMode");
+            break;
+        case CommandPaletteMode::AgentBackgroundMode:
+            SearchBoxPlaceholderText(RS_(L"CmdPalAgentBackgroundPrompt"));
+            NoMatchesText(L"");
+            ControlName(RS_(L"CommandPaletteControlName"));
+            PrefixCharacter(L"&");
+            modeAnnouncementResourceKey = USES_RESOURCE(L"CommandPaletteModeAnnouncement_AgentBackgroundMode");
             break;
         case CommandPaletteMode::ActionMode:
         default:
@@ -1290,15 +1362,6 @@ namespace winrt::TerminalApp::implementation
         }
     }
 
-    // Method Description:
-    // - Dismiss the command palette. This will:
-    //   * select all the current text in the input box
-    //   * set our visibility to Hidden
-    //   * raise our Closed event, so the page can return focus to the active Terminal
-    // Arguments:
-    // - <none>
-    // Return Value:
-    // - <none>
     void CommandPalette::_close()
     {
         Visibility(Visibility::Collapsed);

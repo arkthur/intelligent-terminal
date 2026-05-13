@@ -65,6 +65,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         uint64_t GetHostingWindow() const noexcept;
 
         winrt::Windows::UI::Xaml::Media::Brush BackgroundBrush();
+        void NavigateToAIAgents();
 
         Windows::Foundation::Collections::IObservableVector<IInspectable> Breadcrumbs() noexcept;
         Editor::ExtensionsViewModel ExtensionsVM() const noexcept { return _extensionsVM; }
@@ -72,6 +73,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         til::typed_event<Windows::Foundation::IInspectable, Model::SettingsTarget> OpenJson;
         til::typed_event<Windows::Foundation::IInspectable, Windows::Foundation::Collections::IVectorView<Model::SettingsLoadWarnings>> ShowLoadWarningsDialog;
+        til::typed_event<Windows::Foundation::IInspectable, Model::ShellIntegrationTarget> InitShellIntegrationRequested;
 
     private:
         Windows::Foundation::Collections::IObservableVector<IInspectable> _breadcrumbs;

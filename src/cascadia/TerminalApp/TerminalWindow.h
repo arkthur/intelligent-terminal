@@ -49,7 +49,6 @@ namespace winrt::TerminalApp::implementation
         til::property_changed_event PropertyChanged;
 
         WINRT_OBSERVABLE_PROPERTY(winrt::hstring, VirtualWorkingDirectory, PropertyChanged.raise, L"");
-
     public:
         // Used for setting the initial CWD, before we have XAML set up for property change notifications.
         void SetInitialCwd(winrt::hstring cwd) { _VirtualWorkingDirectory = std::move(cwd); };
@@ -145,6 +144,9 @@ namespace winrt::TerminalApp::implementation
 
         void AttachContent(winrt::hstring content, uint32_t tabIndex);
         void SendContentToOther(winrt::TerminalApp::RequestReceiveContentArgs args);
+
+        // Protocol bridge
+        uint32_t TabCount() const;
 
         // -------------------------------- WinRT Events ---------------------------------
         // PropertyChanged is surprisingly not a typed event, so we'll define that one manually.

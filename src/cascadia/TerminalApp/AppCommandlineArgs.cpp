@@ -75,6 +75,8 @@ int AppCommandlineArgs::ParseCommand(const Commandline& command)
 
         // If we parsed the commandline, and _no_ subcommands were provided, try
         // parse the remaining suffix as a "new-tab" command.
+        // Note: --agent flows through _getNewTerminalArgs() naturally,
+        // so no special case is needed here.
         if (_noCommandsProvided())
         {
             _newTabCommand.subcommand->parse(args);

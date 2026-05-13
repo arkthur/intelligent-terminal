@@ -1,0 +1,100 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+import "EnumEntry.idl";
+
+#include "ViewModelHelpers.idl.h"
+
+namespace Microsoft.Terminal.Settings.Editor
+{
+    runtimeclass AgentEntry
+    {
+        AgentEntry(String id, String displayName, Boolean isInstalled);
+        String Id { get; };
+        String DisplayName { get; };
+        String DisplayLabel { get; };
+        Boolean IsInstalled { get; };
+        Boolean IsAddNew { get; };
+    }
+
+    runtimeclass AcpModelEntry
+    {
+        AcpModelEntry(String id, String displayName, String description);
+        String Id { get; };
+        String DisplayName { get; };
+        String Description { get; };
+    }
+
+    runtimeclass AIAgentsViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged
+    {
+        AIAgentsViewModel(Microsoft.Terminal.Settings.Model.GlobalAppSettings globalSettings);
+
+        Windows.Foundation.Collections.IObservableVector<AgentEntry> AcpAgentList { get; };
+        Windows.Foundation.Collections.IObservableVector<AgentEntry> DelegateAgentList { get; };
+        AgentEntry CurrentAcpAgent;
+        AgentEntry CurrentDelegateAgent;
+
+        // Custom agent preview (read-only, shown on page load)
+        Boolean IsCustomAcpAgentSelected { get; };
+        String CustomAcpCommandPreview { get; };
+        void EditCustomAcpAgent();
+        Boolean IsCustomDelegateAgentSelected { get; };
+        String CustomDelegateCommandPreview { get; };
+        void EditCustomDelegateAgent();
+
+        // "Add New" inline editing state
+        Boolean IsAddingCustomAcpAgent { get; };
+        Boolean IsAddingCustomDelegateAgent { get; };
+        String CustomAcpCommand;
+        String CustomDelegateCommand;
+        void SaveCustomAcpAgent();
+        void SaveCustomDelegateAgent();
+        void CancelCustomAcpAgent();
+        void DeleteCustomAcpAgent();
+        void CancelCustomDelegateAgent();
+        void DeleteCustomDelegateAgent();
+
+        Boolean ShowAcpModel { get; };
+        // List of models the connected agent advertised at session start
+        // (via the ACP `models` field on NewSessionResponse). Empty when the
+        // agent pane has not connected yet, or when the agent doesn't
+        // expose a model list — XAML falls back to the free-form TextBox
+        // in that case so custom agents remain usable.
+        Windows.Foundation.Collections.IObservableVector<AcpModelEntry> AcpModelList { get; };
+        Boolean HasAcpModelList { get; };
+        // Convenience for XAML: true when the dropdown is empty so the
+        // free-form TextBox should take its place. Avoids needing a
+        // bool-to-bool converter resource in the page.
+        Boolean ShowAcpModelTextBox { get; };
+        // ComboBox SelectedItem binding target. Setter writes the entry's
+        // Id back to AcpModel; getter resolves AcpModel back to the
+        // matching entry (or null when AcpModel doesn't appear in the list).
+        AcpModelEntry CurrentAcpModelEntry;
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(String, AcpModel);
+        Boolean ShowDelegateModel { get; };
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(String, DelegateModel);
+        PERMANENT_OBSERVABLE_PROJECTED_SETTING(Boolean, AutoFixEnabled);
+
+        event Windows.Foundation.TypedEventHandler<AIAgentsViewModel, Microsoft.Terminal.Settings.Model.ShellIntegrationTarget> InitShellIntegrationRequested;
+
+        IInspectable CurrentAgentPanePosition;
+        Windows.Foundation.Collections.IObservableVector<EnumEntry> AgentPanePositionList { get; };
+
+        // ── Agent Hooks ──────────────────────────────────────────────────
+        // Detection of each supported CLI on PATH and whether the
+        // wt-agent-hooks plugin / extension is currently installed for it.
+        // Hidden behind a single primary "Install hooks" button that
+        // delegates to `wta.exe install-hooks`.
+        Boolean IsCopilotCliDetected { get; };
+        Boolean IsClaudeCliDetected { get; };
+        Boolean IsGeminiCliDetected { get; };
+        Boolean IsAnyAgentCliDetected { get; };
+        String CopilotHooksStatusText { get; };
+        String ClaudeHooksStatusText { get; };
+        String GeminiHooksStatusText { get; };
+        Boolean IsInstallingAgentHooks { get; };
+        String AgentHooksInstallSummary { get; };
+        void RefreshAgentHooksStatus();
+        void InstallAgentHooks();
+    }
+}

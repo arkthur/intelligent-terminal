@@ -192,6 +192,10 @@
                                      x:Uid="Nav_Extensions"
                                      Tag="Extensions_Nav" />
 
+            <muxc:NavigationViewItem x:Name="AIAgentsNavItem"
+                                     x:Uid="Nav_AIAgents"
+                                     Tag="AIAgents_Nav" />
+
             <muxc:NavigationViewItemHeader x:Uid="Nav_Profiles" />
 
             <muxc:NavigationViewItem x:Name="BaseLayerMenuItem"

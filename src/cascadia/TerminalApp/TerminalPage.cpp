@@ -5,6 +5,9 @@
 #include "pch.h"
 #include "TerminalPage.h"
 
+#include <iomanip>
+
+#include <json/json.h>
 #include <TerminalCore/ControlKeyStates.hpp>
 #include <TerminalThemeHelpers.h>
 #include <til/hash.h>
@@ -13,9 +16,12 @@
 
 #include "../../types/inc/ColorFix.hpp"
 #include "../../types/inc/utils.hpp"
+#include "../inc/AgentRegistry.h"
 #include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
 #include "App.h"
 #include "DebugTapConnection.h"
+#include "AgentPaneContent.h"
+#include "FreOverlay.h"
 #include "MarkdownPaneContent.h"
 #include "Remoting.h"
 #include "ScratchpadContent.h"
@@ -23,6 +29,8 @@
 #include "SnippetsPaneContent.h"
 #include "TabRowControl.h"
 #include "TerminalSettingsCache.h"
+#include "TerminalProtocolPipeServer.h"
+#include "WtaProcessLauncher.h"
 
 #include "LaunchPositionRequest.g.cpp"
 #include "RenameWindowRequestedArgs.g.cpp"
@@ -226,6 +234,10 @@ namespace winrt::TerminalApp::implementation
         _WindowProperties.PropertyChanged({ get_weak(), &TerminalPage::_windowPropertyChanged });
     }
 
+    TerminalPage::~TerminalPage()
+    {
+    }
+
     // Method Description:
     // - implements the IInitializeWithWindow interface from shobjidl_core.
     // - We're going to use this HWND as the owner for the ConPTY windows, via
@@ -268,12 +280,26 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::SetSettings(CascadiaSettings settings, bool needRefreshUI)
     {
         assert(Dispatcher().HasThreadAccess());
-        if (_settings == nullptr)
+        const bool firstLoad = (_settings == nullptr);
+        if (firstLoad)
         {
             // Create this only on the first time we load the settings.
             _terminalSettingsCache = std::make_shared<TerminalSettingsCache>(settings);
         }
         _settings = settings;
+
+        // Seed the agent-settings baseline on first load so that later
+        // in-memory mutations (e.g. the bottom-bar agent selector click,
+        // which mutates AcpAgent *before* calling _RebuildAgentStack) are
+        // correctly diffed against the startup state. Without this, the
+        // very first _RebuildAgentStack invocation would take the lazy
+        // "seed-and-skip" branch with the *already-mutated* value and the
+        // real rebuild would never run.
+        if (firstLoad)
+        {
+            _lastAgentSettings = _CaptureAgentSettingsSnapshot();
+            _agentSettingsSnapshotInitialized = true;
+        }
 
         // Make sure to call SetCommands before _RefreshUIForSettingsReload.
         // SetCommands will make sure the KeyChordText of Commands is updated, which needs
@@ -392,6 +418,8 @@ namespace winrt::TerminalApp::implementation
 
         // Hookup our event handlers to the ShortcutActionDispatch
         _RegisterActionCallbacks();
+
+        _UpdateBottomBarState();
 
         //Event Bindings (Early)
         _newTabButton.Click([weakThis{ get_weak() }](auto&&, auto&&) {
@@ -639,6 +667,1691 @@ namespace winrt::TerminalApp::implementation
         _actionDispatch->DoAction(actionAndArgs);
     }
 
+    static void _agentPaneLog(const std::string& msg);
+
+    // Method Description:
+    // - This method is called when the user submits a foreground agent prompt
+    //   from the command palette (? prefix). Opens or reuses an agent pane
+    //   and sends the prompt to it.
+    // Arguments:
+    // - prompt - the user's agent prompt text
+    // Return Value:
+    // - <none>
+    void TerminalPage::_OnAgentForegroundPromptRequested(const IInspectable& /*sender*/, const winrt::hstring& prompt)
+    {
+        _agentPaneLog("_OnAgentForegroundPromptRequested: prompt='" + winrt::to_string(prompt) + "' empty=" + (prompt.empty() ? "true" : "false"));
+        if (!prompt.empty())
+        {
+            _DelegatePromptToAgent(prompt);
+        }
+        // Empty ? is a no-op. Use >Toggle AI assistant (openAgentPane action) to open the agent pane.
+    }
+
+    // Method Description:
+    // - This method is called when the user submits a background agent task
+    //   from the command palette (& prefix). Currently a stub that will be
+    //   connected to the Background Task Manager (C9) in a future change.
+    // Arguments:
+    // - prompt - the user's background task prompt text
+    // Return Value:
+    // - <none>
+    void TerminalPage::_OnAgentBackgroundTaskRequested(const IInspectable& /*sender*/, const winrt::hstring& /*prompt*/)
+    {
+        // TODO: Route to Background Task Manager (C9) when available.
+        // For now, this is a no-op stub. Future implementation will:
+        // 1. Submit the prompt to the Background Task Manager
+        // 2. Show a status indicator in the tab bar
+        // 3. Deliver results via toast notification on completion
+    }
+
+    // Method Description:
+    // - Auto-detects an installed agent CLI by searching the system PATH.
+    //   Checks for known CLIs in priority order: copilot, claude.
+    // Arguments:
+    // - <none>
+    // Return Value:
+    // - The name of the first found CLI, or empty string if none found.
+    winrt::hstring TerminalPage::_DetectAgentCli() const
+    {
+        wchar_t buffer[MAX_PATH];
+
+        // Prefer GitHub Copilot CLI in ACP mode (JSON-RPC over stdio).
+        // The --acp flag starts the agent as an ACP server; stdio is the
+        // default transport.
+        if (SearchPathW(nullptr, L"copilot", L".exe", MAX_PATH, buffer, nullptr) > 0)
+        {
+            return winrt::hstring{ L"copilot --acp --stdio" };
+        }
+
+        // Fall back to other known agent CLIs
+        static constexpr std::wstring_view fallbackClis[] = { L"claude" };
+        for (const auto& cli : fallbackClis)
+        {
+            if (SearchPathW(nullptr, cli.data(), L".exe", MAX_PATH, buffer, nullptr) > 0)
+            {
+                return winrt::hstring{ cli };
+            }
+        }
+        return winrt::hstring{};
+    }
+
+    // Method Description:
+    // - Auto-detects the WTA (Windows Terminal Agent) executable by searching
+    //   the system PATH. WTA is the preferred way to launch agents because it
+    //   handles protocol config injection, giving agents access to Windows Terminal
+    //   tools (pane management, capture-pane, etc.) via the Terminal Protocol (wtcli).
+    // Arguments:
+    // - <none>
+    // Return Value:
+    // - The full path to wta.exe, or empty string if not found.
+    winrt::hstring TerminalPage::_DetectWtaPath() const
+    {
+        const auto modulePath = std::filesystem::path{ wil::GetModuleFileNameW<std::wstring>(nullptr) };
+        const auto moduleDir = modulePath.parent_path();
+
+        // 1. Check for wta.exe next to the running module (packaged / installed
+        //    scenario).  A co-located wta.exe inherits the package identity of
+        //    the Terminal process, which is required for COM activation.
+        {
+            const auto sibling = moduleDir / L"wta.exe";
+            std::error_code ec;
+            if (std::filesystem::exists(sibling, ec))
+            {
+                return winrt::hstring{ sibling.lexically_normal().wstring() };
+            }
+        }
+
+        // 2. Walk up from the running module to find a local dev build.
+        //    This is the fallback for development when wta.exe is not
+        //    co-located with the Terminal binary.
+        auto cursor = moduleDir;
+        while (!cursor.empty())
+        {
+            for (const auto& relative : {
+                     std::filesystem::path{ L"wta\\target\\debug\\wta.exe" },
+                     std::filesystem::path{ L"wta\\target\\release\\wta.exe" },
+                 })
+            {
+                const auto candidate = cursor / relative;
+                std::error_code ec;
+                if (std::filesystem::exists(candidate, ec))
+                {
+                    return winrt::hstring{ candidate.lexically_normal().wstring() };
+                }
+            }
+
+            const auto parent = cursor.parent_path();
+            if (parent == cursor)
+            {
+                break;
+            }
+            cursor = parent;
+        }
+
+        // 3. Fall back to system PATH.
+        wchar_t buffer[MAX_PATH];
+        if (SearchPathW(nullptr, L"wta", L".exe", MAX_PATH, buffer, nullptr) > 0)
+        {
+            return winrt::hstring{ buffer };
+        }
+
+        return winrt::hstring{};
+    }
+
+    // Returns the single shared agent pane if it is still alive, or nullptr.
+    std::shared_ptr<Pane> TerminalPage::_FindAgentPane()
+    {
+        return _agentPane.lock();
+    }
+
+    // Returns the tab that currently contains the agent pane, or nullptr.
+    winrt::com_ptr<Tab> TerminalPage::_FindTabContainingAgentPane()
+    {
+        const auto agentPane = _agentPane.lock();
+        if (!agentPane)
+        {
+            return {};
+        }
+        for (const auto& tab : _tabs)
+        {
+            if (auto tabImpl = _GetTabImpl(tab))
+            {
+                if (const auto rootPane = tabImpl->GetRootPane())
+                {
+                    const auto found = rootPane->WalkTree([&](const auto& p) -> std::shared_ptr<Pane> {
+                        return p == agentPane ? p : nullptr;
+                    });
+                    if (found)
+                    {
+                        return tabImpl;
+                    }
+                }
+            }
+        }
+        return {};
+    }
+
+    SplitDirection TerminalPage::_AgentPanePositionToSplitDirection(const winrt::hstring& position)
+    {
+        if (position == L"bottom")
+            return SplitDirection::Down;
+        if (position == L"top")
+            return SplitDirection::Up;
+        if (position == L"left")
+            return SplitDirection::Left;
+        return SplitDirection::Right;
+    }
+
+    // ── First-run experience ──────────────────────────────────────────────
+
+    bool TerminalPage::_IsFreRequired() const
+    {
+        return !ApplicationState::SharedInstance().AgentFreCompleted();
+    }
+
+    void TerminalPage::_ShowFreOverlay()
+    {
+        if (auto overlay = FindName(L"FreOverlayElement").try_as<winrt::TerminalApp::FreOverlay>())
+        {
+            overlay.ResetDragOffset();
+            overlay.Completed({ get_weak(), &TerminalPage::_OnFreCompleted });
+            overlay.Visibility(Visibility::Visible);
+        }
+    }
+
+    void TerminalPage::_OnFreCompleted(const winrt::TerminalApp::FreOverlay& /*sender*/,
+                                       const winrt::Windows::Foundation::IInspectable& /*args*/)
+    {
+        // Hide the overlay
+        if (auto overlay = FreOverlayElement())
+        {
+            overlay.Visibility(Visibility::Collapsed);
+        }
+
+        // Persist: never show FRE again
+        ApplicationState::SharedInstance().AgentFreCompleted(true);
+
+        // Agent pane was already created during startup with --setup.
+        // Focus it so the user can interact with the Getting Started screen.
+        if (const auto agentPane = _FindAgentPane())
+        {
+            if (const auto& content = agentPane->GetContent())
+            {
+                content.Focus(winrt::Windows::UI::Xaml::FocusState::Programmatic);
+            }
+        }
+    }
+
+    // Repositions the agent pane to match the current AgentPanePosition setting.
+    void TerminalPage::_RepositionAgentPanes()
+    {
+        const auto agentTab = _FindTabContainingAgentPane();
+        if (!agentTab)
+        {
+            return;
+        }
+        const auto splitDirection = _AgentPanePositionToSplitDirection(
+            _settings.GlobalSettings().AgentPanePosition());
+        if (const auto rootPane = agentTab->GetRootPane())
+        {
+            rootPane->RepositionAgentPane(splitDirection);
+        }
+    }
+
+    static void _agentPaneLog(const std::string& msg)
+    {
+        wchar_t localAppData[MAX_PATH];
+        if (GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH) == 0)
+            return;
+        const auto logDir = std::wstring(localAppData) + L"\\IntelligentTerminal\\logs";
+        std::filesystem::create_directories(logDir);
+        const auto logPath = logDir + L"\\wta-agent-pane.log";
+        if (auto f = std::ofstream(logPath, std::ios::app))
+        {
+            // Use ISO8601 UTC with millisecond precision so log timestamps can
+            // be correlated with wta-main.log down to the millisecond.
+            const auto nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                   std::chrono::system_clock::now().time_since_epoch())
+                                   .count();
+            const auto secs = static_cast<std::time_t>(nowMs / 1000);
+            const int ms = static_cast<int>(nowMs % 1000);
+            std::tm tmUtc{};
+            ::gmtime_s(&tmUtc, &secs);
+            char ts[32];
+            std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S", &tmUtc);
+            f << "[" << ts << "." << std::setw(3) << std::setfill('0') << ms << "Z] " << msg << "\n";
+        }
+    }
+
+    // Resolve the effective ACP agent commandline from structured settings.
+    // Build: "<agent> <acp_flags> [--model <model>]".
+    // The Rust agent_registry knows the ACP flags for each known agent, but the
+    // C++ side doesn't import Rust code — so we duplicate just the flag knowledge
+    // for the two ACP-capable agents.  WTA's registry is still the authority at
+    // runtime; this is only used to build the --agent value.
+    // Check if this is a custom agent ID (starts with "custom:").
+    static bool _IsCustomAgentId(const winrt::hstring& id)
+    {
+        return winrt::to_string(id).starts_with("custom:");
+    }
+
+    static winrt::hstring _ResolveEffectiveAgentCliPath(
+        const winrt::Microsoft::Terminal::Settings::Model::GlobalAppSettings& globals,
+        const std::function<winrt::hstring()>& detectFallback)
+    {
+        const auto acpAgent = globals.AcpAgent();
+
+        // Custom agents: use the stored custom command directly.
+        if (_IsCustomAgentId(acpAgent))
+        {
+            const auto customCmd = globals.AcpCustomCommand();
+            if (!customCmd.empty()) return customCmd;
+        }
+
+        // Built-in agents: append known ACP flags + model.
+        const auto lower = winrt::to_string(acpAgent);
+
+        // Adapter-style launches: claude/codex CLIs don't speak ACP themselves.
+        // We invoke the npm adapter via npx; the npm-installed claude/codex
+        // shim implies node/npx are present. Model is sent via ACP
+        // setSessionModel after handshake, not on the command line.
+        if (lower == "claude")
+        {
+            return winrt::hstring{ L"npx -y @zed-industries/claude-code-acp" };
+        }
+        if (lower == "codex")
+        {
+            return winrt::hstring{ L"npx -y @zed-industries/codex-acp" };
+        }
+
+        std::wstring cmd{ acpAgent };
+        if (lower == "copilot")
+        {
+            cmd += L" --acp --stdio";
+        }
+        else if (lower == "gemini")
+        {
+            cmd += L" --experimental-acp";
+        }
+
+        if (lower == "copilot" || lower == "gemini")
+        {
+            const auto acpModel = globals.AcpModel();
+            if (!acpModel.empty())
+            {
+                cmd += L" --model ";
+                cmd += std::wstring_view{ acpModel };
+            }
+            return winrt::hstring{ cmd };
+        }
+
+        // Unknown agent — try auto-detection as last resort.
+        if (detectFallback)
+        {
+            return detectFallback();
+        }
+        return acpAgent;
+    }
+
+    // Resolve the effective delegate agent name from structured settings.
+    static winrt::hstring _ResolveEffectiveDelegateAgent(
+        const winrt::Microsoft::Terminal::Settings::Model::GlobalAppSettings& globals)
+    {
+        const auto delegateAgent = globals.DelegateAgent();
+        // For custom agents, pass the full command so WTA can launch it.
+        if (_IsCustomAgentId(delegateAgent))
+        {
+            const auto customCmd = globals.DelegateCustomCommand();
+            if (!customCmd.empty()) return customCmd;
+        }
+        return delegateAgent;
+    }
+
+    // Holds the spawned wta process and its protocol pipe server. Owned by
+    // TerminalPage in `_agentPipeServers`; entries self-remove when the IO
+    // thread exits (peer EOF or wta crash), via the SetOnShutdown callback.
+    struct AgentDelegationEntry
+    {
+        wil::unique_process_information processInfo;
+        std::shared_ptr<TerminalProtocol::PipeServer> pipeServer;
+    };
+
+    void TerminalPage::_RemoveAgentPipeServer(AgentDelegationEntry* entry)
+    {
+        std::lock_guard lock{ _agentPipeServersMutex };
+        std::erase_if(_agentPipeServers,
+                      [entry](const auto& e) { return e.get() == entry; });
+    }
+
+    // Move the pending wta-side pipe handles into the connection's valueSet
+    // as decimal HANDLE values. Ownership transfers to ConptyConnection,
+    // which closes them after CreateProcessW. Called from
+    // _CreateConnectionFromSettings just before connection.Initialize.
+    void TerminalPage::_ConsumePendingProtocolPipeIntoValueSet(
+        Windows::Foundation::Collections::ValueSet& valueSet)
+    {
+        if (!_pendingProtocolPipeHandles.has_value())
+        {
+            return;
+        }
+        auto pending = std::move(*_pendingProtocolPipeHandles);
+        _pendingProtocolPipeHandles.reset();
+
+        // release() detaches the HANDLE without closing it — ownership passes
+        // through the valueSet (and eventually to ConptyConnection).
+        const auto rValue = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(pending.wtaRead.release()));
+        const auto wValue = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(pending.wtaWrite.release()));
+        valueSet.Insert(L"protocolPipeReadHandle",
+                        Windows::Foundation::PropertyValue::CreateUInt64(rValue));
+        valueSet.Insert(L"protocolPipeWriteHandle",
+                        Windows::Foundation::PropertyValue::CreateUInt64(wValue));
+    }
+
+    bool TerminalPage::_PrepareAgentPanePipe(wil::unique_handle& wtRead,
+                                              wil::unique_handle& wtWrite)
+    {
+        try
+        {
+            auto pipes = WtaProcessLauncher::CreateInheritablePipePair();
+            wtRead = std::move(pipes.wtRead);
+            wtWrite = std::move(pipes.wtWrite);
+            _pendingProtocolPipeHandles = PendingProtocolPipe{
+                std::move(pipes.wtaRead),
+                std::move(pipes.wtaWrite),
+            };
+            return true;
+        }
+        catch (...)
+        {
+            _agentPaneLog("CreateInheritablePipePair failed; agent pane will use legacy CliChannel");
+            return false;
+        }
+    }
+
+    void TerminalPage::_AttachAgentPanePipeServer(wil::unique_handle wtRead,
+                                                   wil::unique_handle wtWrite)
+    {
+        try
+        {
+            auto entry = std::make_shared<AgentDelegationEntry>();
+            const auto weakThis = get_weak();
+
+            entry->pipeServer = std::make_shared<TerminalProtocol::PipeServer>(
+                std::move(wtRead),
+                std::move(wtWrite),
+                [weakThis](winrt::guid sessionId, std::wstring_view text) -> bool {
+                    auto strong = weakThis.get();
+                    if (!strong)
+                    {
+                        return false;
+                    }
+                    try
+                    {
+                        return strong->SendProtocolInput(sessionId, winrt::hstring{ text }).get();
+                    }
+                    catch (...)
+                    {
+                        return false;
+                    }
+                });
+
+            {
+                std::lock_guard lock{ _agentPipeServersMutex };
+                _agentPipeServers.push_back(entry);
+            }
+
+            AgentDelegationEntry* const entryPtr = entry.get();
+            entry->pipeServer->SetOnShutdown([weakThis, entryPtr]() {
+                auto strong = weakThis.get();
+                if (!strong)
+                {
+                    return;
+                }
+                strong->Dispatcher().RunAsync(
+                    winrt::Windows::UI::Core::CoreDispatcherPriority::Normal,
+                    [weakThis, entryPtr]() {
+                        if (auto p = weakThis.get())
+                        {
+                            p->_RemoveAgentPipeServer(entryPtr);
+                        }
+                    });
+            });
+
+            entry->pipeServer->Start();
+            _agentPaneLog("agent pane pipe attached");
+        }
+        catch (...)
+        {
+            _agentPaneLog("failed to attach agent pane pipe server");
+        }
+    }
+
+    void TerminalPage::_DelegatePromptToAgent(const winrt::hstring& prompt)
+    {
+        _agentPaneLog("_DelegatePromptToAgent called, prompt='" + winrt::to_string(prompt) + "'");
+
+        // Find the WTA executable.
+        const auto wtaPath = _DetectWtaPath();
+        if (wtaPath.empty())
+        {
+            _agentPaneLog("ABORT: no WTA path found");
+            return;
+        }
+
+        // Resolve agent CLI from structured settings (acpAgent/acpModel).
+        const auto& globals = _settings.GlobalSettings();
+        const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
+
+        // Helper: escape and quote an argument for the command line.
+        auto quoteArg = [](std::wstring_view arg) -> std::wstring {
+            std::wstring escaped{ arg };
+            for (size_t pos = 0; (pos = escaped.find(L'"', pos)) != std::wstring::npos; pos += 2)
+            {
+                escaped.replace(pos, 1, L"\\\"");
+            }
+            return L"\"" + escaped + L"\"";
+        };
+
+        // Build: wta delegate --agent <agent> --delegate-agent <delegate> "<prompt>"
+        std::wstring cmdline = quoteArg(wtaPath) + L" delegate";
+
+        if (!agentCliPath.empty())
+        {
+            cmdline += L" --agent " + quoteArg(std::wstring_view{ agentCliPath });
+        }
+
+        const auto delegateAgent = _ResolveEffectiveDelegateAgent(globals);
+        if (!delegateAgent.empty())
+        {
+            cmdline += L" --delegate-agent " + quoteArg(std::wstring_view{ delegateAgent });
+        }
+        const auto delegateModel = globals.DelegateModel();
+        if (!delegateModel.empty())
+        {
+            cmdline += L" --delegate-model " + quoteArg(std::wstring_view{ delegateModel });
+        }
+
+
+
+        // Pass CWD from the active pane.
+        winrt::hstring activeCwd;
+        if (const auto& activeControl = _GetActiveControl())
+        {
+            activeCwd = activeControl.WorkingDirectory();
+        }
+        if (activeCwd.empty())
+        {
+            wchar_t homePath[MAX_PATH];
+            if (GetEnvironmentVariableW(L"USERPROFILE", homePath, MAX_PATH) > 0)
+            {
+                activeCwd = winrt::hstring{ homePath };
+            }
+        }
+        if (!activeCwd.empty())
+        {
+            cmdline += L" --cwd " + quoteArg(std::wstring_view{ activeCwd });
+        }
+
+        // Append the prompt as a positional argument.
+        std::wstring escapedPrompt{ prompt };
+        for (size_t pos = 0; (pos = escapedPrompt.find(L'"', pos)) != std::wstring::npos; pos += 2)
+        {
+            escapedPrompt.replace(pos, 1, L"\"\"");
+        }
+        cmdline += fmt::format(FMT_COMPILE(L" \"{}\""), escapedPrompt);
+
+        _agentPaneLog("launching: " + winrt::to_string(winrt::hstring{ cmdline }));
+
+        // Launch via WtaProcessLauncher: creates a duplex anonymous pipe pair,
+        // inherits the wta-side handles into the child via STARTUPINFOEX
+        // PROC_THREAD_ATTRIBUTE_HANDLE_LIST, and exposes them as
+        // WT_PROTOCOL_PIPE_R / WT_PROTOCOL_PIPE_W env vars. The wt-side
+        // handles drive a per-wta TerminalProtocol::PipeServer.
+        try
+        {
+            WtaProcessLauncher::LaunchOptions opts;
+            opts.exePath = wtaPath;
+            opts.commandLine = cmdline;
+            opts.hidden = true;
+
+            auto launchResult = WtaProcessLauncher::LaunchWta(opts);
+
+            auto entry = std::make_shared<AgentDelegationEntry>();
+            entry->processInfo = std::move(launchResult.processInfo);
+
+            const auto weakThis = get_weak();
+
+            entry->pipeServer = std::make_shared<TerminalProtocol::PipeServer>(
+                std::move(launchResult.wtRead),
+                std::move(launchResult.wtWrite),
+                [weakThis](winrt::guid sessionId, std::wstring_view text) -> bool {
+                    auto strong = weakThis.get();
+                    if (!strong)
+                    {
+                        return false;
+                    }
+                    try
+                    {
+                        return strong->SendProtocolInput(sessionId, winrt::hstring{ text }).get();
+                    }
+                    catch (...)
+                    {
+                        return false;
+                    }
+                });
+
+            {
+                std::lock_guard lock{ _agentPipeServersMutex };
+                _agentPipeServers.push_back(entry);
+            }
+
+            // Self-remove on IO-thread exit. Marshal to the UI thread so the
+            // IO thread does not destruct itself (which would deadlock on
+            // PipeServer::Stop()'s self-join).
+            AgentDelegationEntry* const entryPtr = entry.get();
+            entry->pipeServer->SetOnShutdown([weakThis, entryPtr]() {
+                auto strong = weakThis.get();
+                if (!strong)
+                {
+                    return;
+                }
+                strong->Dispatcher().RunAsync(
+                    winrt::Windows::UI::Core::CoreDispatcherPriority::Normal,
+                    [weakThis, entryPtr]() {
+                        if (auto p = weakThis.get())
+                        {
+                            p->_RemoveAgentPipeServer(entryPtr);
+                        }
+                    });
+            });
+
+            entry->pipeServer->Start();
+            _agentPaneLog("delegate process launched OK (pipe attached)");
+        }
+        catch (const wil::ResultException& ex)
+        {
+            _agentPaneLog(std::string{ "FAILED to launch delegate process: hr=" } +
+                          std::to_string(ex.GetErrorCode()));
+            return;
+        }
+        catch (...)
+        {
+            _agentPaneLog("FAILED to launch delegate process: unknown error");
+            return;
+        }
+    }
+
+    // --- Hot-reload of agent/model settings -------------------------------
+    //
+    // When any agent-identity setting changes, the single shared wta pane must
+    // be torn down and recreated with the updated flags baked into argv.
+    // `_RebuildAgentStack` is the single entry point; it is called from
+    // SetSettings (settings.json reload + Settings UI writes) and from the
+    // bottom-bar selector Click handler.
+    TerminalPage::AgentSettingsSnapshot TerminalPage::_CaptureAgentSettingsSnapshot() const
+    {
+        const auto& globals = _settings.GlobalSettings();
+        return AgentSettingsSnapshot{
+            std::wstring{ globals.AcpAgent() },
+            std::wstring{ globals.AcpModel() },
+            std::wstring{ globals.AcpCustomCommand() },
+            std::wstring{ globals.DelegateAgent() },
+            std::wstring{ globals.DelegateModel() },
+            std::wstring{ globals.DelegateCustomCommand() },
+        };
+    }
+
+    bool TerminalPage::_AgentSettingsChanged(const AgentSettingsSnapshot& a, const AgentSettingsSnapshot& b)
+    {
+        return a.acpAgent != b.acpAgent ||
+               a.acpModel != b.acpModel ||
+               a.acpCustomCommand != b.acpCustomCommand ||
+               a.delegateAgent != b.delegateAgent ||
+               a.delegateModel != b.delegateModel ||
+               a.delegateCustomCommand != b.delegateCustomCommand;
+    }
+
+    // Close the shared agent pane if it is still alive.
+    void TerminalPage::_TeardownAgentPane()
+    {
+        if (auto p = _agentPane.lock())
+        {
+            _agentPaneLog("_TeardownAgentPane: closing agent pane");
+            p->Close();
+        }
+        _agentPane.reset();
+        // The next wta process is fresh and knows nothing about prior
+        // tab_changed events — clear our dedupe so the first notify always
+        // fires.
+        _lastNotifiedAgentTabId.reset();
+    }
+
+    // Move the single shared agent pane to targetTab and ensure it is visible.
+    // No-op if the pane already lives in targetTab and is visible. When the
+    // pane crosses tabs, also fires a tab_changed event so wta switches its
+    // per-tab session.
+    void TerminalPage::_RelocateAgentPaneToTab(winrt::com_ptr<Tab> targetTab)
+    {
+        const auto agentPane = _agentPane.lock();
+        if (!agentPane || !targetTab)
+        {
+            return;
+        }
+
+        const auto sourceTab = _FindTabContainingAgentPane();
+        const bool crossTab = sourceTab && sourceTab != targetTab;
+
+        // Capture which non-agent panes are pinned to the buffer bottom so we
+        // can re-pin them after the layout shift caused by restore. This matches
+        // the long-standing behavior in the previous toggle path.
+        const auto captureAtBottom = [](const std::shared_ptr<Pane>& root) {
+            std::vector<winrt::Microsoft::Terminal::Control::TermControl> result;
+            if (!root)
+            {
+                return result;
+            }
+            root->WalkTree([&](const std::shared_ptr<Pane>& p) {
+                if (p->IsAgentPane())
+                {
+                    return;
+                }
+                const auto ctl = p->GetTerminalControl();
+                if (!ctl)
+                {
+                    return;
+                }
+                if (ctl.ScrollOffset() + ctl.ViewHeight() >= ctl.BufferHeight())
+                {
+                    result.push_back(ctl);
+                }
+            });
+            return result;
+        };
+
+        if (crossTab)
+        {
+            const auto sourceRoot = sourceTab->GetRootPane();
+            if (sourceRoot == agentPane)
+            {
+                // Pane is the sole content of its tab — can't detach. Fall back
+                // to switching to that tab.
+                _agentPaneLog("_RelocateAgentPaneToTab: pane is sole content of source tab; switching tabs instead");
+                _tabView.SelectedItem(sourceTab->TabViewItem());
+                return;
+            }
+            if (sourceRoot)
+            {
+                _agentPaneLog("_RelocateAgentPaneToTab: detaching from source tab");
+                sourceRoot->DetachPane(agentPane);
+            }
+
+            const auto splitDir = _AgentPanePositionToSplitDirection(
+                _settings.GlobalSettings().AgentPanePosition());
+            _UnZoomIfNeeded();
+            targetTab->SplitPaneAtRoot(splitDir, agentPane);
+        }
+
+        const auto newRoot = targetTab->GetRootPane();
+        auto wasAtBottom = captureAtBottom(newRoot);
+        if (newRoot && (crossTab || agentPane->IsHidden()))
+        {
+            _agentPaneLog("_RelocateAgentPaneToTab: restoring pane");
+            newRoot->RestorePane(agentPane);
+        }
+        for (auto& ctl : wasAtBottom)
+        {
+            ctl.ScrollViewport(ctl.BufferHeight());
+        }
+
+        if (const auto paneId = agentPane->Id())
+        {
+            targetTab->FocusPane(paneId.value());
+        }
+        if (const auto ctrl = agentPane->GetTerminalControl())
+        {
+            ctrl.Focus(winrt::Windows::UI::Xaml::FocusState::Programmatic);
+        }
+
+        // Notify wta of the destination tab. (No-op if it's the same tab we
+        // last told wta about — _ReconcileAgentPaneForActiveTab handles that
+        // case for the broader "user just switched tabs" path.)
+        _NotifyAgentTabChanged(targetTab);
+    }
+
+    // Tells wta which tab is now active so it routes incoming events to the
+    // matching TabSession. Deduped via _lastNotifiedAgentTabId so we only emit
+    // on actual change. No-op if there's no agent pane to talk to.
+    void TerminalPage::_NotifyAgentTabChanged(const winrt::com_ptr<Tab>& targetTab)
+    {
+        if (!targetTab)
+        {
+            return;
+        }
+        if (!_agentPane.lock())
+        {
+            // No wta to talk to — don't emit (and don't seed _lastNotified
+            // either, so when a pane spawns later we will fire a fresh event).
+            return;
+        }
+        const auto newTabIdx = _GetTabIndex(*targetTab);
+        if (!newTabIdx)
+        {
+            return;
+        }
+        if (_lastNotifiedAgentTabId == newTabIdx)
+        {
+            return;
+        }
+
+        Json::Value tabEvt;
+        tabEvt["type"] = "event";
+        tabEvt["method"] = "tab_changed";
+        Json::Value tabParams;
+        tabParams["tab_id"] = std::to_string(newTabIdx.value());
+        if (_lastNotifiedAgentTabId.has_value())
+        {
+            tabParams["from_tab_id"] = std::to_string(_lastNotifiedAgentTabId.value());
+        }
+        tabEvt["params"] = tabParams;
+        Json::StreamWriterBuilder wb;
+        wb["indentation"] = "";
+        ProtocolVtSequenceReceived.raise(
+            *this,
+            winrt::to_hstring(Json::writeString(wb, tabEvt)));
+
+        _lastNotifiedAgentTabId = newTabIdx;
+    }
+
+    // Broadcast a `set_view` event to wta so it switches its TUI view
+    // (Chat / Agents). Used by Ctrl+Shift+/ to drive the wta into the
+    // Agents (session list) view when the agent pane is already alive.
+    // For a fresh pane the same effect is achieved via the
+    // `--initial-view` CLI flag passed to wta on spawn.
+    void TerminalPage::_BroadcastAgentSetView(std::string_view view)
+    {
+        Json::Value evt;
+        evt["type"] = "event";
+        evt["method"] = "set_view";
+        Json::Value params;
+        params["view"] = std::string{ view };
+        // Scope to this WT window so multi-window users with multiple
+        // wta processes don't cross-talk. wta ignores the event when its
+        // own window_id is known and doesn't match.
+        params["window_id"] = std::to_string(_WindowProperties.WindowId());
+        evt["params"] = params;
+        Json::StreamWriterBuilder wb;
+        wb["indentation"] = "";
+        _agentPaneLog(std::string{ "broadcasting set_view event: view=" } + std::string{ view });
+        ProtocolVtSequenceReceived.raise(
+            *this,
+            winrt::to_hstring(Json::writeString(wb, evt)));
+    }
+
+    // Reset every tab's AgentPaneOpen() flag. Called when the shared pane is
+    // torn down (user-closed or process crash) so per-tab state doesn't refer
+    // to a pane that no longer exists.
+    void TerminalPage::_ClearAllAgentPaneFlags()
+    {
+        for (const auto& tab : _tabs)
+        {
+            if (auto tabImpl = _GetTabImpl(tab))
+            {
+                tabImpl->AgentPaneOpen(false);
+            }
+        }
+    }
+
+    // Reconcile the shared agent pane against the active tab's AgentPaneOpen()
+    // flag — making the pane visible on the active tab when the flag is true,
+    // hiding it (when in the active tab) when the flag is false. The pane is
+    // left untouched when it lives in a non-active tab and the active tab
+    // doesn't want it: it isn't user-visible there anyway.
+    void TerminalPage::_ReconcileAgentPaneForActiveTab()
+    {
+        const auto agentPane = _agentPane.lock();
+        if (!agentPane)
+        {
+            return;
+        }
+        const auto activeTab = _GetFocusedTabImpl();
+        if (!activeTab)
+        {
+            return;
+        }
+
+        if (activeTab->AgentPaneOpen())
+        {
+            _RelocateAgentPaneToTab(activeTab);
+        }
+        else if (_agentPanePreWarming)
+        {
+            // The pane is mid-prewarm: it has been added to the visual tree
+            // but SwapChainPanel.LayoutUpdated has not yet fired, so
+            // connection.Start() has not run and wta.exe has not launched.
+            // Hiding now would remove the pane from the tree, kill layout,
+            // and prevent wta from ever starting — exactly the "agent stuck
+            // in connecting state" bug. The Initialized callback in
+            // _AutoCreateHiddenAgentPane will hide the pane once layout
+            // (and thus wta launch) has happened.
+            _agentPaneLog("_ReconcileAgentPaneForActiveTab: skipping hide — pane is pre-warming");
+        }
+        else
+        {
+            const auto ownerTab = _FindTabContainingAgentPane();
+            if (ownerTab == activeTab && !agentPane->IsHidden())
+            {
+                if (const auto rootPane = activeTab->GetRootPane())
+                {
+                    _agentPaneLog("_ReconcileAgentPaneForActiveTab: hiding pane on active tab");
+                    rootPane->HidePane(agentPane);
+                    if (const auto target = _FindSourceOfAgentPaneId(rootPane))
+                    {
+                        activeTab->FocusPane(target.value());
+                    }
+                    _FocusCurrentTab(true);
+                }
+            }
+        }
+
+        // Always tell wta which tab is now active so incoming events
+        // (autofix triggers, prompt deliveries, etc.) get routed to the right
+        // TabSession — even when the pane itself didn't move. Deduped inside.
+        _NotifyAgentTabChanged(activeTab);
+
+        _UpdateBottomBarState();
+    }
+
+    // Auto-create the single shared agent pane (hidden) in `tab`.
+    // Safe to call any time — skips if the pane is already alive or wta is absent.
+    // Running wta directly (single-process TUI + ACP client) means event monitoring
+    // and autofix work in the background as long as the pane hasn't been closed.
+    void TerminalPage::_AutoCreateHiddenAgentPane(winrt::com_ptr<Tab> tab)
+    {
+        const bool isFirstRun = _IsFreRequired();
+
+        // Already have a live pane — nothing to do.
+        if (_agentPane.lock())
+        {
+            return;
+        }
+
+        if (!tab || !tab->GetActiveTerminalControl())
+        {
+            return;
+        }
+
+        const auto wtaPath = _DetectWtaPath();
+        if (wtaPath.empty())
+        {
+            _agentPaneLog("_AutoCreateHiddenAgentPane: no WTA path, skipping");
+            return;
+        }
+
+        const auto& globals = _settings.GlobalSettings();
+        std::wstring cmdline = std::wstring{ wtaPath };
+
+        const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
+        if (!agentCliPath.empty())
+        {
+            std::wstring s{ agentCliPath };
+            for (size_t pos = 0; (pos = s.find(L'"', pos)) != std::wstring::npos; pos += 2)
+                s.replace(pos, 1, L"\"\"");
+            cmdline += fmt::format(FMT_COMPILE(L" --agent \"{}\""), s);
+        }
+
+        const auto delegateAgent = _ResolveEffectiveDelegateAgent(globals);
+        if (!delegateAgent.empty())
+        {
+            std::wstring s{ delegateAgent };
+            for (size_t pos = 0; (pos = s.find(L'"', pos)) != std::wstring::npos; pos += 2)
+                s.replace(pos, 1, L"\"\"");
+            cmdline += fmt::format(FMT_COMPILE(L" --delegate-agent \"{}\""), s);
+        }
+
+        const auto delegateModel = globals.DelegateModel();
+        if (!delegateModel.empty())
+        {
+            std::wstring s{ delegateModel };
+            for (size_t pos = 0; (pos = s.find(L'"', pos)) != std::wstring::npos; pos += 2)
+                s.replace(pos, 1, L"\"\"");
+            cmdline += fmt::format(FMT_COMPILE(L" --delegate-model \"{}\""), s);
+        }
+
+        // Pass the ACP model selection out-of-band so it works for adapter
+        // launches (claude/codex via npx) where --model can't be put on the
+        // adapter cmdline. wta sends this via ACP setSessionModel after
+        // handshake; for copilot/gemini it's redundant (their --model is
+        // already on the agent cmdline) but harmless.
+        const auto acpModel = globals.AcpModel();
+        if (!acpModel.empty())
+        {
+            std::wstring s{ acpModel };
+            for (size_t pos = 0; (pos = s.find(L'"', pos)) != std::wstring::npos; pos += 2)
+                s.replace(pos, 1, L"\"\"");
+            cmdline += fmt::format(FMT_COMPILE(L" --acp-model \"{}\""), s);
+        }
+
+        if (!globals.AutoFixEnabled())
+        {
+            cmdline += L" --no-autofix";
+        }
+
+        if (isFirstRun)
+        {
+            cmdline += L" --setup first-run";
+        }
+
+        _agentPaneLog("_AutoCreateHiddenAgentPane: cmdline=" + winrt::to_string(winrt::hstring{ cmdline }));
+
+        winrt::hstring startingDirectory;
+        if (const auto& ctl = _GetActiveControl())
+        {
+            startingDirectory = ctl.WorkingDirectory();
+        }
+        if (startingDirectory.empty())
+        {
+            wchar_t homePath[MAX_PATH];
+            if (GetEnvironmentVariableW(L"USERPROFILE", homePath, MAX_PATH) > 0)
+            {
+                startingDirectory = winrt::hstring{ homePath };
+            }
+        }
+
+        NewTerminalArgs args;
+        args.Commandline(winrt::hstring{ cmdline });
+        args.Profile(globals.AiCoordinatorProfile());
+        if (!startingDirectory.empty())
+        {
+            args.StartingDirectory(startingDirectory);
+        }
+
+        // Stage secure-pipe handles for this agent-pane wta. Same flow as
+        // _OpenOrReuseAgentPane: wt-side stays here for the PipeServer,
+        // wta-side flows into _CreateConnectionFromSettings → ConptyConnection.
+        wil::unique_handle autoPaneWtRead;
+        wil::unique_handle autoPaneWtWrite;
+        const bool autoPanePipePrepared = _PrepareAgentPanePipe(autoPaneWtRead, autoPaneWtWrite);
+
+        auto rawPane = _MakeTerminalPane(args, nullptr, nullptr);
+        if (!rawPane)
+        {
+            _agentPaneLog("_AutoCreateHiddenAgentPane: _MakeTerminalPane returned null");
+            _pendingProtocolPipeHandles.reset();
+            return;
+        }
+
+        if (autoPanePipePrepared && !_pendingProtocolPipeHandles.has_value() &&
+            autoPaneWtRead && autoPaneWtWrite)
+        {
+            _AttachAgentPanePipeServer(std::move(autoPaneWtRead), std::move(autoPaneWtWrite));
+        }
+        else
+        {
+            _pendingProtocolPipeHandles.reset();
+        }
+
+        // Wrap the raw terminal pane in an AgentPaneContent so the leaf
+        // renders the XAML agent bar above the wta TermControl. We construct
+        // a fresh Pane around the wrapper because Pane has no API to swap
+        // its content in place.
+        std::shared_ptr<Pane> newPane;
+        if (const auto innerTerm = rawPane->GetContent().try_as<winrt::TerminalApp::TerminalPaneContent>())
+        {
+            // The raw Pane's first border currently parents the TermControl;
+            // release it before AgentPaneContent re-parents it as the wrapper's
+            // ContentPresenter child. Without this, XAML throws because the
+            // TermControl would be in two visual trees at once.
+            if (const auto rootGrid = rawPane->GetRootElement())
+            {
+                if (rootGrid.Children().Size() > 0)
+                {
+                    if (const auto border = rootGrid.Children().GetAt(0).try_as<winrt::Windows::UI::Xaml::Controls::Border>())
+                    {
+                        border.Child(nullptr);
+                    }
+                }
+            }
+            auto agentContent = winrt::make<winrt::TerminalApp::implementation::AgentPaneContent>(innerTerm);
+            newPane = std::make_shared<Pane>(agentContent);
+        }
+        else
+        {
+            // Defensive fallback — shouldn't happen for a terminal-content pane.
+            _agentPaneLog("_AutoCreateHiddenAgentPane: rawPane content is not TerminalPaneContent — using unwrapped pane");
+            newPane = rawPane;
+        }
+
+        newPane->IsAgentPane(true);
+        _agentPane = newPane;
+        {
+            auto weakSelf = get_weak();
+            newPane->Closed([weakSelf](auto&&, auto&&) {
+                _agentPaneLog("agent pane closed — _agentPane cleared");
+                if (auto self = weakSelf.get())
+                {
+                    self->_agentPane.reset();
+                    self->_agentPanePreWarming = false;
+                    self->_lastNotifiedAgentTabId.reset();
+                    self->_ClearAllAgentPaneFlags();
+                    self->_UpdateBottomBarState();
+                }
+            });
+        }
+
+        // Engage the pre-warming guard BEFORE splitting the pane into the
+        // visual tree. SplitPaneAtRoot triggers a TabView SelectionChanged
+        // event in the same message-loop turn, which calls
+        // _ReconcileAgentPaneForActiveTab — and without this guard the
+        // reconcile would HidePane() the pre-warming pane before
+        // SwapChainPanel.LayoutUpdated has fired, killing connection.Start()
+        // and preventing wta.exe from ever launching. The Initialized
+        // callback below clears the guard once layout (and thus connection
+        // startup) has happened.
+        _agentPanePreWarming = true;
+
+        const auto splitDirection = _AgentPanePositionToSplitDirection(
+            globals.AgentPanePosition());
+        tab->SplitPaneAtRoot(splitDirection, newPane);
+
+        // CRITICAL: do NOT hide synchronously here. TermControl spawns its
+        // ConPty connection (which is what actually launches wta.exe) only
+        // after SwapChainPanel.LayoutUpdated fires — which requires the
+        // control to be in the visual tree long enough to lay out. Calling
+        // HidePane() removes _root.Children() immediately, so the layout
+        // never happens, and the connection never starts. Result: wta.exe
+        // doesn't actually spawn until the user later restores the pane via
+        // Ctrl+Shift+. — at which point they wait the full 5–7 s for ACP
+        // session creation, defeating the whole point of pre-warming.
+        //
+        // Instead: hook the TermControl's Initialized event (raised at the
+        // end of _InitializeTerminal, immediately after connection.Start()),
+        // and only hide AFTER that fires. By that point wta.exe is already
+        // running and ACP init is in flight, so by the time the user opens
+        // the pane it's almost always Connected.
+        std::weak_ptr<Pane> weakNewPane = newPane;
+        std::weak_ptr<Pane> weakRootPane = tab->GetRootPane();
+        auto weakSelfForHide = get_weak();
+        if (const auto termControl = newPane->GetTerminalControl())
+        {
+            // Use a shared event_token holder so the lambda can revoke
+            // itself after firing once.
+            auto tokenHolder = std::make_shared<winrt::event_token>();
+            *tokenHolder = termControl.Initialized([
+                weakNewPane,
+                weakRootPane,
+                weakSelfForHide,
+                termControlWeak = winrt::make_weak(termControl),
+                tokenHolder,
+                isFirstRun
+            ](auto&& /*sender*/, auto&& /*args*/) {
+                _agentPaneLog("_AutoCreateHiddenAgentPane: TermControl Initialized");
+                if (const auto tc = termControlWeak.get())
+                {
+                    tc.Initialized(*tokenHolder);
+                }
+                auto self = weakSelfForHide.get();
+                if (!self)
+                {
+                    return;
+                }
+                // Pre-warm has done its job: connection.Start() ran inside
+                // _InitializeTerminal just before this event, so wta.exe is
+                // launching. Drop the reconcile guard before doing anything
+                // else -- from here on, _ReconcileAgentPaneForActiveTab is
+                // free to manage visibility normally.
+                self->_agentPanePreWarming = false;
+
+                // During first-run, keep the pane visible so the user sees
+                // the Getting Started screen behind the FRE dialog overlay.
+                if (isFirstRun)
+                {
+                    self->_UpdateBottomBarState();
+                    return;
+                }
+
+                // If the user already toggled the agent pane open before
+                // Initialized fired, don't hide it -- that would leave the
+                // bottom bar lit but no pane visible (the very first toggle
+                // after launch would silently fail).
+                bool anyTabWantsOpen = false;
+                for (const auto& t : self->_tabs)
+                {
+                    if (auto tabImpl = TerminalPage::_GetTabImpl(t))
+                    {
+                        if (tabImpl->AgentPaneOpen())
+                        {
+                            anyTabWantsOpen = true;
+                            break;
+                        }
+                    }
+                }
+                if (anyTabWantsOpen)
+                {
+                    _agentPaneLog("_AutoCreateHiddenAgentPane: TermControl Initialized -- user already opened pane, skipping hide");
+                    self->_UpdateBottomBarState();
+                    return;
+                }
+                _agentPaneLog("_AutoCreateHiddenAgentPane: TermControl Initialized -- hiding pane now");
+                if (auto rootPane = weakRootPane.lock())
+                {
+                    if (auto pane = weakNewPane.lock())
+                    {
+                        rootPane->HidePane(pane);
+                        self->_UpdateBottomBarState();
+                    }
+                }
+            });
+        }
+        else
+        {
+            // No TermControl on the new pane (shouldn't happen for a
+            // terminal-content pane). Fall back to the old immediate-hide
+            // behavior to avoid leaving a visible auto-created pane.
+            _agentPaneLog("_AutoCreateHiddenAgentPane: no TermControl on new pane, hiding immediately");
+            _agentPanePreWarming = false;
+            if (!isFirstRun)
+            {
+                if (const auto rootPane = tab->GetRootPane())
+                {
+                    rootPane->HidePane(newPane);
+                }
+            }
+        }
+
+        // Return focus to the terminal pane that was active before the split.
+        // (The new agent pane will steal focus briefly while it lays out, but
+        // the Initialized handler above only hides it — focus restoration is
+        // separate, and is also done from the existing focus path below.)
+        if (const auto& ctl = tab->GetActiveTerminalControl())
+        {
+            ctl.Focus(winrt::Windows::UI::Xaml::FocusState::Programmatic);
+        }
+
+        _agentPaneLog("_AutoCreateHiddenAgentPane: done — split done, awaiting Initialized to launch wta");
+    }
+
+    // Called whenever agent-identity settings may have changed. Diffs the
+    // last known snapshot against the current one, tears down + rebuilds
+    // the agent pane, and updates the snapshot.
+    void TerminalPage::_RebuildAgentStack()
+    {
+        const auto current = _CaptureAgentSettingsSnapshot();
+
+        {
+            std::string diag = "_RebuildAgentStack: entered. current.acp=";
+            diag += winrt::to_string(current.acpAgent);
+            diag += " last.acp=";
+            diag += winrt::to_string(_lastAgentSettings.acpAgent);
+            diag += " initialized=";
+            diag += (_agentSettingsSnapshotInitialized ? "true" : "false");
+            diag += " rebuilding=";
+            diag += (_agentRebuilding ? "true" : "false");
+            _agentPaneLog(diag);
+        }
+
+        // First call just seeds the snapshot — there's nothing to rebuild.
+        if (!_agentSettingsSnapshotInitialized)
+        {
+            _lastAgentSettings = current;
+            _agentSettingsSnapshotInitialized = true;
+            _agentPaneLog("_RebuildAgentStack: seeded snapshot, skip rebuild");
+            return;
+        }
+
+        if (!_AgentSettingsChanged(_lastAgentSettings, current))
+        {
+            _agentPaneLog("_RebuildAgentStack: no change, skip rebuild");
+            return;
+        }
+
+        // Re-entrancy guard.
+        if (_agentRebuilding)
+        {
+            _agentPaneLog("_RebuildAgentStack: already rebuilding, skipping nested trigger");
+            return;
+        }
+        _agentRebuilding = true;
+        auto guard = wil::scope_exit([this]() noexcept { _agentRebuilding = false; });
+
+        _agentPaneLog("_RebuildAgentStack: agent settings changed, rebuilding");
+
+        // Remember the pane and the tab that owns it BEFORE teardown.
+        // Settings changes are typically authored from the Settings tab, so
+        // _GetFocusedTabImpl() points at Settings — we must not recreate the
+        // agent pane there. If no pane exists yet, just snapshot and bail —
+        // the user gets a fresh pane next time they open one.
+        const auto existingPane = _FindAgentPane();
+        if (!existingPane)
+        {
+            _lastAgentSettings = current;
+            _agentPaneLog("_RebuildAgentStack: no existing agent pane, snapshot only");
+            return;
+        }
+        const bool hadVisiblePane = !existingPane->IsHidden();
+        const auto ownerTab = _FindTabContainingAgentPane();
+
+        // Snapshot per-tab open/closed flags so the rebuild doesn't lose them
+        // when the Closed handler clears them.
+        std::vector<std::pair<winrt::com_ptr<Tab>, bool>> savedFlags;
+        savedFlags.reserve(_tabs.Size());
+        for (const auto& t : _tabs)
+        {
+            if (auto tabImpl = _GetTabImpl(t))
+            {
+                savedFlags.emplace_back(tabImpl, tabImpl->AgentPaneOpen());
+            }
+        }
+
+        _TeardownAgentPane();
+        _lastAgentSettings = current;
+
+        // Recreate the hidden pane on the original tab — never on whatever
+        // happens to be focused (often Settings during a model switch).
+        if (ownerTab)
+        {
+            _AutoCreateHiddenAgentPane(ownerTab);
+        }
+
+        // Restore the per-tab flags.
+        for (const auto& [tabImpl, flag] : savedFlags)
+        {
+            if (tabImpl)
+            {
+                tabImpl->AgentPaneOpen(flag);
+            }
+        }
+
+        // If the pane was visible before the rebuild, restore it on the
+        // *owner* tab. Going through _OpenOrReuseAgentPane would drag the
+        // pane onto the currently focused tab (Settings, when the rebuild
+        // is triggered by a model switch), which is what we just fixed.
+        if (hadVisiblePane && ownerTab)
+        {
+            if (const auto newPane = _FindAgentPane())
+            {
+                if (const auto newRoot = ownerTab->GetRootPane())
+                {
+                    newRoot->RestorePane(newPane);
+                    if (const auto paneId = newPane->Id())
+                    {
+                        ownerTab->FocusPane(paneId.value());
+                    }
+                }
+            }
+        }
+        _UpdateBottomBarState();
+    }
+
+    void TerminalPage::_OpenOrReuseAgentPane(const winrt::hstring& prompt, bool intoSessionsView)
+    {
+        _agentPaneLog("_OpenOrReuseAgentPane called, prompt='" + winrt::to_string(prompt) + "', intoSessionsView=" + (intoSessionsView ? "true" : "false"));
+
+        const auto& globals = _settings.GlobalSettings();
+        std::wstring cmdline;
+
+        // Build the wta command line (single-process TUI mode, no subcommand).
+        if (const auto wtaPath = _DetectWtaPath(); !wtaPath.empty())
+        {
+            cmdline = std::wstring{ wtaPath };
+
+            const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
+            if (!agentCliPath.empty())
+            {
+                std::wstring agentStr{ agentCliPath };
+                for (size_t pos = 0; (pos = agentStr.find(L'"', pos)) != std::wstring::npos; pos += 2)
+                    agentStr.replace(pos, 1, L"\"\"");
+                cmdline += fmt::format(FMT_COMPILE(L" --agent \"{}\""), agentStr);
+            }
+
+            const auto delegateAgent = _ResolveEffectiveDelegateAgent(globals);
+            if (!delegateAgent.empty())
+            {
+                std::wstring delegateStr{ delegateAgent };
+                for (size_t pos = 0; (pos = delegateStr.find(L'"', pos)) != std::wstring::npos; pos += 2)
+                    delegateStr.replace(pos, 1, L"\"\"");
+                cmdline += fmt::format(FMT_COMPILE(L" --delegate-agent \"{}\""), delegateStr);
+            }
+
+            const auto delegateModel = globals.DelegateModel();
+            if (!delegateModel.empty())
+            {
+                std::wstring modelStr{ delegateModel };
+                for (size_t pos = 0; (pos = modelStr.find(L'"', pos)) != std::wstring::npos; pos += 2)
+                    modelStr.replace(pos, 1, L"\"\"");
+                cmdline += fmt::format(FMT_COMPILE(L" --delegate-model \"{}\""), modelStr);
+            }
+
+            if (!globals.AutoFixEnabled())
+            {
+                cmdline += L" --no-autofix";
+            }
+
+            if (intoSessionsView)
+            {
+                cmdline += L" --initial-view sessions";
+            }
+        }
+        else
+        {
+            cmdline = std::wstring{ globals.AiCoordinatorCommandline() };
+        }
+
+        if (cmdline.empty())
+        {
+            _agentPaneLog("EARLY RETURN: cmdline is empty — no AI assistant configured");
+            if (auto tip{ FindName(L"WindowIdToast").try_as<MUX::Controls::TeachingTip>() })
+            {
+                tip.Title(RS_(L"AgentNotConfiguredTitle"));
+                tip.Subtitle(RS_(L"AgentNotConfiguredSubtitle"));
+                tip.IsOpen(true);
+            }
+            return;
+        }
+        _agentPaneLog("cmdline built OK");
+
+        // Check for the single shared agent pane (may be in any tab).
+        if (const auto existingPane = _FindAgentPane())
+        {
+            _agentPaneLog("found existing agent pane, hidden=" + std::string(existingPane->IsHidden() ? "true" : "false"));
+
+            if (!prompt.empty())
+            {
+                // Broadcast prompt to the running wta process via the WT protocol.
+                _agentPaneLog("prompt non-empty, broadcasting agent_prompt event");
+                Json::Value evt;
+                evt["type"] = "event";
+                evt["method"] = "agent_prompt";
+                Json::Value params;
+                params["prompt"] = winrt::to_string(prompt);
+                evt["params"] = params;
+                Json::StreamWriterBuilder wb;
+                wb["indentation"] = "";
+                ProtocolVtSequenceReceived.raise(
+                    *this,
+                    winrt::to_hstring(Json::writeString(wb, evt)));
+                return;
+            }
+
+            if (intoSessionsView)
+            {
+                // Open-into-sessions semantics (Ctrl+Shift+/): never toggle
+                // closed. Force the active tab's flag on, reconcile (which
+                // moves the pane to the active tab and emits tab_changed),
+                // focus it, then broadcast set_view so wta switches the
+                // *new* active tab's TabSession into the Agents view.
+                const auto activeTab = _GetFocusedTabImpl();
+                if (!activeTab)
+                {
+                    return;
+                }
+                activeTab->AgentPaneOpen(true);
+                _agentPaneLog("intoSessionsView: forcing active tab AgentPaneOpen=true");
+                _ReconcileAgentPaneForActiveTab();
+
+                if (const auto pane = _FindAgentPane())
+                {
+                    if (const auto& content{ pane->GetContent() })
+                    {
+                        content.Focus(FocusState::Programmatic);
+                    }
+                }
+
+                // Order matters: tab_changed (raised inside reconcile via
+                // _NotifyAgentTabChanged) must reach wta before set_view so
+                // the view switch lands on the right TabSession.
+                _BroadcastAgentSetView("sessions");
+                _agentSessionsViewActive = true;
+                return;
+            }
+
+            // Empty prompt: per-tab toggle. Flip the active tab's flag, then
+            // reconcile the shared pane against it. The pane follows the
+            // active tab — switching tabs preserves each tab's open/closed
+            // state independently.
+            const auto activeTab = _GetFocusedTabImpl();
+            if (!activeTab)
+            {
+                return;
+            }
+            const bool wantOpen = !activeTab->AgentPaneOpen();
+            activeTab->AgentPaneOpen(wantOpen);
+            _agentPaneLog(std::string{ "toggle: active tab AgentPaneOpen=" } + (wantOpen ? "true" : "false"));
+            _ReconcileAgentPaneForActiveTab();
+            if (wantOpen)
+            {
+                // Transitioning hidden → visible via the chat keybinding
+                // (Ctrl+Shift+.). Force wta into chat view in case it was
+                // last left in the Agents view (the pane stays alive when
+                // hidden, so wta retains its previous view). Without this
+                // the user would press the chat key and still see the
+                // session list.
+                _BroadcastAgentSetView("chat");
+            }
+            // Toggle path opens to chat (default) or hides the pane —
+            // either way the sessions view is no longer active.
+            _agentSessionsViewActive = false;
+            return;
+        }
+
+        _agentPaneLog("no existing agent pane, creating new one");
+
+        // Append the initial prompt to the cmdline when creating a new pane.
+        if (!prompt.empty())
+        {
+            std::wstring escapedPrompt{ prompt };
+            for (size_t pos = 0; (pos = escapedPrompt.find(L'"', pos)) != std::wstring::npos; pos += 2)
+                escapedPrompt.replace(pos, 1, L"\"\"");
+            cmdline += fmt::format(FMT_COMPILE(L" \"{}\""), escapedPrompt);
+        }
+
+        // Resolve CWD. Priority:
+        //   a) VirtualWorkingDirectory (CLI-remoted commands like `wt agent`)
+        //   b) Active pane CWD (from shell integration / OSC 9;9)
+        //   c) Profile's configured starting directory
+        //   d) User's home directory
+        winrt::hstring startingDirectory = _WindowProperties.VirtualWorkingDirectory();
+        if (startingDirectory.empty())
+        {
+            if (const auto& activeControl = _GetActiveControl())
+            {
+                startingDirectory = activeControl.WorkingDirectory();
+            }
+        }
+        if (startingDirectory.empty())
+        {
+            if (const auto tab = _GetFocusedTabImpl())
+            {
+                if (const auto profile = tab->GetFocusedProfile())
+                {
+                    startingDirectory = profile.EvaluatedStartingDirectory();
+                }
+            }
+        }
+        if (startingDirectory.empty())
+        {
+            wchar_t homePath[MAX_PATH];
+            if (GetEnvironmentVariableW(L"USERPROFILE", homePath, MAX_PATH) > 0)
+            {
+                startingDirectory = winrt::hstring{ homePath };
+            }
+        }
+
+        OutputDebugStringW(fmt::format(FMT_COMPILE(L"[AgentPane] CWD='{}', cmd='{}'\n"),
+                                       std::wstring_view{ startingDirectory },
+                                       cmdline).c_str());
+
+        NewTerminalArgs newTerminalArgs;
+        newTerminalArgs.Commandline(winrt::hstring{ cmdline });
+        if (!startingDirectory.empty())
+        {
+            newTerminalArgs.StartingDirectory(startingDirectory);
+        }
+
+        // Stage the secure-pipe pair for this agent-pane wta. wt-side handles
+        // stay here for PipeServer registration; wta-side handles flow into
+        // _CreateConnectionFromSettings via _pendingProtocolPipeHandles.
+        wil::unique_handle pendingWtRead;
+        wil::unique_handle pendingWtWrite;
+        const bool pipePrepared = _PrepareAgentPanePipe(pendingWtRead, pendingWtWrite);
+
+        auto newPane = _MakeTerminalPane(newTerminalArgs, nullptr, nullptr);
+        if (!newPane)
+        {
+            _pendingProtocolPipeHandles.reset();
+            return;
+        }
+
+        // If the pipe pair was prepared and consumed by _CreateConnectionFromSettings
+        // (i.e. _pendingProtocolPipeHandles is now empty), wire up the PipeServer.
+        if (pipePrepared && !_pendingProtocolPipeHandles.has_value() && pendingWtRead && pendingWtWrite)
+        {
+            _AttachAgentPanePipeServer(std::move(pendingWtRead), std::move(pendingWtWrite));
+        }
+        else
+        {
+            // _CreateConnectionFromSettings was bypassed (e.g. existing connection
+            // path); drop pending handles to avoid dangling.
+            _pendingProtocolPipeHandles.reset();
+        }
+
+        newPane->IsAgentPane(true);
+        _agentPane = newPane;
+        {
+            auto weakSelf = get_weak();
+            newPane->Closed([weakSelf](auto&&, auto&&) {
+                _agentPaneLog("agent pane closed — _agentPane cleared");
+                if (auto self = weakSelf.get())
+                {
+                    self->_agentPane.reset();
+                    self->_lastNotifiedAgentTabId.reset();
+                    self->_agentSessionsViewActive = false;
+                    self->_ClearAllAgentPaneFlags();
+                    self->_UpdateBottomBarState();
+                }
+            });
+        }
+
+        const auto& activeTab = _GetFocusedTabImpl();
+        if (!activeTab)
+        {
+            return;
+        }
+        const auto splitDirection = _AgentPanePositionToSplitDirection(
+            _settings.GlobalSettings().AgentPanePosition());
+
+        _UnZoomIfNeeded();
+        activeTab->SplitPaneAtRoot(splitDirection, newPane);
+
+        if (const auto& content{ newPane->GetContent() })
+        {
+            content.Focus(FocusState::Programmatic);
+        }
+
+        // The user explicitly asked to open it on this tab.
+        activeTab->AgentPaneOpen(true);
+
+        // New pane: wta starts in whichever view --initial-view requested
+        // (chat by default; sessions when Ctrl+Shift+/ triggered the open).
+        _agentSessionsViewActive = intoSessionsView;
+
+        _UpdateBottomBarState();
+    }
+
+    // Focus toggle: ensure the agent pane is visible and cycle focus between it
+    // and the previously focused pane. Unlike _OpenOrReuseAgentPane, this never
+    // hides the agent pane — pressing while already focused on the agent
+    // returns focus to the prior pane, leaving the agent pane visible.
+    void TerminalPage::_FocusAgentPane()
+    {
+        _agentPaneLog("_FocusAgentPane called");
+
+        const auto existingPane = _FindAgentPane();
+
+        // No agent pane yet, or it's hidden — delegate to the create / restore
+        // path, which already focuses the agent pane after showing it.
+        if (!existingPane || existingPane->IsHidden())
+        {
+            _OpenOrReuseAgentPane(L"");
+            return;
+        }
+
+        const auto agentTab = _FindTabContainingAgentPane();
+        if (!agentTab)
+        {
+            return;
+        }
+
+        const auto activeTab = _GetFocusedTabImpl();
+
+        // On a different tab — let the existing logic move it to the active
+        // tab (which also focuses it).
+        if (agentTab != activeTab)
+        {
+            _OpenOrReuseAgentPane(L"");
+            return;
+        }
+
+        // Visible on the active tab. Toggle focus.
+        const auto agentId = existingPane->Id();
+        const auto activePane = activeTab->GetActivePane();
+        const auto activeId = activePane ? activePane->Id() : std::nullopt;
+
+        const bool agentIsFocused = agentId.has_value() &&
+                                    activeId.has_value() &&
+                                    agentId.value() == activeId.value();
+
+        if (agentIsFocused)
+        {
+            // Already on the agent pane — return focus to the source pane.
+            // Tab::_UpdateActivePane tags the last non-agent pane as the
+            // source whenever focus shifts to the agent pane (mouse or
+            // hotkey), so this is always up to date.
+            const auto target = _FindSourceOfAgentPaneId(agentTab->GetRootPane());
+            _agentPaneLog(std::string{ "focus-toggle: returning focus; target=" } +
+                          (target.has_value() ? std::to_string(target.value()) : std::string{ "<none>" }));
+            if (target.has_value())
+            {
+                activeTab->FocusPane(target.value());
+            }
+            return;
+        }
+
+        // Focus is elsewhere — move focus to the agent pane.
+        _agentPaneLog(std::string{ "focus-toggle: focusing agent pane; activeId=" } +
+                      (activeId.has_value() ? std::to_string(activeId.value()) : std::string{ "<none>" }) +
+                      " agentId=" + (agentId.has_value() ? std::to_string(agentId.value()) : std::string{ "<none>" }));
+        if (agentId.has_value())
+        {
+            activeTab->FocusPane(agentId.value());
+        }
+        if (const auto ctrl = existingPane->GetTerminalControl())
+        {
+            ctrl.Focus(winrt::Windows::UI::Xaml::FocusState::Programmatic);
+        }
+        _UpdateBottomBarState();
+    }
+
+    // Walk the pane tree and return the id of the pane currently flagged as
+    // "source of agent pane" — i.e. the last non-agent pane the user was on
+    // before focus moved to the agent. Tab::_UpdateActivePane keeps this in
+    // sync for both hotkey and mouse focus changes, so it's the source of
+    // truth for "where to go back to".
+    std::optional<uint32_t> TerminalPage::_FindSourceOfAgentPaneId(const std::shared_ptr<Pane>& root)
+    {
+        std::optional<uint32_t> result;
+        if (!root)
+        {
+            return result;
+        }
+        root->WalkTree([&](const std::shared_ptr<Pane>& p) {
+            if (!result.has_value() && p->IsSourceOfAgentPane())
+            {
+                result = p->Id();
+            }
+        });
+        return result;
+    }
+
     // Method Description:
     // - This method is called once on startup, on the first LayoutUpdated event.
     //   We'll use this event to know that we have an ActualWidth and
@@ -800,6 +2513,20 @@ namespace winrt::TerminalApp::implementation
     {
         _startupState = StartupState::Initialized;
 
+        // Belt-and-suspenders: also try to auto-create the hidden agent pane
+        // here. _InitializeTab already calls _AutoCreateHiddenAgentPane
+        // synchronously when the first tab is created, but if for any reason
+        // that didn't run (e.g. the first tab was a non-terminal content type
+        // and didn't have a TerminalControl), this gives us a second chance
+        // on the first focused terminal tab.
+        if (!_agentPane.lock())
+        {
+            if (const auto firstTab = _GetFocusedTabImpl())
+            {
+                _AutoCreateHiddenAgentPane(firstTab);
+            }
+        }
+
         // GH#632 - It's possible that the user tried to create the terminal
         // with only one tab, with only an elevated profile. If that happens,
         // we'll create _another_ process to host the elevated version of that
@@ -843,6 +2570,13 @@ namespace winrt::TerminalApp::implementation
             // initialization is finished. However, there are still a few frames
             // after the frame is displayed before the XAML content first draws,
             // so that didn't actually resolve any issues.
+            // Show the first-run experience overlay on the very first launch.
+            // This covers the terminal content until the user clicks Next.
+            if (_IsFreRequired())
+            {
+                _ShowFreOverlay();
+            }
+
             Dispatcher().RunAsync(CoreDispatcherPriority::Low, [weak = get_weak()]() {
                 if (auto self{ weak.get() })
                 {
@@ -1562,7 +3296,7 @@ namespace winrt::TerminalApp::implementation
         else
         {
             auto settingsInternal{ winrt::get_self<Settings::TerminalSettings>(settings) };
-            const auto environment = settingsInternal->EnvironmentVariables();
+            auto environment = settingsInternal->EnvironmentVariables();
 
             // Update the path to be relative to whatever our CWD is.
             //
@@ -1611,6 +3345,8 @@ namespace winrt::TerminalApp::implementation
         {
             valueSet.Insert(L"sessionId", Windows::Foundation::PropertyValue::CreateGuid(id));
         }
+
+        _ConsumePendingProtocolPipeIntoValueSet(valueSet);
 
         connection.Initialize(valueSet);
 
@@ -1769,6 +3505,440 @@ namespace winrt::TerminalApp::implementation
             TraceLoggingValue("About", "ItemType", "The type of item that was clicked in the new tab menu"),
             TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
             TelemetryPrivacyDataTag(PDT_ProductAndServiceUsage));
+    }
+
+    // ─── Bottom Bar (AI toolbar) button handlers ───────────────────────
+
+    void TerminalPage::_AgentToggleButtonOnClick(const IInspectable& /*sender*/,
+                                                  const RoutedEventArgs& /*eventArgs*/)
+    {
+        _OpenOrReuseAgentPane(L"");
+        _UpdateBottomBarState();
+    }
+
+    void TerminalPage::_DiagnosticsButtonOnClick(const IInspectable& /*sender*/,
+                                                  const RoutedEventArgs& /*eventArgs*/)
+    {
+        switch (_diagnostics.autofixState)
+        {
+        case AutofixState::Armed:
+            // Fix ready — execute it.
+            _TriggerAutofix();
+            break;
+        case AutofixState::Suggested:
+            // No executable fix — auto-fix produced an explanation that lives
+            // in the agent pane chat history. Open the pane so the user can
+            // read it, then drop back to Idle (the suggestion has been "seen").
+            _OpenOrReuseAgentPane(L"");
+            _diagnostics.autofixState = AutofixState::Idle;
+            _diagnostics.suggestionTitle.clear();
+            _UpdateBottomBarState();
+            break;
+        case AutofixState::Pending:
+            // Analysis in flight — show the agent pane so the user can watch
+            // progress. Keep Pending state until WTA confirms armed/cleared.
+            _OpenOrReuseAgentPane(L"");
+            break;
+        case AutofixState::Idle:
+        default:
+            // Button is disabled in Idle, but if reached anyway just no-op.
+            break;
+        }
+    }
+
+    // Updates the bottom bar visual state based on whether the agent pane
+    // is currently visible in the active tab, and the diagnostic error count.
+    // The bottom bar is hidden entirely on non-terminal tabs (e.g. Settings).
+    void TerminalPage::_UpdateBottomBarState()
+    {
+        // Hide the bottom bar on non-terminal tabs (Settings, Scratchpad, etc.)
+        // by checking the active content type directly. AgentPaneContent counts
+        // as a terminal — it wraps a TerminalPaneContent — so the bottom bar
+        // stays visible when the agent pane is focused.
+        if (auto bottomBar = BottomBar())
+        {
+            bool isTerminalTab = true;
+            if (const auto tab = _GetFocusedTabImpl())
+            {
+                if (const auto content = tab->GetActiveContent())
+                {
+                    const bool isTerm = content.try_as<TerminalApp::TerminalPaneContent>() != nullptr;
+                    const bool isAgent = content.try_as<TerminalApp::AgentPaneContent>() != nullptr;
+                    isTerminalTab = isTerm || isAgent;
+                }
+            }
+            bottomBar.Visibility(isTerminalTab ? Visibility::Visible : Visibility::Collapsed);
+            if (!isTerminalTab)
+            {
+                return;
+            }
+        }
+
+        // Per-tab flag drives the toggle button's lit state — it tracks
+        // whether the user wants the agent pane open on the *active* tab,
+        // not whether the single shared pane object happens to be visible
+        // (it may currently live in a different tab).
+        const auto existingPane = _FindAgentPane();
+        bool activeTabWantsOpen = false;
+        if (existingPane)
+        {
+            if (const auto activeTab = _GetFocusedTabImpl())
+            {
+                activeTabWantsOpen = activeTab->AgentPaneOpen();
+            }
+        }
+        _agentPaneVisible = activeTabWantsOpen;
+
+        // Update AI toggle button visual — use a subtle highlight when active.
+        if (auto toggleBtn = AgentToggleButton())
+        {
+            if (_agentPaneVisible)
+            {
+                // Subtle white overlay for both light and dark themes
+                toggleBtn.Background(SolidColorBrush{
+                    ColorHelper::FromArgb(30, 255, 255, 255) });
+            }
+            else
+            {
+                toggleBtn.Background(SolidColorBrush{ Colors::Transparent() });
+            }
+        }
+
+        // Swap the toggle icon to match the current pane position.
+        {
+            const auto position = _settings.GlobalSettings().AgentPanePosition();
+            const bool isVertical = (position == L"right" || position == L"left");
+            if (auto iconBottom = AgentToggleIconBottom())
+                iconBottom.Visibility(isVertical ? Visibility::Collapsed : Visibility::Visible);
+            if (auto iconRight = AgentToggleIconRight())
+                iconRight.Visibility(isVertical ? Visibility::Visible : Visibility::Collapsed);
+        }
+
+        // Update diagnostics button + label based on the autofix state.
+        //   Idle    : dim icon, no label        — not clickable
+        //   Pending : lit icon (neutral), label "Error detected: analyzing…"
+        //             — not clickable (WTA is still generating the fix)
+        //   Armed   : lit icon (accent), label "Error detected: <hotkey> to fix"
+        //             — clickable, click/hotkey executes the cached fix
+        if (auto diagBtn = DiagnosticsButton())
+        {
+            auto label = DiagnosticsLabel();
+            auto icon = DiagnosticsIcon();
+
+            switch (_diagnostics.autofixState)
+            {
+            case AutofixState::Pending:
+            {
+                diagBtn.Opacity(1.0);
+                diagBtn.IsEnabled(false);
+                ToolTipService::SetToolTip(
+                    diagBtn,
+                    box_value(winrt::hstring{ L"Analyzing error…" }));
+                if (icon)
+                {
+                    icon.Foreground(
+                        SolidColorBrush{ ColorHelper::FromArgb(255, 0xD6, 0xB7, 0x00) });
+                }
+                if (label)
+                {
+                    label.Text(L"Error detected: analyzing…");
+                    label.Foreground(
+                        SolidColorBrush{ ColorHelper::FromArgb(255, 0xD6, 0xB7, 0x00) });
+                    label.Visibility(Visibility::Visible);
+                }
+                break;
+            }
+            case AutofixState::Armed:
+            {
+                diagBtn.Opacity(1.0);
+                diagBtn.IsEnabled(true);
+
+                const auto hotkey = _diagnostics.hotkeyHint.empty()
+                                        ? std::wstring{ L"Ctrl+Alt+." }
+                                        : _diagnostics.hotkeyHint;
+                std::wstring labelText = L"Error detected: " + hotkey + L" to fix";
+                label.Text(winrt::hstring{ labelText });
+
+                // Yellow warning color.
+                const auto accent = SolidColorBrush{
+                    ColorHelper::FromArgb(255, 0xFF, 0xD7, 0x00)
+                };
+                if (icon)
+                {
+                    icon.Foreground(accent);
+                }
+                if (label)
+                {
+                    label.Foreground(accent);
+                    label.Visibility(Visibility::Visible);
+                }
+
+                std::wstring tooltip = L"Fix ready — " + hotkey + L" to apply";
+                if (!_diagnostics.fixPreview.empty())
+                {
+                    tooltip += L": ";
+                    if (_diagnostics.fixPreview.size() > 120)
+                    {
+                        tooltip.append(_diagnostics.fixPreview, 0, 120);
+                        tooltip += L"…";
+                    }
+                    else
+                    {
+                        tooltip += _diagnostics.fixPreview;
+                    }
+                }
+                ToolTipService::SetToolTip(
+                    diagBtn,
+                    box_value(winrt::hstring{ tooltip }));
+                break;
+            }
+            case AutofixState::Suggested:
+            {
+                diagBtn.Opacity(1.0);
+                diagBtn.IsEnabled(true);
+
+                // Same yellow as Armed — both are "something needs attention"
+                // states. The label text is what distinguishes them
+                // ("open agent pane" vs "Ctrl+Alt+. to fix").
+                const auto accent = SolidColorBrush{
+                    ColorHelper::FromArgb(255, 0xFF, 0xD7, 0x00)
+                };
+                if (icon)
+                {
+                    icon.Foreground(accent);
+                }
+                if (label)
+                {
+                    label.Text(L"Suggestion ready — open agent pane");
+                    label.Foreground(accent);
+                    label.Visibility(Visibility::Visible);
+                }
+
+                std::wstring tooltip = L"Auto-fix declined to fix this directly. ";
+                if (!_diagnostics.suggestionTitle.empty())
+                {
+                    tooltip += L"\n";
+                    tooltip += _diagnostics.suggestionTitle;
+                    tooltip += L"\n";
+                }
+                tooltip += L"Click here or press Ctrl+Shift+. to open the agent pane and read the full suggestion.";
+                ToolTipService::SetToolTip(
+                    diagBtn,
+                    box_value(winrt::hstring{ tooltip }));
+                break;
+            }
+            case AutofixState::Idle:
+            default:
+            {
+                diagBtn.Opacity(0.5);
+                diagBtn.IsEnabled(false);
+                ToolTipService::SetToolTip(
+                    diagBtn,
+                    box_value(winrt::hstring{ L"Diagnostics" }));
+                if (icon)
+                {
+                    // Neutral gray — Opacity=0.5 already makes it barely
+                    // visible; picking a concrete brush avoids leaving an
+                    // accent color from the previous Armed state.
+                    icon.Foreground(
+                        SolidColorBrush{ ColorHelper::FromArgb(255, 0xB0, 0xB0, 0xB0) });
+                }
+                if (label)
+                {
+                    label.Visibility(Visibility::Collapsed);
+                    label.Text(L"");
+                }
+                break;
+            }
+            }
+        }
+    }
+
+    // Inbound event from WTA carrying an autofix_state update. Called by the
+    // COM server on the UI thread. Payload shape:
+    //   {"type":"event","method":"autofix_state",
+    //    "params":{"state":"pending|armed|cleared",
+    //              "session_id":"...", "summary":"...",
+    //              "fix_preview":"...", "hotkey_hint":"Ctrl+."}}
+    void TerminalPage::OnAutofixStateChanged(hstring eventJson)
+    {
+        Json::Value evt;
+        Json::CharReaderBuilder rb;
+        std::istringstream ss(winrt::to_string(eventJson));
+        std::string errs;
+        if (!Json::parseFromStream(rb, ss, &evt, &errs))
+        {
+            return;
+        }
+        const auto& params = evt["params"];
+        if (!params.isObject() || !params.isMember("state"))
+        {
+            return;
+        }
+        const auto state = params["state"].asString();
+        if (state == "pending")
+        {
+            _diagnostics.autofixState = AutofixState::Pending;
+        }
+        else if (state == "armed")
+        {
+            _diagnostics.autofixState = AutofixState::Armed;
+        }
+        else if (state == "suggested")
+        {
+            _diagnostics.autofixState = AutofixState::Suggested;
+        }
+        else if (state == "cleared")
+        {
+            _diagnostics.autofixState = AutofixState::Idle;
+            _diagnostics.fixPreview.clear();
+            _diagnostics.suggestionTitle.clear();
+        }
+        if (params.isMember("session_id") && params["session_id"].isString())
+        {
+            const auto s = params["session_id"].asString();
+            _diagnostics.lastErrorSessionId.assign(s.begin(), s.end());
+        }
+        if (params.isMember("fix_preview") && params["fix_preview"].isString())
+        {
+            const auto s = params["fix_preview"].asString();
+            _diagnostics.fixPreview.assign(s.begin(), s.end());
+        }
+        if (params.isMember("hotkey_hint") && params["hotkey_hint"].isString())
+        {
+            const auto s = params["hotkey_hint"].asString();
+            _diagnostics.hotkeyHint.assign(s.begin(), s.end());
+        }
+        if (params.isMember("suggestion_title") && params["suggestion_title"].isString())
+        {
+            const auto s = params["suggestion_title"].asString();
+            _diagnostics.suggestionTitle.assign(s.begin(), s.end());
+        }
+        _UpdateBottomBarState();
+    }
+
+    // Inbound event from WTA: {method:"agent_status", params:{name,version,model,state}}.
+    // Find the agent leaf and forward the values to AgentPaneContent so the
+    // XAML bar can refresh its label / future status indicator.
+    void TerminalPage::OnAgentStatusChanged(hstring eventJson)
+    {
+        Json::Value evt;
+        Json::CharReaderBuilder rb;
+        std::istringstream ss(winrt::to_string(eventJson));
+        std::string errs;
+        if (!Json::parseFromStream(rb, ss, &evt, &errs))
+        {
+            return;
+        }
+        const auto& params = evt["params"];
+        if (!params.isObject())
+        {
+            return;
+        }
+
+        const auto pickStr = [&](const char* key) -> winrt::hstring {
+            if (!params.isMember(key))
+            {
+                return {};
+            }
+            const auto& v = params[key];
+            if (v.isString())
+            {
+                return winrt::to_hstring(v.asString());
+            }
+            return {};
+        };
+        const auto name = pickStr("name");
+        const auto version = pickStr("version");
+        const auto model = pickStr("model");
+        const auto state = pickStr("state");
+
+        _agentPaneLog("OnAgentStatusChanged: payload=" + winrt::to_string(eventJson).substr(0, 600));
+
+        // Sync the process-wide model-list cache. The Settings UI's
+        // AIAgentsViewModel reads from this on construction, so any new
+        // dropdown opened after this point sees the freshest list.
+        if (params.isMember("available_models") && params["available_models"].isArray())
+        {
+            _agentPaneLog("OnAgentStatusChanged: available_models has " +
+                          std::to_string(params["available_models"].size()) + " entries");
+            std::vector<winrt::Microsoft::Terminal::Settings::Model::AcpModelInfo> entries;
+            for (const auto& m : params["available_models"])
+            {
+                if (!m.isObject())
+                {
+                    continue;
+                }
+                winrt::hstring id;
+                winrt::hstring name;
+                winrt::hstring description;
+                if (m.isMember("id") && m["id"].isString())
+                {
+                    id = winrt::to_hstring(m["id"].asString());
+                }
+                if (m.isMember("name") && m["name"].isString())
+                {
+                    name = winrt::to_hstring(m["name"].asString());
+                }
+                if (m.isMember("description") && m["description"].isString())
+                {
+                    description = winrt::to_hstring(m["description"].asString());
+                }
+                if (!id.empty())
+                {
+                    entries.push_back(winrt::Microsoft::Terminal::Settings::Model::AcpModelInfo{
+                        id,
+                        name.empty() ? id : name,
+                        description });
+                }
+            }
+            winrt::hstring currentId;
+            if (params.isMember("current_model_id") && params["current_model_id"].isString())
+            {
+                currentId = winrt::to_hstring(params["current_model_id"].asString());
+            }
+            winrt::Microsoft::Terminal::Settings::Model::AcpRuntimeState::Current()
+                .SetAvailableModels(
+                    winrt::single_threaded_vector(std::move(entries)).GetView(),
+                    currentId);
+        }
+
+        const auto agentPane = _FindAgentPane();
+        if (!agentPane)
+        {
+            return;
+        }
+        if (const auto content = agentPane->GetContent())
+        {
+            if (const auto agentContent = content.try_as<winrt::TerminalApp::AgentPaneContent>())
+            {
+                agentContent.UpdateAgentStatus(name, version, model, state);
+            }
+        }
+    }
+
+    // Send {method:"autofix_execute",params:{pane_id}} over the outbound
+    // protocol bus. WTA (as a wtcli subscriber) receives this via its
+    // listen --json event stream and executes the cached fix.
+    void TerminalPage::_TriggerAutofix()
+    {
+        if (_diagnostics.autofixState != AutofixState::Armed)
+        {
+            return;
+        }
+        Json::Value evt;
+        evt["type"] = "event";
+        evt["method"] = "autofix_execute";
+        Json::Value params;
+        params["session_id"] = winrt::to_string(_diagnostics.lastErrorSessionId);
+        evt["params"] = params;
+        Json::StreamWriterBuilder wb;
+        wb["indentation"] = "";
+        ProtocolVtSequenceReceived.raise(
+            *this,
+            winrt::to_hstring(Json::writeString(wb, evt)));
+
+        // WTA will emit autofix_state:cleared — OnAutofixStateChanged handles the transition.
     }
 
     // Method Description:
@@ -2007,6 +4177,27 @@ namespace winrt::TerminalApp::implementation
     //      on the right thread
     // Arguments:
     // - term: The newly created TermControl to connect the events for
+    std::string TerminalPage::_FindSessionIdForControl(const TermControl& control)
+    {
+        if (const auto conn = control.Connection())
+        {
+            const auto sid = conn.SessionId();
+            if (sid != winrt::guid{})
+            {
+                // Format as plain GUID string (no braces), matching WT_SESSION.
+                wchar_t buf[40]{};
+                StringFromGUID2(sid, buf, ARRAYSIZE(buf));
+                // StringFromGUID2 produces {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
+                // Strip braces for plain format.
+                std::wstring ws(buf);
+                if (ws.size() > 2 && ws.front() == L'{' && ws.back() == L'}')
+                    ws = ws.substr(1, ws.size() - 2);
+                return winrt::to_string(winrt::hstring{ ws });
+            }
+        }
+        return {};
+    }
+
     void TerminalPage::_RegisterTerminalEvents(TermControl term)
     {
         term.RaiseNotice({ this, &TerminalPage::_ControlNoticeRaisedHandler });
@@ -2035,6 +4226,178 @@ namespace winrt::TerminalApp::implementation
         term.ShowWindowChanged({ get_weak(), &TerminalPage::_ShowWindowChangedHandler });
         term.SearchMissingCommand({ get_weak(), &TerminalPage::_SearchMissingCommandHandler });
         term.WindowSizeChanged({ get_weak(), &TerminalPage::_WindowSizeChanged });
+
+        // Forward VT sequences and connection state changes to protocol clients.
+        // This is unconditional — if no pipe client is listening, the event raise is a noop.
+        //
+        // We capture a weak ref to the TermControl and resolve the connection SessionId
+        // at event-fire time, because at _RegisterTerminalEvents time the Pane hasn't
+        // been created yet (TermControl is set up before the Pane wraps it).
+        //
+        // VtSequenceReceived fires on the connection reader thread (background).
+        // _FindSessionIdForControl accesses _tabs which has UI thread affinity,
+        // so we dispatch the session ID lookup + event raise to the UI thread.
+        {
+            winrt::weak_ref<TermControl> weakTerm{ term };
+
+            term.VtSequenceReceived(
+                [weakThis = get_weak(), weakTerm](auto&&, const winrt::hstring& seq) {
+                    auto strongThis = weakThis.get();
+                    if (!strongThis)
+                        return;
+
+                    // Dispatch to UI thread: _FindSessionIdForControl accesses _tabs
+                    // which has UI thread affinity.  Fire-and-forget — don't block
+                    // the connection reader thread.
+                    strongThis->Dispatcher().RunAsync(
+                        winrt::Windows::UI::Core::CoreDispatcherPriority::Normal,
+                        [weakThis, weakTerm, seq]() {
+                            auto page = weakThis.get();
+                            auto term2 = weakTerm.get();
+                            if (!page || !term2)
+                                return;
+
+                            // Autofix pipeline: skip forwarding if disabled at runtime.
+                            if (!page->_settings.GlobalSettings().AutoFixEnabled())
+                                return;
+
+                            const auto sessionIdStr = page->_FindSessionIdForControl(term2);
+                            if (sessionIdStr.empty())
+                                return;
+
+                            auto seqStr = winrt::to_string(seq);
+
+                            // Check for AgentEvent sub-action: "AgentEvent;{json}"
+                            static constexpr std::string_view agentPrefix = "AgentEvent;";
+                            if (seqStr.starts_with(agentPrefix))
+                            {
+                                auto jsonPayload = seqStr.substr(agentPrefix.size());
+                                Json::Value agentParams;
+                                Json::CharReaderBuilder rb;
+                                std::string errs;
+                                std::istringstream ss(jsonPayload);
+                                if (Json::parseFromStream(rb, ss, &agentParams, &errs) &&
+                                    agentParams.isObject() &&
+                                    agentParams.isMember("event") &&
+                                    agentParams["event"].isString())
+                                {
+                                    agentParams["session_id"] = sessionIdStr;
+
+                                    Json::Value evt;
+                                    evt["type"] = "event";
+                                    evt["method"] = "agent_event";
+                                    evt["params"] = agentParams;
+
+                                    Json::StreamWriterBuilder wb;
+                                    wb["indentation"] = "";
+                                    page->ProtocolVtSequenceReceived.raise(
+                                        *page,
+                                        winrt::to_hstring(Json::writeString(wb, evt)));
+                                    return; // Don't also emit as raw vt_sequence
+                                }
+                            }
+
+                            // Track command failures for the bottom bar diagnostics button.
+                            // OSC 133;D;N with N>0 means the last command failed.
+                            // seqStr format: "osc:133;D;1"
+                            static constexpr std::string_view osc133Prefix = "osc:133;";
+                            if (seqStr.starts_with(osc133Prefix))
+                            {
+                                auto rest = seqStr.substr(osc133Prefix.size());
+                                // rest is e.g. "D;1" or "D;0"
+                                if (rest.starts_with("D;"))
+                                {
+                                    auto codeStr = rest.substr(2);
+                                    int exitCode = 0;
+                                    try { exitCode = std::stoi(codeStr); } catch (...) {}
+                                    // All bar state transitions come from WTA via autofix_state events.
+                                }
+                            }
+
+                            Json::Value evt;
+                            evt["type"] = "event";
+                            evt["method"] = "vt_sequence";
+                            Json::Value params;
+                            params["session_id"] = sessionIdStr;
+                            params["sequence"] = seqStr;
+                            evt["params"] = params;
+                            Json::StreamWriterBuilder wb;
+                            wb["indentation"] = "";
+                            page->ProtocolVtSequenceReceived.raise(
+                                *page,
+                                winrt::to_hstring(Json::writeString(wb, evt)));
+                        });
+                });
+
+            term.ConnectionStateChanged(
+                [weakThis = get_weak(), weakTerm](const auto& /*sender*/, auto&&) {
+                    auto strongThis = weakThis.get();
+                    if (!strongThis)
+                        return;
+
+                    // NOTE: `sender` here is NOT the TermControl. TermControl
+                    // bubble-forwards this event from its inner ControlCore via
+                    // BUBBLED_FORWARDED_TYPED_EVENT, which passes the original
+                    // sender through unchanged. So `sender` is the ControlCore
+                    // and `try_as<TermControl>()` always returns null, which
+                    // would leave stateStr permanently "unknown" and the switch
+                    // dead code. Read state from the captured weakTerm instead.
+                    auto control = weakTerm.get();
+                    if (!control)
+                        return;
+
+                    std::string stateStr;
+                    switch (control.ConnectionState())
+                    {
+                    case ConnectionState::Connected:
+                        stateStr = "connected";
+                        break;
+                    case ConnectionState::Closed:
+                        stateStr = "closed";
+                        break;
+                    case ConnectionState::Failed:
+                        stateStr = "failed";
+                        break;
+                    default:
+                        return;
+                    }
+
+                    // Dispatch to UI thread: _FindSessionIdForControl accesses _tabs.
+                    strongThis->Dispatcher().RunAsync(
+                        winrt::Windows::UI::Core::CoreDispatcherPriority::Normal,
+                        [weakThis, weakTerm, stateStr]() {
+                            auto page = weakThis.get();
+                            auto term2 = weakTerm.get();
+                            if (!page)
+                                return;
+
+                            // connection_state is pane-lifecycle plumbing that
+                            // wta needs regardless of AutoFix being enabled —
+                            // it drives F2 session-list demotion (PaneClosed)
+                            // when an agent CLI exits and the pane is closed.
+                            // Volume is low (a handful of events per pane
+                            // lifecycle), so always forward.
+                            const auto sessionIdStr = term2
+                                ? page->_FindSessionIdForControl(term2)
+                                : std::string{};
+                            if (sessionIdStr.empty())
+                                return;
+
+                            Json::Value evt;
+                            evt["type"] = "event";
+                            evt["method"] = "connection_state";
+                            Json::Value params;
+                            params["session_id"] = sessionIdStr;
+                            params["state"] = stateStr;
+                            evt["params"] = params;
+                            Json::StreamWriterBuilder wb;
+                            wb["indentation"] = "";
+                            page->ProtocolVtSequenceReceived.raise(
+                                *page,
+                                winrt::to_hstring(Json::writeString(wb, evt)));
+                        });
+                });
+        }
 
         // Don't even register for the event if the feature is compiled off.
         if constexpr (Feature_ShellCompletions::IsEnabled())
@@ -2221,6 +4584,8 @@ namespace winrt::TerminalApp::implementation
         p.CommandLineExecutionRequested({ this, &TerminalPage::_OnCommandLineExecutionRequested });
         p.SwitchToTabRequested({ this, &TerminalPage::_OnSwitchToTabRequested });
         p.PreviewAction({ this, &TerminalPage::_PreviewActionHandler });
+        p.AgentForegroundPromptRequested({ this, &TerminalPage::_OnAgentForegroundPromptRequested });
+        p.AgentBackgroundTaskRequested({ this, &TerminalPage::_OnAgentBackgroundTaskRequested });
 
         return p;
     }
@@ -2808,7 +5173,8 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_SplitPane(const winrt::com_ptr<Tab>& tab,
                                   const SplitDirection splitDirection,
                                   const float splitSize,
-                                  std::shared_ptr<Pane> newPane)
+                                  std::shared_ptr<Pane> newPane,
+                                  bool focusNewPane)
     {
         auto activeTab = tab;
         // Clever hack for a crash in startup, with multiple sub-commands. Say
@@ -2845,6 +5211,15 @@ namespace winrt::TerminalApp::implementation
             return;
         }
 
+        // Agent panes are fixed panels and cannot be split.
+        if (const auto activePane = activeTab->GetActivePane())
+        {
+            if (activePane->IsAgentPane())
+            {
+                return;
+            }
+        }
+
         // If the caller is calling us with the return value of _MakePane
         // directly, it's possible that nullptr was returned, if the connections
         // was supposed to be launched in an elevated window. In that case, do
@@ -2869,7 +5244,7 @@ namespace winrt::TerminalApp::implementation
         // After GH#6586, the control will no longer focus itself
         // automatically when it's finished being laid out. Manually focus
         // the control here instead.
-        if (_startupState == StartupState::Initialized)
+        if (focusNewPane && _startupState == StartupState::Initialized)
         {
             if (const auto& content{ newGuy->GetContent() })
             {
@@ -3739,10 +6114,15 @@ namespace winrt::TerminalApp::implementation
         const auto sessionId = controlSettings.DefaultSettings()->SessionId();
         const auto hasSessionId = sessionId != winrt::guid{};
 
-        auto connection = existingConnection ? existingConnection : _CreateConnectionFromSettings(profile, *controlSettings.DefaultSettings(), hasSessionId);
+        TerminalConnection::ITerminalConnection connection{ nullptr };
         if (existingConnection)
         {
+            connection = existingConnection;
             connection.Resize(controlSettings.DefaultSettings()->InitialRows(), controlSettings.DefaultSettings()->InitialCols());
+        }
+        else
+        {
+            connection = _CreateConnectionFromSettings(profile, *controlSettings.DefaultSettings(), hasSessionId);
         }
 
         TerminalConnection::ITerminalConnection debugConnection{ nullptr };
@@ -4056,6 +6436,15 @@ namespace winrt::TerminalApp::implementation
 
         // The user may have changed the "show title in titlebar" setting.
         TitleChanged.raise(*this, nullptr);
+
+        // Reposition existing agent panes if the position setting changed.
+        _RepositionAgentPanes();
+
+        // If any of the agent-identity settings (agent / model / custom
+        // command for either ACP or delegate) changed, tear down and
+        // recreate the affected layers so the new values take effect
+        // without a terminal restart.
+        _RebuildAgentStack();
     }
 
     void TerminalPage::_updateAllTabCloseButtons()
@@ -4504,6 +6893,9 @@ namespace winrt::TerminalApp::implementation
         // Create the SUI pane content
         auto settingsContent{ winrt::make_self<SettingsPaneContent>(_settings) };
         auto sui = settingsContent->SettingsUI();
+        _settingsMainPage = sui;
+
+        sui.InitShellIntegrationRequested({ get_weak(), &TerminalPage::_OnSettingsInitShellIntegration });
 
         if (_hostingHwnd)
         {
@@ -4550,6 +6942,7 @@ namespace winrt::TerminalApp::implementation
         {
             _tabView.SelectedItem(_settingsTab.TabViewItem());
         }
+
     }
 
     // Method Description:
@@ -5228,6 +7621,17 @@ namespace winrt::TerminalApp::implementation
             // be able to hittest for clicks, and then clicking on the border
             // will eat focus.
             _paneResources.broadcastBorderBrush = SolidColorBrush{ Colors::Black() };
+        }
+
+        const auto agentColorKey = winrt::box_value(L"AgentPaneBorderColor");
+        if (res.HasKey(agentColorKey))
+        {
+            auto obj = ThemeLookup(res, requestedTheme, agentColorKey);
+            _paneResources.agentFocusedBorderBrush = obj.try_as<winrt::Windows::UI::Xaml::Media::SolidColorBrush>();
+        }
+        else
+        {
+            _paneResources.agentFocusedBorderBrush = SolidColorBrush{ Colors::Black() };
         }
     }
 

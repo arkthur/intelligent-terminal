@@ -33,8 +33,21 @@
     "minimizeToNotificationArea": false,
     "alwaysShowNotificationIcon": false,
 
+    // Agent Integration
+    "agentPanePosition": "bottom",
+
     "profiles":
     [
+        {
+            "guid": "{fd19208a-412b-4857-8a2d-9ca592b4b16e}",
+            "name": "Agent Pane",
+            "hidden": true,
+            "padding": "8, 8, 8, 0",
+            "background": "#0c0c0c",
+            "scrollbarState": "hidden",
+            "closeOnExit": "always",
+            "suppressApplicationTitle": true
+        },
         {
             "guid": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
             "name": "Windows PowerShell",
@@ -531,6 +544,7 @@
         { "command": "renameTab", "id": "Terminal.RenameTab" },
         { "command": "openTabRenamer", "id": "Terminal.OpenTabRenamer" },
         { "command": "commandPalette", "id": "Terminal.ToggleCommandPalette" },
+        { "command": "showProtocolInfo", "id": "Terminal.ShowProtocolInfo" },
         { "command": "identifyWindow", "id": "Terminal.IdentifyWindow" },
         { "command": "openWindowRenamer", "id": "Terminal.OpenWindowRenamer" },
         { "command": "quakeMode", "id": "Terminal.QuakeMode" },
@@ -542,7 +556,10 @@
         { "command": "quickFix", "id": "Terminal.QuickFix" },
         { "command": { "action": "showSuggestions", "source": "all"}, "id": "Terminal.Suggestions" },
         { "command": "openCWD", "id": "Terminal.OpenCWD" },
-
+        { "command": "openAgentPane", "id": "Terminal.OpenAgentPane" },
+        { "command": "focusAgentPane", "id": "Terminal.FocusAgentPane" },
+        { "command": "openAgentSessions", "id": "Terminal.OpenAgentSessions" },
+        { "command": "triggerAutofix", "id": "Terminal.TriggerAutofix" },
         // Tab Management
         // "command": "closeTab" is unbound by default.
         //   The closeTab command closes a tab without confirmation, even if it has multiple panes.
@@ -609,6 +626,7 @@
         { "command": { "action": "swapPane", "direction": "first" }, "id": "Terminal.SwapPaneFirst" },
         { "command": "toggleBroadcastInput", "id": "Terminal.ToggleBroadcastInput" },
         { "command": "togglePaneZoom", "id": "Terminal.TogglePaneZoom" },
+        { "command": "togglePaneVisibility", "id": "Terminal.TogglePaneVisibility" },
         { "command": "toggleSplitOrientation", "id": "Terminal.ToggleSplitOrientation" },
         { "command": "toggleReadOnlyMode", "id": "Terminal.ToggleReadOnlyMode" },
         { "command": "enableReadOnlyMode", "id": "Terminal.EnableReadOnlyMode" },
@@ -731,7 +749,10 @@
         { "keys": "ctrl+shift+p", "id": "Terminal.ToggleCommandPalette" },
         { "keys": "win+sc(41)", "id": "Terminal.QuakeMode" },
         { "keys": "alt+space", "id": "Terminal.OpenSystemMenu" },
-        { "keys": "ctrl+shift+period", "id": "Terminal.Suggestions" },
+        { "keys": "ctrl+shift+period", "id": "Terminal.OpenAgentPane" },
+        { "keys": "ctrl+shift+i", "id": "Terminal.FocusAgentPane" },
+        { "keys": "ctrl+shift+/", "id": "Terminal.OpenAgentSessions" },
+        { "keys": "ctrl+alt+period", "id": "Terminal.TriggerAutofix" },
 
         // Tab Management
         // "command": "closeTab" is unbound by default.

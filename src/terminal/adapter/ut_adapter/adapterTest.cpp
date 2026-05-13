@@ -233,6 +233,10 @@ public:
         Log::Comment(L"SearchMissingCommand MOCK called...");
     }
 
+    void NotifyVtSequence(const std::wstring_view /*sequence*/) override
+    {
+    }
+
     void PrepData()
     {
         PrepData(CursorDirection::UP); // if called like this, the cursor direction doesn't matter.

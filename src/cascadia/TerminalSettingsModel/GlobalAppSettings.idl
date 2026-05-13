@@ -114,6 +114,22 @@ namespace Microsoft.Terminal.Settings.Model
         INHERITABLE_SETTING(Boolean, EnableUnfocusedAcrylic);
         INHERITABLE_SETTING(Boolean, AllowHeadless);
         INHERITABLE_SETTING(String, SearchWebDefaultQueryUrl);
+        INHERITABLE_SETTING(String, AcpAgent);
+        INHERITABLE_SETTING(String, AcpModel);
+        INHERITABLE_SETTING(String, DelegateAgent);
+        INHERITABLE_SETTING(String, DelegateModel);
+        INHERITABLE_SETTING(Boolean, AutoFixEnabled);
+        INHERITABLE_SETTING(String, AcpCustomCommand);
+        INHERITABLE_SETTING(String, DelegateCustomCommand);
+        INHERITABLE_SETTING(String, AgentPanePosition);
+
+        // AI Integration settings
+        INHERITABLE_SETTING(Boolean, AiCoordinatorEnabled);
+        INHERITABLE_SETTING(String, AiCoordinatorCommandline);
+        INHERITABLE_SETTING(String, AiCoordinatorProfile);
+        INHERITABLE_SETTING(String, AiConfirmationReadOps);
+        INHERITABLE_SETTING(String, AiConfirmationCreateOps);
+        INHERITABLE_SETTING(String, AiConfirmationInputOps);
 
         Windows.Foundation.Collections.IMapView<String, ColorScheme> ColorSchemes();
         void AddColorScheme(ColorScheme scheme);
