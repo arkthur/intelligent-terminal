@@ -37,6 +37,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let inner = Block::default().borders(Borders::NONE);
     let inner_area = inner.inner(area);
     let visible_height = inner_area.height as usize;
+    let wrap_width = inner_area.width as usize;
     let requested_lines = visible_height
         .saturating_add(app.current_tab().scroll_offset)
         .saturating_add(32);
@@ -52,7 +53,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
 
     for (idx, msg) in app.current_tab().messages.iter().enumerate().rev() {
         let is_last_message = idx + 1 == app.current_tab().messages.len();
-        let mut message_lines = build_message_lines(msg, is_last_message, app.current_tab().agent_streaming);
+        let mut message_lines = build_message_lines(msg, is_last_message, app.current_tab().agent_streaming, wrap_width);
         reversed_lines.extend(message_lines.drain(..).rev());
         if reversed_lines.len() >= requested_lines {
             break;
@@ -62,7 +63,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     let selected_idx = app.current_tab().selected_completed_turn_idx;
     for (idx, turn) in app.current_tab().completed_turns.iter().enumerate().rev() {
         let is_selected = selected_idx == Some(idx);
-        let mut turn_lines = build_completed_turn_lines(turn, is_selected);
+        let mut turn_lines = build_completed_turn_lines(turn, is_selected, wrap_width);
         reversed_lines.extend(turn_lines.drain(..).rev());
         if reversed_lines.len() >= requested_lines {
             break;
@@ -97,6 +98,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
 fn build_completed_turn_lines<'a>(
     turn: &'a crate::app::CompletedTurn,
     is_selected: bool,
+    wrap_width: usize,
 ) -> Vec<Line<'a>> {
     let chevron = if turn.expanded { "▼ " } else { "▶ " };
     // Selected row uses the SELECTED theme (reverse video) to make the
@@ -126,7 +128,7 @@ fn build_completed_turn_lines<'a>(
         // `agent_streaming=false` together suppress the streaming-cursor
         // path; details are always finalized by the time they land here.
         for msg in turn.details.iter() {
-            lines.extend(build_message_lines(msg, false, false));
+            lines.extend(build_message_lines(msg, false, false, wrap_width));
         }
     }
 
@@ -237,6 +239,7 @@ fn build_message_lines<'a>(
     msg: &'a ChatMessage,
     is_last_message: bool,
     agent_streaming: bool,
+    wrap_width: usize,
 ) -> Vec<Line<'a>> {
     let mut lines = Vec::new();
     match msg {
@@ -248,21 +251,13 @@ fn build_message_lines<'a>(
             lines.push(Line::default());
         }
         ChatMessage::Agent(text) => {
-            for (i, line_text) in text.lines().enumerate() {
-                if i == 0 {
-                    // First line gets green dot indicator
-                    lines.push(Line::from(vec![
-                        Span::styled("● ", theme::DOT_AGENT),
-                        Span::styled(truncate_render_text(line_text), theme::AGENT_TEXT),
-                    ]));
-                } else {
-                    // Subsequent lines indented to align with text after dot
-                    lines.push(Line::from(vec![
-                        Span::raw("  "),
-                        Span::styled(truncate_render_text(line_text), theme::AGENT_TEXT),
-                    ]));
-                }
-            }
+            push_dot_prefixed_lines(
+                &mut lines,
+                text,
+                wrap_width,
+                theme::DOT_AGENT,
+                theme::AGENT_TEXT,
+            );
             if !agent_streaming || !is_last_message {
                 lines.push(Line::default());
             }
@@ -302,25 +297,13 @@ fn build_message_lines<'a>(
             lines.push(Line::default());
         }
         ChatMessage::Error(text) => {
-            for (i, line_text) in text.lines().enumerate() {
-                if i == 0 {
-                    lines.push(Line::from(vec![
-                        Span::styled("● ", theme::DOT_ERROR),
-                        Span::styled(
-                            truncate_render_text(line_text),
-                            theme::ERROR_STYLE,
-                        ),
-                    ]));
-                } else {
-                    lines.push(Line::from(vec![
-                        Span::raw("  "),
-                        Span::styled(
-                            truncate_render_text(line_text),
-                            theme::ERROR_STYLE,
-                        ),
-                    ]));
-                }
-            }
+            push_dot_prefixed_lines(
+                &mut lines,
+                text,
+                wrap_width,
+                theme::DOT_ERROR,
+                theme::ERROR_STYLE,
+            );
             lines.push(Line::default());
         }
         ChatMessage::AgentEvent(text) => {
@@ -341,6 +324,56 @@ fn build_message_lines<'a>(
         }
     }
     lines
+}
+
+// Render a multi-line text block with a colored dot prefix on the first
+// visual row and a 2-cell hanging indent on every continuation row (both
+// for explicit \n breaks AND for soft-wrapped continuations of long
+// paragraphs). Without this, ratatui's Paragraph word-wrap pushes
+// continuation rows back to column 0 and the bullet alignment breaks.
+fn push_dot_prefixed_lines<'a>(
+    lines: &mut Vec<Line<'a>>,
+    text: &str,
+    wrap_width: usize,
+    dot_style: Style,
+    text_style: Style,
+) {
+    // Reserve 2 cells for either "● " or the continuation indent.
+    let body_width = wrap_width.saturating_sub(2).max(1);
+    let mut first_row = true;
+
+    for paragraph in text.split('\n') {
+        if paragraph.is_empty() {
+            // Preserve blank lines between paragraphs.
+            if first_row {
+                lines.push(Line::from(vec![
+                    Span::styled("● ", dot_style),
+                    Span::styled(String::new(), text_style),
+                ]));
+                first_row = false;
+            } else {
+                lines.push(Line::default());
+            }
+            continue;
+        }
+
+        let wrapped = textwrap::wrap(paragraph, body_width);
+        for piece in wrapped {
+            let piece_str = truncate_render_text(&piece).into_owned();
+            if first_row {
+                lines.push(Line::from(vec![
+                    Span::styled("● ", dot_style),
+                    Span::styled(piece_str, text_style),
+                ]));
+                first_row = false;
+            } else {
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled(piece_str, text_style),
+                ]));
+            }
+        }
+    }
 }
 
 fn truncate_render_text(text: &str) -> Cow<'_, str> {

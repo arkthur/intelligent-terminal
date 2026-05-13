@@ -940,7 +940,7 @@ impl TabSession {
             .collect()
     }
 
-    pub fn stage_completed_turn(&mut self, agent_text: String) {
+    pub fn stage_completed_turn(&mut self, agent_text: String, expanded: bool) {
         let Some(prompt) = self.current_prompt_text.clone() else {
             self.pending_completed_turn = None;
             return;
@@ -951,7 +951,7 @@ impl TabSession {
         self.pending_completed_turn = Some(CompletedTurn {
             prompt,
             details,
-            expanded: false,
+            expanded,
         });
     }
 
@@ -4221,7 +4221,7 @@ impl App {
                 let choice_count = recommendations.choices.len();
                 let recommended_choice = recommendations.recommended_choice;
                 let tab = self.session_tab_mut(session_id);
-                tab.stage_completed_turn(text);
+                tab.stage_completed_turn(text, false);
                 tab.selected_recommendation = rec_idx;
                 tab.recommendations = Some(recommendations);
                 tab.selection_visible_pending = true;
@@ -4257,7 +4257,11 @@ impl App {
                 );
                 let tab = self.session_tab_mut(session_id);
                 if has_prompt {
-                    tab.stage_completed_turn(text);
+                    // JSON parse failed → treat the agent's response as a
+                    // plain chat answer (chat mode in terminal-agent.md).
+                    // Default-expand so the answer is immediately visible
+                    // without forcing the user to Tab+Enter to reveal it.
+                    tab.stage_completed_turn(text, true);
                     tab.commit_pending_completed_turn();
                     tab.clear_chat_history();
                 } else {
