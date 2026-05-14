@@ -5,67 +5,45 @@ use crate::app::{rec_card_height, App};
 use crate::coordinator::{OpenTarget, RecommendationChoice, RecommendedAction};
 use crate::theme;
 
-pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
-    let recs = match app.current_tab().recommendations.clone() {
-        Some(r) => r,
-        None => return,
-    };
+/// Render the recommendations panel. Pure: callers (layout.rs) must call
+/// `App::sync_rec_scroll_max` first so `rec_scroll.offset` is already clamped
+/// when we paint.
+///
+/// Cards are positioned in a virtual canvas (stacked top-to-bottom by their
+/// natural heights), then shifted up by `rec_scroll`. We don't render partial
+/// cards: a card is drawn iff its top has scrolled into view AND its full
+/// body fits above the hint line. The hint always occupies the panel's last
+/// row.
+pub fn render(frame: &mut Frame, app: &App, area: Rect) {
+    let Some(recs) = app.current_tab().recommendations.as_ref() else { return };
     if area.width == 0 || area.height == 0 {
         return;
     }
 
-    let mut constraints: Vec<Constraint> = Vec::with_capacity(recs.choices.len() + 2);
-    for choice in &recs.choices {
-        let h = rec_card_height(choice, area.width) as u16;
-        constraints.push(Constraint::Length(h));
-    }
-    constraints.push(Constraint::Length(1));
-    constraints.push(Constraint::Min(0));
+    let rec_scroll = app.current_tab().rec_scroll.offset;
+    let cards_bottom = area.y.saturating_add(area.height.saturating_sub(1));
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(constraints)
-        .split(area);
-
-    // Clamp rec_scroll: the keyboard path (scroll_rec_to_selected) treats it
-    // as a relative offset from the panel top, but the skip check below was
-    // comparing it against absolute y. Reconcile here by clamping to a value
-    // that always keeps the last card visible so wheel scrolling can't hide
-    // every card.
-    let total_cards_h: usize = recs
-        .choices
-        .iter()
-        .map(|c| rec_card_height(c, area.width))
-        .sum();
-    let last_card_h = recs
-        .choices
-        .last()
-        .map(|c| rec_card_height(c, area.width))
-        .unwrap_or(0);
-    let max_rec_scroll = total_cards_h.saturating_sub(last_card_h);
-    if app.current_tab().rec_scroll > max_rec_scroll {
-        app.current_tab_mut().rec_scroll = max_rec_scroll;
-    }
-    let rec_scroll = app.current_tab().rec_scroll;
-
-    let panel_top_y = area.y as usize;
+    let mut canvas_top = 0usize;
     for (idx, choice) in recs.choices.iter().enumerate() {
-        let raw = chunks[idx];
-        let card_top_rel = (raw.y as usize).saturating_sub(panel_top_y);
-        let card_bottom_rel = card_top_rel + raw.height as usize;
-        if card_bottom_rel <= rec_scroll {
-            continue;
+        let h = rec_card_height(choice, area.width);
+        if canvas_top >= rec_scroll {
+            let card_h = h.saturating_sub(1) as u16; // last row is inter-card gap
+            let y = area.y + (canvas_top - rec_scroll) as u16;
+            if y + card_h > cards_bottom {
+                break; // would overlap the hint row
+            }
+            let card_area = Rect {
+                x: area.x.saturating_add(2),
+                y,
+                width: area.width.saturating_sub(4),
+                height: card_h,
+            };
+            render_card(frame, app, card_area, choice, idx);
         }
-        let card_area = Rect {
-            x: raw.x.saturating_add(2),
-            y: raw.y,
-            width: raw.width.saturating_sub(4),
-            height: raw.height.saturating_sub(1),
-        };
-        render_card(frame, app, card_area, choice, idx);
+        canvas_top += h;
     }
 
-    let hint_area = chunks[recs.choices.len()];
+    let hint_area = Rect { x: area.x, y: cards_bottom, width: area.width, height: 1 };
     let hint = Paragraph::new(Line::from(Span::styled(
         "Enter: activate | Esc: dismiss",
         theme::DIM,

@@ -97,6 +97,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         .split(chunks[1]);
 
     chat::render(frame, app, h_chat[1]);
+    app.sync_rec_scroll_max();
     recommendations::render(frame, app, h_rec[1]);
     input::render(frame, app, chunks[2]);
 

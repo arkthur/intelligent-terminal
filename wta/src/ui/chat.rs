@@ -39,7 +39,7 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
     let visible_height = inner_area.height as usize;
     let wrap_width = inner_area.width as usize;
     let requested_lines = visible_height
-        .saturating_add(app.current_tab().scroll_offset)
+        .saturating_add(app.current_tab().chat_scroll.offset)
         .saturating_add(32);
 
     let mut reversed_lines: Vec<Line> = Vec::new();
@@ -79,7 +79,7 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
     let lines: Vec<Line> = reversed_lines.into_iter().rev().collect();
 
     let total_lines = lines.len();
-    let scroll = total_lines.saturating_sub(visible_height.saturating_add(app.current_tab().scroll_offset));
+    let scroll = total_lines.saturating_sub(visible_height.saturating_add(app.current_tab().chat_scroll.offset));
 
     let paragraph = Paragraph::new(lines)
         .block(inner)
@@ -88,15 +88,14 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
 
     frame.render_widget(paragraph, area);
 
-    // Once both loops exhausted without hitting requested_lines, the history
-    // above is fully built — any scroll_offset past `total_lines - visible_height`
-    // is over the top. Clamp it so the user doesn't have to burn off the
-    // inflated value before scrolling down re-engages.
+    // Update the scroll bound only when the build saw all of history;
+    // otherwise the true max is still unknown and the stored value (possibly
+    // stale) is the best we have. Either way `Scroll::by` itself doesn't
+    // clamp, so wheel-up keeps working even with a stale bound.
     if !truncated {
-        let max_scroll = total_lines.saturating_sub(visible_height);
-        if app.current_tab().scroll_offset > max_scroll {
-            app.current_tab_mut().scroll_offset = max_scroll;
-        }
+        app.current_tab_mut()
+            .chat_scroll
+            .set_max(total_lines.saturating_sub(visible_height));
     }
 
     ui_trace::log_slow("chat_render", render_started.elapsed(), || {

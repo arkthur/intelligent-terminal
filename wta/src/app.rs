@@ -771,6 +771,47 @@ pub enum AppEvent {
 
 pub(crate) const DEFAULT_TAB_ID: &str = "0";
 
+/// Single-axis scroll cursor. All mutations go through methods so callers
+/// don't reinvent saturating-math; the upper bound `max` is established by
+/// the layout/render pass once total content height is known and re-clamps
+/// on every frame.
+///
+/// `by` deliberately does NOT clamp to `max` — the bound may be stale at
+/// input time (the lazy chat build only learns `max` after exhausting
+/// history). Clamping happens on the next `set_max`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Scroll {
+    pub offset: usize,
+    pub max: usize,
+}
+
+impl Scroll {
+    pub fn by(&mut self, delta: isize) {
+        self.offset = if delta >= 0 {
+            self.offset.saturating_add(delta as usize)
+        } else {
+            self.offset.saturating_sub(delta.unsigned_abs())
+        };
+    }
+
+    /// Jump to an absolute offset, clamped to current `max`. Only meaningful
+    /// after `max` has been set this frame.
+    pub fn set(&mut self, offset: usize) {
+        self.offset = offset.min(self.max);
+    }
+
+    pub fn set_max(&mut self, max: usize) {
+        self.max = max;
+        if self.offset > max {
+            self.offset = max;
+        }
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+}
+
 /// Everything that conceptually belongs to one tab's conversation: the
 /// message history, the streaming buffer of the in-flight prompt, the
 /// pending tool calls, the recommendations panel state, etc.
@@ -788,7 +829,7 @@ pub struct TabSession {
     /// toggles `CompletedTurn.expanded`. None means no selection — Enter
     /// goes to the input/prompt path as before.
     pub selected_completed_turn_idx: Option<usize>,
-    pub scroll_offset: usize,
+    pub chat_scroll: Scroll,
 
     // Streaming state
     pub prompt_in_flight: bool,
@@ -806,7 +847,7 @@ pub struct TabSession {
     pub recommendations: Option<RecommendationSet>,
     pub selected_recommendation: usize,
     pub selected_button: usize,
-    pub rec_scroll: usize,
+    pub rec_scroll: Scroll,
 
     // Prompt identification / completion staging
     pub current_prompt_id: Option<u64>,
@@ -838,14 +879,14 @@ pub struct TabSession {
 
 impl TabSession {
     pub fn scroll_to_bottom(&mut self) {
-        self.scroll_offset = 0;
+        self.chat_scroll.offset = 0;
     }
 
     pub fn clear_recommendations(&mut self) {
         self.recommendations = None;
         self.selected_recommendation = 0;
         self.selected_button = 0;
-        self.rec_scroll = 0;
+        self.rec_scroll.reset();
     }
 
     pub fn clear_chat_history(&mut self) {
@@ -857,7 +898,7 @@ impl TabSession {
         self.activity_frame = 0;
         self.pending_agent_response.clear();
         self.agent_streaming = false;
-        self.scroll_offset = 0;
+        self.chat_scroll.reset();
         self.timing_note = None;
         self.selection_visible_pending = false;
         self.current_prompt_text = None;
@@ -918,7 +959,7 @@ impl TabSession {
         self.activity_frame = 0;
         self.pending_agent_response.clear();
         self.agent_streaming = false;
-        self.scroll_offset = 0;
+        self.chat_scroll.reset();
         self.selection_visible_pending = false;
         self.current_prompt_text = None;
         self.current_prompt_submitted_at_unix_s = None;
@@ -2271,7 +2312,7 @@ impl App {
             tab.input.chars().count(),
             tab.pending_thought_response.chars().count(),
             tab.pending_agent_response.chars().count(),
-            tab.scroll_offset,
+            tab.chat_scroll.offset,
             tab.agent_streaming,
             tab.activity_frame,
             tab.recommendations
@@ -2287,37 +2328,23 @@ impl App {
         match event {
             AppEvent::Key(key) => self.handle_key(key),
             AppEvent::MouseScroll { delta, row } => {
-                if self.current_tab_mut().recommendations.is_some() {
-                    // Route based on where the mouse is.
-                    // Recs panel sits just above the input (bottom of screen).
-                    let input_h: u16 = 3; // INPUT_MIN_HEIGHT
-                    let rec_h = self.rec_panel_height();
-                    let recs_top = self.terminal_rows.saturating_sub(input_h + rec_h);
-                    if row >= recs_top {
-                        // Mouse is in the recs area: scroll the recommendation panel.
-                        // Ratatui scroll(n,0) skips n lines from the top, so:
-                        //   delta>0 (wheel down) → show lower content → rec_scroll increases
-                        //   delta<0 (wheel up)   → show higher content → rec_scroll decreases
-                        if delta > 0 {
-                            self.current_tab_mut().rec_scroll = self.current_tab_mut().rec_scroll.saturating_add(delta as usize);
-                        } else {
-                            self.current_tab_mut().rec_scroll = self.current_tab_mut().rec_scroll.saturating_sub((-delta) as usize);
-                        }
-                    } else {
-                        // Mouse is in the chat area: scroll chat history.
-                        if delta < 0 {
-                            self.current_tab_mut().scroll_offset = self.current_tab_mut().scroll_offset.saturating_add((-delta) as usize);
-                        } else {
-                            self.current_tab_mut().scroll_offset = self.current_tab_mut().scroll_offset.saturating_sub(delta as usize);
-                        }
-                    }
+                // Recs panel sits just above the input. When the cursor is
+                // over it, the wheel drives `rec_scroll` (top-anchored:
+                // positive delta = scroll down = increase offset). Otherwise
+                // it drives `chat_scroll` (bottom-anchored: wheel up shows
+                // higher content = increase offset, so we negate delta).
+                let in_recs = self.current_tab().recommendations.is_some() && {
+                    let recs_top = self
+                        .terminal_rows
+                        .saturating_sub(3 + self.rec_panel_height());
+                    row >= recs_top
+                };
+                let d = delta as isize;
+                let tab = self.current_tab_mut();
+                if in_recs {
+                    tab.rec_scroll.by(d);
                 } else {
-                    // No recs visible — scroll chat.
-                    if delta < 0 {
-                        self.current_tab_mut().scroll_offset = self.current_tab_mut().scroll_offset.saturating_add((-delta) as usize);
-                    } else {
-                        self.current_tab_mut().scroll_offset = self.current_tab_mut().scroll_offset.saturating_sub(delta as usize);
-                    }
+                    tab.chat_scroll.by(-d);
                 }
             }
             AppEvent::Tick => {
@@ -3020,7 +3047,7 @@ impl App {
                             // Clear error messages from the failed first attempt
                             let tab = self.current_tab_mut();
                             tab.messages.retain(|m| !matches!(m, ChatMessage::Error(_)));
-                            tab.scroll_offset = 0;
+                            tab.chat_scroll.reset();
                             self.setup = None;
                             self.auth = Some(AuthState {
                                 agent_id: agent_id.clone(),
@@ -3652,10 +3679,10 @@ impl App {
                 self.current_tab_mut().move_cursor_end();
             }
             KeyCode::PageUp => {
-                self.current_tab_mut().scroll_offset = self.current_tab_mut().scroll_offset.saturating_add(10);
+                self.current_tab_mut().chat_scroll.by(10);
             }
             KeyCode::PageDown => {
-                self.current_tab_mut().scroll_offset = self.current_tab_mut().scroll_offset.saturating_sub(10);
+                self.current_tab_mut().chat_scroll.by(-10);
             }
             KeyCode::Char(c) => {
                 self.current_tab_mut().insert_input_char(c);
@@ -3847,59 +3874,65 @@ impl App {
         }
     }
 
-    /// Height of the recommendations panel — grows to fit content, capped at 40% of pane height.
+    /// Height of the recommendations panel — grows to fit content, capped so
+    /// input (3) and chat (≥3) still have room, but floored at
+    /// `recommended_card_h + 1` so the recommended card is always fully
+    /// renderable (`render_card` bails when raw height < 4). The floor wins
+    /// when the cap would otherwise hide every card.
     pub fn rec_panel_height(&self) -> u16 {
-        let recs = match self.current_tab().recommendations.as_ref() {
-            Some(r) => r,
-            None => return 0,
-        };
-        let panel_width = self.terminal_cols;
-        let total_needed: u16 = recs
+        let Some(recs) = self.current_tab().recommendations.as_ref() else { return 0 };
+        let w = self.terminal_cols;
+        let total: u16 = recs
             .choices
             .iter()
-            .map(|c| rec_card_height(c, panel_width) as u16)
+            .map(|c| rec_card_height(c, w) as u16)
             .sum::<u16>()
             .saturating_add(1); // hint line
-        // The recommended card must always be fully renderable: render_card
-        // bails when raw.height < 5 (Borders::ALL + 3-row inner layout), so a
-        // panel shorter than recommended_card_h + 1 hides every card and
-        // leaves only the hint visible — the very symptom we hit when the
-        // old `.max(8)` lower bound was too small for cards with wrapped
-        // content.
         let rec_idx = crate::coordinator::recommended_choice_index(recs);
-        let recommended_card_h = recs
+        let floor = recs
             .choices
             .get(rec_idx)
-            .map(|c| rec_card_height(c, panel_width) as u16)
-            .unwrap_or(7);
-        let min_panel = recommended_card_h.saturating_add(1); // + hint
-        // Cap so input (3) and chat (>=3) still have room; floor at the
-        // minimum the recommended card needs.
-        let max = self.terminal_rows.saturating_sub(6).max(min_panel);
-        total_needed.min(max).max(min_panel)
+            .map(|c| rec_card_height(c, w) as u16)
+            .unwrap_or(7)
+            .saturating_add(1); // + hint
+        let ceiling = self.terminal_rows.saturating_sub(6);
+        total.min(ceiling).max(floor)
+    }
+
+    /// Recompute `rec_scroll.max` from the current card heights. Called from
+    /// layout.rs before `recommendations::render` so the renderer stays
+    /// `&App` and any wheel-driven over-scroll is clamped before paint.
+    ///
+    /// The bound is `total - last_card_h`: any larger offset would shift the
+    /// last card's top above `rec_scroll`, and our shifted-scroll model
+    /// skips partial cards — so we'd render nothing.
+    pub fn sync_rec_scroll_max(&mut self) {
+        let w = self.terminal_cols;
+        let Some(recs) = self.current_tab().recommendations.as_ref() else { return };
+        let total: usize = recs.choices.iter().map(|c| rec_card_height(c, w)).sum();
+        let last: usize = recs.choices.last().map(|c| rec_card_height(c, w)).unwrap_or(0);
+        self.current_tab_mut().rec_scroll.set_max(total.saturating_sub(last));
     }
 
     fn clear_recommendations(&mut self) {
         self.current_tab_mut().clear_recommendations();
     }
 
-    /// Adjusts rec_scroll so the selected recommendation card's title is at the top of the panel.
+    /// Scroll the rec panel so the selected card's top sits at the panel top.
     fn scroll_rec_to_selected(&mut self) {
-        let panel_height = self.rec_panel_height() as usize; // actual panel size, not full pane
-        let panel_width = self.terminal_cols;
-        let Some(recs) = self.current_tab_mut().recommendations.clone() else { return };
+        let panel_height = self.rec_panel_height() as usize;
+        let w = self.terminal_cols;
+        let Some(recs) = self.current_tab().recommendations.as_ref().cloned() else { return };
 
-        // Accumulate line offsets to find the exact top of the selected card.
-        let mut line_top: usize = 0;
+        let mut line_top = 0usize;
         for (idx, choice) in recs.choices.iter().enumerate() {
-            let card_h = rec_card_height(choice, panel_width);
-            if idx == self.current_tab_mut().selected_recommendation {
-                // Scroll so title is at the top; if the card fits, keep it fully visible.
-                let card_bottom = line_top + card_h;
-                if line_top < self.current_tab_mut().rec_scroll {
-                    self.current_tab_mut().rec_scroll = line_top;
-                } else if card_bottom > self.current_tab_mut().rec_scroll + panel_height {
-                    self.current_tab_mut().rec_scroll = line_top;
+            let card_h = rec_card_height(choice, w);
+            if idx == self.current_tab().selected_recommendation {
+                let tab = self.current_tab_mut();
+                if line_top < tab.rec_scroll.offset
+                    || line_top + card_h > tab.rec_scroll.offset + panel_height
+                {
+                    tab.rec_scroll.set(line_top);
                 }
                 return;
             }
@@ -4244,8 +4277,8 @@ impl App {
                 tab.selected_recommendation = rec_idx;
                 tab.selected_button = 0;
                 // Reset scroll so a leftover offset from a previous rec set
-                // doesn't skip every card (render bails when card.y+h <= rec_scroll).
-                tab.rec_scroll = 0;
+                // doesn't shift the new cards out of view.
+                tab.rec_scroll.reset();
                 tab.recommendations = Some(recommendations);
                 tab.selection_visible_pending = true;
                 // Drop any leftover completed-turn selection so Enter routes
