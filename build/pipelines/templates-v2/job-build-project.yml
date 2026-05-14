@@ -207,8 +207,11 @@ jobs:
   # This is NOT checked into the repo because it would break local dev
   # (the feed requires CI-only auth tokens). It only exists during CI.
   # TODO(wta): replace with our own microsoft/Dart Cargo feed once provisioned.
+  # Cargo discovers .cargo/config.toml by walking from the current
+  # working directory (repo root) up — NOT from the manifest directory.
+  # The config must live at the repo root, not inside wta/.
   - pwsh: |-
-      $configDir = 'wta/.cargo'
+      $configDir = '.cargo'
       New-Item -ItemType Directory -Path $configDir -Force | Out-Null
       @"
       [registries]
@@ -220,6 +223,8 @@ jobs:
       [source.WindowsTerminalCargo]
       registry = "sparse+https://pkgs.dev.azure.com/microsoft/Dart/_packaging/sudo_public_cargo/Cargo/index/"
       "@ | Set-Content "$configDir/config.toml" -Encoding utf8NoBOM
+      Write-Host "Wrote $configDir/config.toml"
+      Get-Content "$configDir/config.toml"
     displayName: Create Cargo registry config (CI only)
 
   # CargoAuthenticate issues a Bearer token (using System.AccessToken) for
@@ -230,7 +235,7 @@ jobs:
   - task: CargoAuthenticate@0
     displayName: Authenticate Cargo feeds
     inputs:
-      configFile: wta/.cargo/config.toml
+      configFile: .cargo/config.toml
 
   # Separate fetch step: some 1ES pools disable network during the build
   # phase. Fetching upfront keeps `cargo build --frozen` fully offline.
