@@ -4,6 +4,11 @@
 # Rust build output
 wta/target/
 
+# Cargo-fuzz artifacts (corpus, crashes, build output)
+wta/fuzz/target/
+wta/fuzz/corpus/
+wta/fuzz/artifacts/
+
 # Claude Code local settings
 .claude/settings.local.json
 
