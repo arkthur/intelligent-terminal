@@ -39,10 +39,13 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
                 break; // render_card bails below 4 — nothing useful to draw
             }
             let render_h = card_h.min(available);
+            // Cards use the full h_rec[1] width so their left border sits in
+            // the same column as the chat's green dot (column 1 of main_area)
+            // and the right border is symmetric on the opposite edge.
             let card_area = Rect {
-                x: area.x.saturating_add(2),
+                x: area.x,
                 y,
-                width: area.width.saturating_sub(4),
+                width: area.width,
                 height: render_h,
             };
             render_card(frame, app, card_area, choice, idx);
@@ -103,15 +106,14 @@ fn render_card(
     let inner_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
             Constraint::Min(1),
             Constraint::Length(1),
             Constraint::Length(1),
         ])
         .split(inner);
-    let content_area = inner_chunks[1];
-    let divider_y = inner_chunks[2].y;
-    let button_area = inner_chunks[3];
+    let content_area = inner_chunks[0];
+    let divider_y = inner_chunks[1].y;
+    let button_area = inner_chunks[2];
 
     let (command_text, buttons, body_kind) = extract_card_content(choice, app, is_selected);
     let body_style = match body_kind {
@@ -189,14 +191,8 @@ fn render_buttons(
         pieces.push((label.clone(), style));
     }
 
-    let buttons_width: usize = pieces.iter().map(|(t, _)| t.chars().count()).sum();
-    let total_width = area.width as usize;
-    let pad_left = total_width.saturating_sub(buttons_width);
-
-    let mut spans: Vec<Span> = Vec::with_capacity(pieces.len() + 1);
-    if pad_left > 0 {
-        spans.push(Span::raw(" ".repeat(pad_left)));
-    }
+    // Left-align buttons so they sit under the command text column.
+    let mut spans: Vec<Span> = Vec::with_capacity(pieces.len());
     for (text, style) in pieces {
         spans.push(Span::styled(text, style));
     }
@@ -220,7 +216,7 @@ fn extract_card_content(
             RecommendedAction::Send { input, .. } => {
                 return (
                     input.clone(),
-                    vec!["[ Run ]".into(), "Insert in Terminal".into()],
+                    vec!["[ Run command ]".into(), "Insert in Terminal".into()],
                     CardBodyKind::Code,
                 );
             }

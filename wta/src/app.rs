@@ -4657,8 +4657,10 @@ const THOUGHT_PREVIEW_MAX_CHARS: usize = 1024;
 /// Computes the rendered height (in terminal rows) of a recommendation card.
 pub(crate) fn rec_card_height(choice: &RecommendationChoice, panel_width: u16) -> usize {
     use crate::coordinator::RecommendedAction;
-    // h_rec padding (1+1) + outer indent (2+2) + side borders (1+1) + inner padding (2+2) = 12.
-    let inner_width = (panel_width as usize).saturating_sub(12).max(1);
+    // h_rec padding (1+1) + side borders (1+1) + inner padding (2+2) = 8. The
+    // card now spans the full h_rec[1] width so its border aligns with the
+    // green-dot column in the chat above (no extra 2-cell outer indent).
+    let inner_width = (panel_width as usize).saturating_sub(8).max(1);
 
     let text = choice.actions.iter().find_map(|action| match action {
         RecommendedAction::Send { input, .. } => Some(input.clone()),
@@ -4691,8 +4693,8 @@ pub(crate) fn rec_card_height(choice: &RecommendationChoice, panel_width: u16) -
         .sum::<usize>()
         .max(1);
 
-    // top_border + top_pad + content + divider + buttons + bottom_border + blank = 6 fixed rows.
-    6 + content_lines
+    // top_border + content + divider + buttons + bottom_border + blank = 5 fixed rows.
+    5 + content_lines
 }
 
 /// Render a parsed `RecommendationSet` as the agent's "reply" text in chat.
