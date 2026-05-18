@@ -23,6 +23,10 @@ struct DeferredAcpParams {
     wt_connected: bool,
 }
 
+mod turn_state;
+
+pub use turn_state::{AutofixContext, ChunkKind, SubmittedPrompt, TurnOutcome, TurnState};
+
 use crate::commands::{self, CommandKind, CommandSpec, ParsedCommand};
 use crate::coordinator::{
     parse_autofix_response, parse_recommendation_set, recommended_choice_index,
@@ -609,11 +613,6 @@ pub fn classify_wt_event(method: &str, pane_id: &str, params: &serde_json::Value
     }
 }
 
-enum FinalizeOutcome {
-    None,
-    SelectionReady,
-}
-
 // --- Events ---
 
 /// One entry of an ACP agent's advertised model list, mirrored into the
@@ -833,33 +832,26 @@ pub struct TabSession {
     pub selected_completed_turn_idx: Option<usize>,
     pub chat_scroll: Scroll,
 
-    // Streaming state
-    pub prompt_in_flight: bool,
-    pub agent_streaming: bool,
-    pub pending_thought_response: String,
-    pub pending_agent_response: String,
+    // Explicit per-turn lifecycle. Source of truth in the new state machine
+    // (see `doc/specs/turn-state-refactor.md`).
+    pub turn: TurnState,
+
+    // Agent-supplied progress message (e.g. "Reading file foo.rs"). Falls
+    // back to the spinner label derived from `turn` when None.
     pub progress_status: Option<String>,
     pub activity_frame: usize,
     pub timing_note: Option<String>,
     pub selection_visible_pending: bool,
 
-    // Tool calls / permission / recommendations
+    // Tool calls / permission
     pub tool_calls: HashMap<String, (String, String)>,
     pub permission: Option<PermissionState>,
-    pub recommendations: Option<RecommendationSet>,
+    // Recommendation card UI focus (the set itself lives on
+    // `turn.recommendations()`).
     pub selected_recommendation: usize,
     pub selected_button: usize,
     pub rec_scroll: Scroll,
-    /// Set when an autofix Fix/Explain or a planner recommendation has been
-    /// surfaced from streamed chunks ahead of `AgentMessageEnd`. Tells the
-    /// end-of-turn handler to skip re-parsing and only clean up.
-    pub eagerly_finalized: bool,
 
-    // Prompt identification / completion staging
-    pub current_prompt_id: Option<u64>,
-    pub current_prompt_submitted_at_unix_s: Option<f64>,
-    pub current_prompt_text: Option<String>,
-    pub pending_completed_turn: Option<CompletedTurn>,
 
     // Input editor state — per-tab so each tab keeps its own draft text,
     // cursor, and slash-command popup across switches.
@@ -889,11 +881,9 @@ impl TabSession {
     }
 
     pub fn clear_recommendations(&mut self) {
-        self.recommendations = None;
         self.selected_recommendation = 0;
         self.selected_button = 0;
         self.rec_scroll.reset();
-        self.eagerly_finalized = false;
     }
 
     pub fn clear_chat_history(&mut self) {
@@ -901,16 +891,11 @@ impl TabSession {
         self.tool_calls.clear();
         self.permission = None;
         self.progress_status = None;
-        self.pending_thought_response.clear();
         self.activity_frame = 0;
-        self.pending_agent_response.clear();
-        self.agent_streaming = false;
         self.chat_scroll.reset();
         self.timing_note = None;
         self.selection_visible_pending = false;
-        self.current_prompt_text = None;
-        self.current_prompt_submitted_at_unix_s = None;
-        self.pending_completed_turn = None;
+        self.turn = TurnState::Idle;
         self.clear_recommendations();
     }
 
@@ -957,59 +942,12 @@ impl TabSession {
         }
     }
 
-    pub fn clear_completed_turn_history(&mut self) {
-        self.messages.clear();
-        self.tool_calls.clear();
-        self.permission = None;
-        self.progress_status = None;
-        self.pending_thought_response.clear();
-        self.activity_frame = 0;
-        self.pending_agent_response.clear();
-        self.agent_streaming = false;
-        self.chat_scroll.reset();
-        self.selection_visible_pending = false;
-        self.current_prompt_text = None;
-        self.current_prompt_submitted_at_unix_s = None;
-    }
-
-    pub fn prepare_for_new_prompt(&mut self, prompt_text: &str) {
-        self.clear_chat_history();
-        self.current_prompt_text = Some(prompt_text.to_string());
-        self.prompt_in_flight = true;
-        self.progress_status = Some("Thinking...".to_string());
-        self.activity_frame = 0;
-    }
-
     pub fn current_turn_details(&self) -> Vec<ChatMessage> {
         self.messages
             .iter()
             .filter(|message| !matches!(message, ChatMessage::User(_)))
             .cloned()
             .collect()
-    }
-
-    pub fn stage_completed_turn(&mut self, agent_text: String, expanded: bool) {
-        let Some(prompt) = self.current_prompt_text.clone() else {
-            self.pending_completed_turn = None;
-            return;
-        };
-
-        let mut details = self.current_turn_details();
-        details.push(ChatMessage::Agent(agent_text));
-        self.pending_completed_turn = Some(CompletedTurn {
-            prompt,
-            details,
-            expanded,
-        });
-    }
-
-    pub fn commit_pending_completed_turn(&mut self) {
-        let Some(turn) = self.pending_completed_turn.take() else {
-            return;
-        };
-
-        self.completed_turns.push(turn);
-        self.scroll_to_bottom();
     }
 
     pub fn clear_input(&mut self) {
@@ -1191,11 +1129,10 @@ pub struct App {
     pub suggested_pane_id: Option<String>,
     pub autofix_enabled: bool,
     // Generation counter: incremented on every new trigger or cancel.
-    // AgentMessageEnd responses whose generation doesn't match are discarded.
+    // Snapshotted into `AutofixContext.generation` at submit time; chunks /
+    // close events whose snapshot doesn't match the current value are
+    // discarded by the state machine.
     autofix_generation: u64,
-    // Generation captured when the current in-flight autofix prompt was sent.
-    // None means the in-flight prompt is not an autofix prompt.
-    inflight_autofix_generation: Option<u64>,
     // Per-tab conversation sessions. Keyed by the stable tab GUID WT mints
     // at tab construction. The active tab is `tab_id` — seeded from the
     // `--owner-tab-id` CLI arg before ACP init in the WT-spawned path, or
@@ -1361,7 +1298,6 @@ impl App {
             suggested_pane_id: None,
             autofix_enabled,
             autofix_generation: 0,
-            inflight_autofix_generation: None,
             tab_sessions,
             session_to_tab: HashMap::new(),
             agent_sessions: crate::agent_sessions::AgentSessionRegistry::new(),
@@ -2348,20 +2284,16 @@ impl App {
     fn trace_state(&self) -> String {
         let tab = self.current_tab();
         format!(
-            "state={:?} messages={} completed_turns={} input_chars={} thought_chars={} pending_chars={} scroll={} streaming={} activity_frame={} recommendations={} permission={} timing_note={}",
+            "state={:?} turn={:?} messages={} completed_turns={} input_chars={} pending_chars={} scroll={} activity_frame={} recommendations={} permission={} timing_note={}",
             self.state,
+            std::mem::discriminant(&tab.turn),
             tab.messages.len(),
             tab.completed_turns.len(),
             tab.input.chars().count(),
-            tab.pending_thought_response.chars().count(),
-            tab.pending_agent_response.chars().count(),
+            tab.turn.buffer().map(|b| b.chars().count()).unwrap_or(0),
             tab.chat_scroll.offset,
-            tab.agent_streaming,
             tab.activity_frame,
-            tab.recommendations
-                .as_ref()
-                .map(|recs| recs.choices.len())
-                .unwrap_or(0),
+            tab.turn.recommendations().map(|r| r.choices.len()).unwrap_or(0),
             tab.permission.is_some(),
             tab.timing_note.is_some()
         )
@@ -2376,7 +2308,7 @@ impl App {
                 // positive delta = scroll down = increase offset). Otherwise
                 // it drives `chat_scroll` (bottom-anchored: wheel up shows
                 // higher content = increase offset, so we negate delta).
-                let in_recs = self.current_tab().recommendations.is_some() && {
+                let in_recs = self.current_tab().turn.recommendations().is_some() && {
                     // 3 input + 1 nav hint row above the input.
                     let recs_top = self
                         .terminal_rows
@@ -2396,10 +2328,7 @@ impl App {
                 // prompt should keep its shimmer phase advancing so when the
                 // user switches back the animation is in step.
                 for tab in self.tab_sessions.values_mut() {
-                    if tab.prompt_in_flight
-                        || tab.agent_streaming
-                        || tab.progress_status.is_some()
-                    {
+                    if tab.turn.spinner_label().is_some() || tab.progress_status.is_some() {
                         tab.activity_frame =
                             (tab.activity_frame + 1) % crate::ui::ACTIVITY_CYCLE_FRAMES;
                     }
@@ -2560,14 +2489,10 @@ impl App {
                         Some(sid) => self.session_tab_mut(sid),
                         None => self.current_tab_mut(),
                     };
-                    tab.prompt_in_flight = false;
-                    tab.agent_streaming = false;
                     tab.progress_status = None;
-                    tab.pending_thought_response.clear();
                     tab.activity_frame = 0;
-                    tab.pending_agent_response.clear();
                     tab.timing_note = None;
-                    tab.pending_completed_turn = None;
+                    tab.turn = TurnState::Idle;
                     tab.messages.push(ChatMessage::Error(message));
                 }
             }
@@ -2576,111 +2501,36 @@ impl App {
                 self.current_tab_mut().scroll_to_bottom();
             }
             AppEvent::AgentThoughtChunk { session_id, text } => {
-                let tab = self.session_tab_mut(&session_id);
-                // If the user cancelled this prompt (or it already
-                // completed) we drop the late chunk rather than re-arming
-                // the spinner.
-                if !tab.prompt_in_flight {
-                    return;
-                }
-                if tab.progress_status.is_none() {
-                    tab.progress_status = Some("Thinking...".to_string());
-                }
-                append_thought_preview(&mut tab.pending_thought_response, &text);
+                // Late chunk after cancel / completion is dropped by
+                // `turn_observe_chunk` (state isn't Submitted/Streaming).
+                self.turn_observe_chunk(&session_id, ChunkKind::Thought, &text);
             }
             AppEvent::AgentMessageChunk { session_id, text } => {
-                let tab = self.session_tab_mut(&session_id);
-                if !tab.prompt_in_flight {
-                    return;
-                }
-                tab.agent_streaming = true;
-                tab.progress_status = None;
-                tab.pending_thought_response.clear();
-                tab.pending_agent_response.push_str(&text);
-
+                // Append to the streaming buffer. The state machine drops
+                // late chunks and handles the stale-autofix generation check
+                // before returning whether the buffer actually grew.
+                let advanced =
+                    self.turn_observe_chunk(&session_id, ChunkKind::Message, &text);
                 // Surface the card the moment the streamed JSON parses,
                 // instead of waiting for AgentMessageEnd (gated behind
                 // Copilot's Stop/SessionEnd hooks, ~8s on Windows).
-                if self.autofix_pane_id.is_some() {
-                    if self.inflight_autofix_generation == Some(self.autofix_generation) {
-                        self.try_eager_finalize_autofix(&session_id);
-                    }
-                } else {
-                    self.try_eager_finalize_planner(&session_id);
+                if advanced {
+                    self.turn_try_eager_surface(&session_id);
                 }
             }
             AppEvent::AgentMessageEnd { session_id } => {
-                // Check if this response is stale (generation bumped since we sent).
-                let is_stale_autofix = match self.inflight_autofix_generation {
-                    Some(gen) => gen != self.autofix_generation,
-                    None => false,
-                };
-
-                if is_stale_autofix {
-                    // Discard: a newer error or cancel superseded this response.
-                    // maybe_trigger_autofix's clear_recommendations already
-                    // wiped any eager card from the superseded turn; reset
-                    // the eager flag defensively in case a future path skips
-                    // that step.
-                    tracing::info!(target: "autofix", inflight_gen = ?self.inflight_autofix_generation, current_gen = self.autofix_generation, "discarding stale autofix response");
-                    {
-                        let tab = self.session_tab_mut(&session_id);
-                        tab.agent_streaming = false;
-                        tab.prompt_in_flight = false;
-                        tab.progress_status = None;
-                        tab.pending_thought_response.clear();
-                        tab.pending_agent_response.clear();
-                        tab.activity_frame = 0;
-                        tab.eagerly_finalized = false;
-                    }
-                    self.inflight_autofix_generation = None;
-                    return;
-                }
-
-                // Always reset streaming flags so autofix guards don't get stuck.
-                {
-                    let tab = self.session_tab_mut(&session_id);
-                    tab.agent_streaming = false;
-                    tab.prompt_in_flight = false;
-                    tab.progress_status = None;
-                    tab.pending_thought_response.clear();
-                    tab.activity_frame = 0;
-                }
-                self.inflight_autofix_generation = None;
-
                 if let Some(summary) = self.session_completion_latency_summary(&session_id) {
                     self.push_execution_info(summary);
                 }
-
-                // If a streamed AgentMessageChunk already surfaced the autofix
-                // recommendation (the common case on Windows where Copilot's
-                // Stop hook blocks session/prompt's reply for ~7.5s), skip
-                // re-parsing — the card is already on screen. Just clean up
-                // the buffer and the flag so the next turn starts fresh.
-                let eagerly_finalized = self.session_tab(&session_id).eagerly_finalized;
-                if eagerly_finalized {
-                    let tab = self.session_tab_mut(&session_id);
-                    tab.pending_agent_response.clear();
-                    tab.eagerly_finalized = false;
-                    return;
-                }
-
-                match self.finalize_agent_response_for(&session_id) {
-                    FinalizeOutcome::SelectionReady => {
-                        self.session_tab_mut(&session_id)
-                            .clear_completed_turn_history();
-                    }
-                    FinalizeOutcome::None => {
-                        self.session_tab_mut(&session_id).scroll_to_bottom();
-                    }
-                }
+                self.turn_close(&session_id);
+                self.session_tab_mut(&session_id).scroll_to_bottom();
             }
             AppEvent::TimingMetric { session_id, note } => {
                 self.session_tab_mut(&session_id).timing_note = Some(note);
             }
             AppEvent::ToolCall { session_id, id, title, status } => {
                 let tab = self.session_tab_mut(&session_id);
-                if !tab.prompt_in_flight {
+                if !tab.turn.is_in_flight() {
                     return;
                 }
                 tab.tool_calls
@@ -2691,7 +2541,7 @@ impl App {
             }
             AppEvent::ToolCallUpdate { session_id, id, status } => {
                 let tab = self.session_tab_mut(&session_id);
-                if !tab.prompt_in_flight {
+                if !tab.turn.is_in_flight() {
                     return;
                 }
                 if let Some(entry) = tab.tool_calls.get_mut(&id) {
@@ -2713,7 +2563,7 @@ impl App {
             }
             AppEvent::Plan { session_id, entries } => {
                 let tab = self.session_tab_mut(&session_id);
-                if !tab.prompt_in_flight {
+                if !tab.turn.is_in_flight() {
                     return;
                 }
                 tab.messages.push(ChatMessage::Plan(entries));
@@ -2726,7 +2576,7 @@ impl App {
                 responder,
             } => {
                 let tab = self.session_tab_mut(&session_id);
-                if !tab.prompt_in_flight {
+                if !tab.turn.is_in_flight() {
                     // Auto-deny if the user cancelled before the agent
                     // got around to asking. Dropping the responder yields
                     // a Cancelled outcome on the agent side.
@@ -3093,15 +2943,24 @@ impl App {
                                 .unwrap_or(false);
                             let is_prompt_start = seq == "osc:133;A";
                             if is_exit_zero && self.autofix_pane_id.as_deref() == Some(pane_id.as_str()) {
-                                self.autofix_generation = self.autofix_generation.wrapping_add(1);
-                                // Do NOT clear inflight_autofix_generation: the stale
-                                // check in AgentMessageEnd relies on Some(old) != new_gen.
-                                let pane = self.autofix_pane_id.take().unwrap();
-                                self.clear_recommendations();
-                                self.current_tab_mut().prompt_in_flight = false;
-                                self.current_tab_mut().agent_streaming = false;
-                                self.current_tab_mut().progress_status = None;
-                                self.emit_autofix_state_cleared(&pane);
+                                // `turn_cancel` owns the full cleanup: bumps
+                                // `autofix_generation`, emits autofix_state_cleared
+                                // (resolving the pane from the AutofixContext, or
+                                // `autofix_pane_id` as a fallback), and resets
+                                // `tab.turn` to `Idle`. Avoid duplicating its work.
+                                let session_id = self.current_tab().session_id.clone();
+                                if let Some(sid) = session_id {
+                                    self.turn_cancel(&sid);
+                                } else {
+                                    // No ACP session bound — replicate the
+                                    // minimum cleanup turn_cancel would do.
+                                    self.autofix_generation =
+                                        self.autofix_generation.wrapping_add(1);
+                                    self.clear_recommendations();
+                                    if let Some(pane) = self.autofix_pane_id.take() {
+                                        self.emit_autofix_state_cleared(&pane);
+                                    }
+                                }
                             }
                             // Suggested: dismiss on prompt activity (exit-zero or
                             // a fresh prompt-start) in ANY pane. Emit cleared
@@ -3244,7 +3103,7 @@ impl App {
             code = ?key.code,
             modifiers = ?key.modifiers,
             input_empty = self.current_tab().input.is_empty(),
-            recs = self.current_tab().recommendations.is_some(),
+            recs = self.current_tab().turn.recommendations().is_some(),
             turns = self.current_tab().completed_turns.len(),
             selected_turn = ?self.current_tab().selected_completed_turn_idx,
             "key received"
@@ -3459,18 +3318,18 @@ impl App {
         }
 
         match key.code {
-            KeyCode::Up if self.current_tab().input.is_empty() && self.current_tab_mut().recommendations.is_some() => {
+            KeyCode::Up if self.current_tab().input.is_empty() && self.current_tab().turn.recommendations().is_some() => {
                 if self.current_tab_mut().selected_recommendation > 0 {
                     self.current_tab_mut().selected_recommendation -= 1;
                     self.current_tab_mut().selected_button = self.default_button_for_selected();
                     self.scroll_rec_to_selected();
                 }
             }
-            KeyCode::Down if self.current_tab().input.is_empty() && self.current_tab().recommendations.is_some() => {
+            KeyCode::Down if self.current_tab().input.is_empty() && self.current_tab().turn.recommendations().is_some() => {
                 let choices_len = self
                     .current_tab()
-                    .recommendations
-                    .as_ref()
+                    .turn
+                    .recommendations()
                     .map(|r| r.choices.len())
                     .unwrap_or(0);
                 if self.current_tab().selected_recommendation + 1 < choices_len {
@@ -3481,7 +3340,7 @@ impl App {
                 }
             }
             KeyCode::Right | KeyCode::Tab
-                if self.current_tab().input.is_empty() && self.current_tab_mut().recommendations.is_some() =>
+                if self.current_tab().input.is_empty() && self.current_tab().turn.recommendations().is_some() =>
             {
                 // Cycle button focus forward within the selected card.
                 // Send: 0=Run, 1=Insert. OpenAndSend has only index 0.
@@ -3492,14 +3351,14 @@ impl App {
             }
             KeyCode::Tab
                 if self.current_tab().input.is_empty()
-                    && self.current_tab().recommendations.is_none()
+                    && self.current_tab().turn.recommendations().is_none()
                     && !self.current_tab().completed_turns.is_empty() =>
             {
                 self.current_tab_mut().select_older_completed_turn();
             }
             KeyCode::BackTab
                 if self.current_tab().input.is_empty()
-                    && self.current_tab().recommendations.is_none()
+                    && self.current_tab().turn.recommendations().is_none()
                     && !self.current_tab().completed_turns.is_empty() =>
             {
                 self.current_tab_mut().select_newer_completed_turn();
@@ -3512,7 +3371,7 @@ impl App {
                 self.current_tab_mut().selected_completed_turn_idx = None;
             }
             KeyCode::Left
-                if self.current_tab().input.is_empty() && self.current_tab_mut().recommendations.is_some() =>
+                if self.current_tab().input.is_empty() && self.current_tab().turn.recommendations().is_some() =>
             {
                 // Cycle button focus backward.
                 let button_count = self.button_count_for_selected();
@@ -3540,30 +3399,25 @@ impl App {
                 return;
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                let in_flight = self.current_tab().prompt_in_flight
-                    || self.current_tab().agent_streaming;
+                // In-flight: state is Submitted/Streaming or Surfaced{end_pending}.
+                let in_flight = !self.current_tab().turn.is_idle()
+                    && !matches!(
+                        self.current_tab().turn,
+                        TurnState::Surfaced { end_pending: false, .. }
+                    );
                 if in_flight {
                     // Send a session/cancel to the ACP client. The client
                     // will fire the protocol notification and signal the
                     // per-prompt oneshot so the spawned task drops out of
                     // conn.prompt() immediately.
                     let session_id = self.current_tab().session_id.clone();
-                    if let Some(sid) = session_id {
+                    if let Some(sid) = session_id.clone() {
                         let _ = self.cancel_tx.send(CancelRequest { session_id: sid });
                     }
-                    // Optimistically reset the local UI so the spinner
-                    // stops immediately — don't wait for the agent's
-                    // cancelled-end roundtrip. Late chunks for this prompt
-                    // are dropped by the chunk handlers (they bail on
-                    // !prompt_in_flight).
+                    if let Some(sid) = session_id {
+                        self.turn_cancel(&sid);
+                    }
                     let tab = self.current_tab_mut();
-                    tab.prompt_in_flight = false;
-                    tab.agent_streaming = false;
-                    tab.pending_agent_response.clear();
-                    tab.pending_thought_response.clear();
-                    tab.progress_status = None;
-                    tab.activity_frame = 0;
-                    tab.pending_completed_turn = None;
                     tab.messages.push(ChatMessage::System("Cancelled.".to_string()));
                     tab.scroll_to_bottom();
                     self.close_pane_armed_at = None;
@@ -3602,19 +3456,23 @@ impl App {
                 self.dismiss_notifications();
             }
             KeyCode::Esc
-                if self.current_tab_mut().recommendations.is_some()
-                    || (self.autofix_pane_id.is_some() && self.current_tab_mut().prompt_in_flight) =>
+                if self.current_tab().turn.recommendations().is_some()
+                    || (self.autofix_pane_id.is_some()
+                        && !self.current_tab().turn.is_idle()) =>
             {
                 // Dismiss armed fix card or cancel in-flight autofix request.
-                self.autofix_generation = self.autofix_generation.wrapping_add(1);
-                let pane = self.autofix_pane_id.take();
-                self.clear_recommendations();
-                self.current_tab_mut().prompt_in_flight = false;
-                self.current_tab_mut().agent_streaming = false;
-                self.current_tab_mut().progress_status = None;
-                self.inflight_autofix_generation = None;
-                if let Some(p) = pane {
-                    self.emit_autofix_state_cleared(&p);
+                // `turn_cancel` bumps generation, emits autofix_state_cleared,
+                // and resets the state machine to Idle.
+                let session_id = self.current_tab().session_id.clone();
+                if let Some(sid) = session_id {
+                    self.turn_cancel(&sid);
+                } else {
+                    // No session attached yet — fall back to manual cleanup
+                    // (no chunks can be in flight in that case).
+                    self.autofix_generation = self.autofix_generation.wrapping_add(1);
+                    if let Some(p) = self.autofix_pane_id.take() {
+                        self.emit_autofix_state_cleared(&p);
+                    }
                 }
             }
             // Dismiss the bottom-bar Suggested indicator (autofix produced an
@@ -3664,7 +3522,7 @@ impl App {
             KeyCode::Enter
                 if self.current_tab().input.is_empty()
                     && self.current_tab().selected_completed_turn_idx.is_some()
-                    && self.current_tab().recommendations.is_none() =>
+                    && self.current_tab().turn.recommendations().is_none() =>
             {
                 // A past turn is highlighted via Tab — Enter toggles its
                 // expanded state instead of submitting / activating recs.
@@ -3672,7 +3530,7 @@ impl App {
             }
             KeyCode::Enter => {
                 let _tab = self.current_tab();
-                tracing::debug!(target: "autofix", input_empty = _tab.input.is_empty(), state = ?self.state, has_recs = _tab.recommendations.is_some(), autofix_pane = ?self.autofix_pane_id, selected_idx = _tab.selected_recommendation, "Enter");
+                tracing::debug!(target: "autofix", input_empty = _tab.input.is_empty(), state = ?self.state, has_recs = _tab.turn.recommendations().is_some(), autofix_pane = ?self.autofix_pane_id, selected_idx = _tab.selected_recommendation, "Enter");
                 // Slash-command intercept. Runs before the prompt path so
                 // commands like /stop work even mid-flight, and /help / /clear
                 // / /exit work even when the agent isn't Connected.
@@ -3709,48 +3567,42 @@ impl App {
                 }
                 if self.current_tab().input.is_empty()
                     && self.state == ConnectionState::Connected
-                    && self.current_tab_mut().recommendations.is_some()
+                    && self.current_tab().turn.recommendations().is_some()
                 {
-                    if let Some(mut choice) = self.selected_recommendation_choice().cloned() {
-                        // Send: index 0 = Run, index 1 = Insert.
-                        // OpenAndSend: sole index 0 = open target.
-                        let insert_only = self.current_tab_mut().selected_button == 1
-                            && self.is_send_choice(&choice);
-                        tracing::info!(target: "autofix", choice = choice.choice, actions = choice.actions.len(), insert_only, "Executing choice");
-                        // Auto-fill parent for Send actions from auto-fix.
-                        if let Some(ref pane_id) = self.autofix_pane_id {
-                            for action in &mut choice.actions {
-                                if let crate::coordinator::RecommendedAction::Send {
-                                    ref mut parent, ..
-                                } = action
-                                {
-                                    if parent.is_empty() {
-                                        *parent = pane_id.clone();
-                                    }
-                                }
-                            }
-                        }
-                        let armed_pane = self.autofix_pane_id.take();
-                        self.current_tab_mut().commit_pending_completed_turn();
-                        self.clear_recommendations();
-                        let label = if insert_only { "Inserting" } else { "Executing" };
-                        self.push_execution_info(format!("{} choice {}.", label, choice.choice));
-                        let _ = self.recommendation_tx.send(
-                            crate::coordinator::ChoiceExecution { choice, insert_only }
+                    // Card is visible — Enter executes the selected choice.
+                    // `turn_execute_card` dispatches the choice to the
+                    // coordinator, transitions the state machine to
+                    // `Surfaced{Empty, end_pending preserved}`, and emits
+                    // the autofix-cleared bottom-bar event when applicable.
+                    let session_id = self.current_tab().session_id.clone();
+                    if let Some(session_id) = session_id {
+                        let label_choice = self
+                            .selected_recommendation_choice()
+                            .map(|c| c.choice)
+                            .unwrap_or(0);
+                        let insert_only = self.current_tab().selected_button == 1
+                            && self
+                                .selected_recommendation_choice()
+                                .map(|c| self.is_send_choice(c))
+                                .unwrap_or(false);
+                        tracing::info!(
+                            target: "autofix",
+                            choice = label_choice,
+                            insert_only,
+                            "Executing choice",
                         );
-                        // Clear the bottom-bar Armed state — the fix has been
-                        // dispatched to the source pane.
-                        if let Some(pane_id) = armed_pane {
-                            self.emit_autofix_state_cleared(&pane_id);
-                        }
+                        let label = if insert_only { "Inserting" } else { "Executing" };
+                        self.push_execution_info(format!(
+                            "{} choice {}.",
+                            label, label_choice
+                        ));
+                        self.turn_execute_card(&session_id);
                     }
                 } else if !self.current_tab().input.is_empty() && self.state == ConnectionState::Connected {
-                    // Same-tab single-flight: refuse a new prompt if this
-                    // tab is still streaming the previous one. The ACP
-                    // client enforces this server-side too, but bouncing
-                    // here keeps the user's input intact instead of
-                    // appearing to drop it.
-                    if self.current_tab().prompt_in_flight {
+                    // Same-tab single-flight: refuse a new prompt if the
+                    // turn isn't accepting one. The ACP transport rejects
+                    // too, but bouncing here keeps the user's input intact.
+                    if !self.current_tab().turn.accepts_new_prompt() {
                         let tab = self.current_tab_mut();
                         tab.messages.push(ChatMessage::System(
                             "Agent is busy on this tab — wait for the current prompt to finish."
@@ -3759,17 +3611,22 @@ impl App {
                         tab.scroll_to_bottom();
                         return;
                     }
-                    // The Enter handler always operates on the active tab —
-                    // the user is by definition on the tab they're typing
-                    // in. Routing of subsequent ACP events back into this
-                    // tab is keyed on the SessionId attached to it.
                     let tab = self.current_tab_mut();
                     let text = std::mem::take(&mut tab.input);
                     tab.cursor_pos = 0;
                     tab.refresh_command_popup();
-                    tab.prepare_for_new_prompt(&text);
-                    tab.messages.push(ChatMessage::User(text.clone()));
-                    tab.scroll_to_bottom();
+                    // `session_id` may be None on a brand-new tab whose ACP
+                    // session is created lazily by `dispatch_prompt_body`.
+                    // Fall back to a key that `session_tab_mut`'s
+                    // `tab_for_session` resolves to the active tab — same
+                    // trick as `maybe_trigger_autofix` — so the state
+                    // machine still installs the turn on this tab. When
+                    // `SessionAttached` later writes the real session id,
+                    // subsequent chunks route here correctly.
+                    let session_id = tab
+                        .session_id
+                        .clone()
+                        .unwrap_or_else(|| DEFAULT_TAB_ID.to_string());
                     let pane_context = PaneContext {
                         pane_id: self.pane_id.clone(),
                         tab_id: self.tab_id.clone(),
@@ -3777,17 +3634,20 @@ impl App {
                         cwd: None,
                         source_pane_id: None,
                     };
-                    let prompt = PromptSubmission::new(text, Some(pane_context));
-                    let tab = self.current_tab_mut();
-                    tab.current_prompt_id = Some(prompt.id);
-                    tab.current_prompt_submitted_at_unix_s = Some(prompt.submitted_at_unix_s);
-                    tab.selection_visible_pending = false;
+                    let prompt = PromptSubmission::new(text.clone(), Some(pane_context));
                     prompt_timing_log(
                         prompt.id,
                         prompt.submitted_at_unix_s,
                         "ui_submit",
                         &format!("preview={:?}", prompt.preview()),
                     );
+                    let submitted = SubmittedPrompt {
+                        id: prompt.id,
+                        text: text.clone(),
+                        submitted_at_unix_s: prompt.submitted_at_unix_s,
+                        autofix: None,
+                    };
+                    self.turn_submit_prompt(&session_id, submitted);
                     let _ = self.prompt_tx.send(prompt);
                 }
             }
@@ -3840,7 +3700,7 @@ impl App {
             return true; // agents-view "Loading" shimmer
         }
         let tab = self.current_tab();
-        tab.prompt_in_flight || tab.agent_streaming || tab.progress_status.is_some()
+        tab.turn.spinner_label().is_some() || tab.progress_status.is_some()
     }
 
     /// Get the most recent unacknowledged notification (for the banner).
@@ -3901,7 +3761,7 @@ impl App {
     /// Dispatch a parsed slash-command. The Enter handler is responsible
     /// for clearing the input and cursor before calling this.
     fn handle_slash_command(&mut self, cmd: ParsedCommand) {
-        let in_flight = self.current_tab().prompt_in_flight;
+        let in_flight = self.current_tab().turn.is_in_flight();
         tracing::info!(
             target: "slash_cmd",
             name = cmd.spec.name,
@@ -3923,17 +3783,13 @@ impl App {
             CommandKind::Stop => {
                 if in_flight {
                     let session_id = self.current_tab().session_id.clone();
-                    if let Some(sid) = session_id {
+                    if let Some(sid) = session_id.clone() {
                         let _ = self.cancel_tx.send(CancelRequest { session_id: sid });
                     }
+                    if let Some(sid) = session_id {
+                        self.turn_cancel(&sid);
+                    }
                     let tab = self.current_tab_mut();
-                    tab.prompt_in_flight = false;
-                    tab.agent_streaming = false;
-                    tab.pending_agent_response.clear();
-                    tab.pending_thought_response.clear();
-                    tab.progress_status = None;
-                    tab.activity_frame = 0;
-                    tab.pending_completed_turn = None;
                     tab.messages
                         .push(ChatMessage::System("Cancelled.".to_string()));
                     tab.scroll_to_bottom();
@@ -4001,13 +3857,6 @@ impl App {
                     tab.completed_turns.clear();
                     tab.selected_completed_turn_idx = None;
                     tab.session_id = None;
-                    tab.prompt_in_flight = false;
-                    tab.agent_streaming = false;
-                    tab.pending_agent_response.clear();
-                    tab.pending_thought_response.clear();
-                    tab.progress_status = None;
-                    tab.activity_frame = 0;
-                    tab.pending_completed_turn = None;
                 }
                 let _ = self.restart_tx.send(RestartRequest);
                 self.publish_agent_status();
@@ -4022,7 +3871,7 @@ impl App {
     /// never lands on a card too tall for the panel. The floor wins when the
     /// cap would otherwise hide a card.
     pub fn rec_panel_height(&self) -> u16 {
-        let Some(recs) = self.current_tab().recommendations.as_ref() else { return 0 };
+        let Some(recs) = self.current_tab().turn.recommendations() else { return 0 };
         let w = self.terminal_cols;
         let card_heights = recs.choices.iter().map(|c| rec_card_height(c, w) as u16);
         let total = card_heights.clone().sum::<u16>();
@@ -4045,7 +3894,7 @@ impl App {
     pub fn sync_rec_scroll_max(&mut self) {
         let w = self.terminal_cols;
         let panel_cards_h = self.rec_panel_height() as usize;
-        let Some(recs) = self.current_tab().recommendations.as_ref() else { return };
+        let Some(recs) = self.current_tab().turn.recommendations() else { return };
         let total: usize = recs.choices.iter().map(|c| rec_card_height(c, w)).sum();
         self.current_tab_mut().rec_scroll.set_max(total.saturating_sub(panel_cards_h));
     }
@@ -4058,7 +3907,7 @@ impl App {
     fn scroll_rec_to_selected(&mut self) {
         let panel_height = self.rec_panel_height() as usize;
         let w = self.terminal_cols;
-        let Some(recs) = self.current_tab().recommendations.as_ref().cloned() else { return };
+        let Some(recs) = self.current_tab().turn.recommendations().cloned() else { return };
 
         let mut line_top = 0usize;
         for (idx, choice) in recs.choices.iter().enumerate() {
@@ -4145,14 +3994,13 @@ impl App {
     /// next tab_changed back into this tab finds an empty-but-present
     /// `TabSession` and just renders an empty chat.
     fn reset_tab_session_for(&mut self, tab_id: &str) {
-        // Wipe local state. We don't call clear_chat_history alone because
-        // it doesn't touch completed_turns / prompt_in_flight / agent
-        // metadata — the same combination the `/clear` slash command uses.
+        // Same wipe as the `/clear` slash command: clear in-flight chat state
+        // via `clear_chat_history` AND the completed-turn history that
+        // `clear_chat_history` deliberately leaves alone.
         if let Some(tab) = self.tab_sessions.get_mut(tab_id) {
             tab.clear_chat_history();
             tab.completed_turns.clear();
             tab.selected_completed_turn_idx = None;
-            tab.prompt_in_flight = false;
             tab.scroll_to_bottom();
             tab.session_id = None;
         }
@@ -4180,8 +4028,8 @@ impl App {
         let mut parts = Vec::new();
         let tab = self.session_tab(session_id);
 
-        if let Some(submitted_at) = tab.current_prompt_submitted_at_unix_s {
-            let total_s = (now_unix_s() - submitted_at).max(0.0);
+        if let Some(prompt) = tab.turn.prompt() {
+            let total_s = (now_unix_s() - prompt.submitted_at_unix_s).max(0.0);
             parts.push(format!("total {:.3}s", total_s));
         }
 
@@ -4251,25 +4099,50 @@ impl App {
             return;
         }
 
-        // Latest event always wins. If we're Pending/Armed for a different
-        // pane, or Armed for the same pane, bump the generation to invalidate
-        // any in-flight response and start fresh.
+        // Latest event always wins — but only if we can actually act on it.
+        // The ACP transport single-flights at the tab level, so if the
+        // current tab already has a prompt in flight, submitting another
+        // one results in `App.turn = Submitted(new)` + ACP `AgentBusy`
+        // rejection — the buffer and the wire diverge, and old chunks
+        // corrupt the new turn's state. Defer instead.
         let same_pane = self.autofix_pane_id.as_deref() == Some(notification.pane_id.as_str());
+        let already_busy = !self.current_tab().turn.is_idle()
+            && !matches!(
+                self.current_tab().turn,
+                TurnState::Surfaced { end_pending: false, .. }
+            );
 
-        if same_pane && self.current_tab_mut().prompt_in_flight {
-            // Same pane, already Pending: re-emit pending with new summary
-            // but don't send another prompt (agent is already working on it).
-            tracing::info!(target: "autofix", pane_id = %notification.pane_id, "autofix re-trigger same pane while pending — re-emit only");
-            self.emit_autofix_state_pending(&notification.pane_id, &notification.summary);
+        if already_busy {
+            if same_pane {
+                // Same pane re-trigger: refresh the bar's summary text but
+                // don't re-submit — the agent is already working on it.
+                tracing::info!(
+                    target: "autofix",
+                    pane_id = %notification.pane_id,
+                    "autofix re-trigger same pane while pending — re-emit only",
+                );
+                self.emit_autofix_state_pending(
+                    &notification.pane_id,
+                    &notification.summary,
+                );
+            } else {
+                // Different pane while busy: drop. The user can Esc the
+                // current autofix to free the slot if they want this one.
+                tracing::info!(
+                    target: "autofix",
+                    pane_id = %notification.pane_id,
+                    armed_pane = ?self.autofix_pane_id,
+                    "skipping autofix: previous turn still in-flight",
+                );
+            }
             return;
         }
 
         // For all other cases (different pane, or Armed state, or Idle):
-        // bump generation to stale any in-flight response, clear current state.
+        // bump generation to stale any in-flight response, then submit a new
+        // autofix turn via the state machine.
         self.autofix_generation = self.autofix_generation.wrapping_add(1);
-        self.clear_recommendations();
-        self.current_tab_mut().agent_streaming = false;
-        self.current_tab_mut().prompt_in_flight = false;
+        let new_gen = self.autofix_generation;
         // A new analysis supersedes any leftover suggestion. The C++ side
         // will swap to Pending on the new pending event below; emitting an
         // explicit cleared first would create a flicker.
@@ -4292,18 +4165,30 @@ impl App {
             source_pane_id: Some(notification.pane_id.clone()),
         };
 
-        // Store the failing pane ID so we can auto-fill `parent` on execution.
+        // Store the failing pane ID so the Esc dismiss path can find it
+        // (legacy; the new state machine carries it via AutofixContext).
         self.autofix_pane_id = Some(notification.pane_id.clone());
 
-        self.current_tab_mut().prompt_in_flight = true;
-        self.inflight_autofix_generation = Some(self.autofix_generation);
-        self.current_tab_mut().progress_status = Some("Thinking...".to_string());
-        self.current_tab_mut().activity_frame = 0;
-
         let prompt = PromptSubmission::new_autofix(prompt_text, Some(pane_context));
-        self.current_tab_mut().current_prompt_id = Some(prompt.id);
-        self.current_tab_mut().current_prompt_submitted_at_unix_s = Some(prompt.submitted_at_unix_s);
-        tracing::info!(target: "autofix", pane_id = %notification.pane_id, generation = self.autofix_generation, "sending auto-fix prompt");
+        let submitted = SubmittedPrompt {
+            id: prompt.id,
+            text: prompt.text.clone(),
+            submitted_at_unix_s: prompt.submitted_at_unix_s,
+            autofix: Some(AutofixContext {
+                target_pane_id: notification.pane_id.clone(),
+                generation: new_gen,
+            }),
+        };
+        // Route through the state machine. If no ACP session is bound yet
+        // (tests / pre-AgentConnected), `turn_submit_prompt` still installs
+        // the turn on the default tab so the prompt is queued correctly.
+        let session_id = self
+            .current_tab()
+            .session_id
+            .clone()
+            .unwrap_or_else(|| DEFAULT_TAB_ID.to_string());
+        self.turn_submit_prompt(&session_id, submitted);
+        tracing::info!(target: "autofix", pane_id = %notification.pane_id, generation = new_gen, "sending auto-fix prompt");
         let _ = self.prompt_tx.send(prompt);
 
         // Light up the bottom-bar diagnostic icon in "Pending" state — the
@@ -4349,7 +4234,7 @@ impl App {
     /// window). Mirrors the Enter-key path in the recommendations handler
     /// but without requiring the agent pane to be focused.
     fn handle_autofix_execute_request(&mut self, requested_pane_id: &str) {
-        tracing::info!(target: "autofix", requested_pane = %requested_pane_id, armed_pane = ?self.autofix_pane_id, has_recs = self.current_tab().recommendations.is_some(), "autofix_execute received");
+        tracing::info!(target: "autofix", requested_pane = %requested_pane_id, armed_pane = ?self.autofix_pane_id, has_recs = self.current_tab().turn.recommendations().is_some(), "autofix_execute received");
         // Only execute if we have a cached autofix for the requested pane.
         // The pane_id check prevents a stale UI click from running against
         // an unrelated, more recent error.
@@ -4362,7 +4247,7 @@ impl App {
                 return;
             }
         };
-        let rec = match self.current_tab_mut().recommendations.clone() {
+        let rec = match self.current_tab().turn.recommendations().cloned() {
             Some(r) => r,
             None => {
                 self.emit_autofix_state_cleared(&armed_pane);
@@ -4387,16 +4272,37 @@ impl App {
                 }
             }
         }
-        self.autofix_pane_id = None;
-        self.current_tab_mut().commit_pending_completed_turn();
-        self.clear_recommendations();
-        self.push_execution_info(format!("Auto-executing choice {}.", choice.choice));
-        let _ = self
-            .recommendation_tx
-            .send(crate::coordinator::ChoiceExecution {
-                choice,
-                insert_only: false,
-            });
+        // Drive the cutover state machine: if the current tab's turn is
+        // still in `Surfaced{Recommendation,..}`, route through
+        // `turn_execute_card`; otherwise fall back to the lightweight
+        // dispatch path (the user may have already cleared the card via
+        // some other input).
+        let session_id = self.current_tab().session_id.clone();
+        let routed = if let Some(sid) = session_id {
+            if matches!(
+                self.current_tab().turn,
+                TurnState::Surfaced { outcome: TurnOutcome::Recommendation(_), .. }
+            ) {
+                self.turn_execute_card(&sid);
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        let choice_label = choice.choice;
+        if !routed {
+            self.autofix_pane_id = None;
+            self.clear_recommendations();
+            let _ = self
+                .recommendation_tx
+                .send(crate::coordinator::ChoiceExecution {
+                    choice,
+                    insert_only: false,
+                });
+        }
+        self.push_execution_info(format!("Auto-executing choice {}.", choice_label));
         self.emit_autofix_state_cleared(&armed_pane);
     }
 
@@ -4467,8 +4373,8 @@ impl App {
 
     fn selected_recommendation_choice(&self) -> Option<&RecommendationChoice> {
         let tab = self.current_tab();
-        tab.recommendations
-            .as_ref()
+        tab.turn
+            .recommendations()
             .and_then(|recs| recs.choices.get(tab.selected_recommendation))
     }
 
@@ -4491,114 +4397,486 @@ impl App {
         choice.actions.iter().any(|a| matches!(a, crate::coordinator::RecommendedAction::Send { .. }))
     }
 
-    fn finalize_agent_response_for(&mut self, session_id: &str) -> FinalizeOutcome {
-        if self.session_tab(session_id).pending_agent_response.trim().is_empty() {
-            self.log_selection_phase_for(session_id, "selection_parse_failed", "reason=empty_agent_response");
-            return FinalizeOutcome::None;
+    fn log_selection_phase_for(&self, session_id: &str, phase: &str, details: &str) {
+        // log against the in-flight tab so traces stay coherent with where
+        // the prompt was submitted, even after the user switches tabs.
+        let tab = self.session_tab(session_id);
+        if let Some(prompt) = tab.turn.prompt() {
+            prompt_timing_log(prompt.id, prompt.submitted_at_unix_s, phase, details);
+        }
+    }
+
+    fn log_selection_visible_if_needed(&mut self) {
+        let tab = self.current_tab();
+        if !tab.selection_visible_pending || tab.turn.recommendations().is_none() {
+            return;
+        }
+        let details = format!(
+            "choice_count={} selected_index={}",
+            tab.turn
+                .recommendations()
+                .map(|set| set.choices.len())
+                .unwrap_or(0),
+            tab.selected_recommendation
+        );
+        let session_id = tab.session_id.clone();
+        if let Some(sid) = session_id {
+            self.log_selection_phase_for(&sid, "selection_visible", &details);
+        }
+        self.current_tab_mut().selection_visible_pending = false;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TurnState transition methods
+//
+// Source of truth for the per-turn lifecycle (see
+// `doc/specs/turn-state-refactor.md`). Every event handler — chunk arrival,
+// end-of-turn, Enter on a card, Esc / Ctrl+C cancel, autofix trigger — goes
+// through one of these methods.
+// ─────────────────────────────────────────────────────────────────────────
+
+impl App {
+    /// Transition `tab.turn` into `Submitted` for a new prompt and perform
+    /// the side effects: clear stale in-flight chat state (messages, tool
+    /// calls, permission, scroll), push the user bubble, log
+    /// `prompt_received`. Caller is responsible for actually dispatching the
+    /// prompt over ACP (so this method stays free of async / channel
+    /// concerns).
+    pub fn turn_submit_prompt(&mut self, session_id: &str, prompt: SubmittedPrompt) {
+        prompt_timing_log(
+            prompt.id,
+            prompt.submitted_at_unix_s,
+            "prompt_received",
+            &format!(
+                "autofix={} text_chars={}",
+                prompt.autofix.is_some(),
+                prompt.text.chars().count()
+            ),
+        );
+        let is_autofix = prompt.autofix.is_some();
+        let user_text = prompt.text.clone();
+        let tab = self.session_tab_mut(session_id);
+        // Per Decision #3, every Idle→Submitted transition explicitly clears
+        // these orthogonal fields rather than relying on side effects from a
+        // grab-bag helper.
+        tab.messages.clear();
+        tab.tool_calls.clear();
+        tab.permission = None;
+        tab.chat_scroll.reset();
+        tab.selection_visible_pending = false;
+        // Any leftover card from the previous turn's
+        // `Surfaced{end_pending:false}` is dismissed by the new submit.
+        tab.selected_recommendation = 0;
+        tab.selected_button = 0;
+        tab.rec_scroll.reset();
+        // Autofix prompts are synthesized by the system; they don't render
+        // as a User bubble (the user already sees the error line in the
+        // failing pane).
+        if !is_autofix {
+            tab.messages.push(ChatMessage::User(user_text));
+        }
+        tab.scroll_to_bottom();
+        tab.progress_status = None;
+        tab.activity_frame = 0;
+        tab.timing_note = None;
+        tab.turn = TurnState::Submitted(prompt);
+    }
+
+    /// Observe a streamed chunk. Thought chunks only advance the state
+    /// (Submitted→Streaming with empty buffer); message chunks append to the
+    /// streaming buffer. Returns true if the buffer changed (so the caller
+    /// can decide whether to attempt an eager surface).
+    pub fn turn_observe_chunk(&mut self, session_id: &str, kind: ChunkKind, text: &str) -> bool {
+        // Stale-autofix check: if the chunk belongs to an autofix turn whose
+        // generation no longer matches the current counter, drop it.
+        let current_gen = self.autofix_generation;
+        let tab = self.session_tab_mut(session_id);
+        if let Some(gen) = tab.turn.autofix_generation() {
+            if gen != current_gen {
+                tracing::debug!(
+                    target: "autofix",
+                    inflight_gen = gen,
+                    current_gen,
+                    "dropping stale autofix chunk",
+                );
+                return false;
+            }
         }
 
-        let text = std::mem::take(&mut self.session_tab_mut(session_id).pending_agent_response);
+        // `progress_status` (agent-supplied "Reading foo.rs" etc.) is left
+        // alone here — its natural lifetime is the whole turn. It's cleared
+        // at turn close (`turn_clear_agent_progress`) and overwritten by
+        // future `ProgressStatus` events. The old per-chunk wipe erased
+        // the value the moment a streaming agent would have it set.
+        match (&mut tab.turn, kind) {
+            // First message chunk: transition Submitted → Streaming.
+            (TurnState::Submitted(_), ChunkKind::Message) => {
+                let TurnState::Submitted(prompt) =
+                    std::mem::replace(&mut tab.turn, TurnState::Idle)
+                else {
+                    unreachable!();
+                };
+                tab.turn = TurnState::Streaming {
+                    prompt,
+                    buf: text.to_string(),
+                };
+                true
+            }
+            // Thought chunk while Submitted: enter Streaming with empty buf.
+            (TurnState::Submitted(_), ChunkKind::Thought) => {
+                let TurnState::Submitted(prompt) =
+                    std::mem::replace(&mut tab.turn, TurnState::Idle)
+                else {
+                    unreachable!();
+                };
+                tab.turn = TurnState::Streaming {
+                    prompt,
+                    buf: String::new(),
+                };
+                false
+            }
+            // Streaming → Streaming, append message chunks only.
+            (TurnState::Streaming { buf, .. }, ChunkKind::Message) => {
+                buf.push_str(text);
+                true
+            }
+            // Thought chunks during Streaming: no buffer change.
+            (TurnState::Streaming { .. }, ChunkKind::Thought) => false,
+            // Trailing chunks after the card has surfaced: drop them.
+            (TurnState::Surfaced { .. }, _) => false,
+            // Chunks while Idle: shouldn't happen; defensive drop.
+            (TurnState::Idle, _) => false,
+        }
+    }
 
-        // Autofix responses use a minimal prompt/format; parse them separately.
-        if self.autofix_pane_id.is_some() {
-            return self.finalize_autofix_response_for(session_id, text);
+    /// Attempt to parse the streaming buffer and surface a card / chat turn
+    /// without waiting for `AgentMessageEnd`. No-op if state isn't
+    /// `Streaming`, buffer hasn't opened a fence yet, or parsing fails.
+    pub fn turn_try_eager_surface(&mut self, session_id: &str) {
+        let tab = self.session_tab(session_id);
+        let TurnState::Streaming { buf, .. } = &tab.turn else {
+            return;
+        };
+        if !buf.contains("```") {
+            return;
+        }
+        let buf = buf.clone();
+        let is_autofix = tab.turn.is_autofix();
+
+        if is_autofix {
+            match parse_autofix_response(&buf) {
+                AutofixDecision::Fix(recommendations) => {
+                    self.turn_surface_fix(session_id, recommendations, "autofix_fix_eager");
+                }
+                AutofixDecision::Explain { title, explanation } => {
+                    self.turn_surface_explain(
+                        session_id,
+                        title,
+                        explanation,
+                        "autofix_explain_eager",
+                    );
+                }
+                AutofixDecision::Ignore => {}
+            }
+        } else {
+            let parsed = parse_recommendation_set(&buf).and_then(|r| {
+                validate_recommendation_set_for_coordinator_target(&r, self.pane_id.as_deref())
+            });
+            if let Ok(recommendations) = parsed {
+                self.turn_surface_recommendation(
+                    session_id,
+                    recommendations,
+                    "selection_ready_eager",
+                );
+            }
+        }
+    }
+
+    /// Close the in-flight turn on `AgentMessageEnd`. Dispatches across
+    /// four termination paths:
+    ///
+    /// 1. Stale-autofix discard (newer trigger or Esc cancelled this turn).
+    /// 2. Eager surface already fired — just release the UI gate.
+    /// 3. `Submitted` with no chunks — model returned nothing.
+    /// 4. `Streaming` with a buffer — final parse via the autofix or
+    ///    planner finalize helper.
+    pub fn turn_close(&mut self, session_id: &str) {
+        // (1) Stale-autofix discard.
+        let current_gen = self.autofix_generation;
+        if let Some(gen) = self.session_tab(session_id).turn.autofix_generation() {
+            if gen != current_gen {
+                tracing::info!(
+                    target: "autofix",
+                    inflight_gen = gen,
+                    current_gen,
+                    "discarding stale autofix turn at close",
+                );
+                self.turn_clear_agent_progress(session_id);
+                self.session_tab_mut(session_id).turn = TurnState::Idle;
+                return;
+            }
         }
 
-        match parse_recommendation_set(&text).and_then(|recommendations| {
-            validate_recommendation_set_for_coordinator_target(
-                &recommendations,
-                self.pane_id.as_deref(),
-            )
-        }) {
+        // (2) Eager surface already fired.
+        if let TurnState::Surfaced {
+            end_pending: true, ..
+        } = &self.session_tab(session_id).turn
+        {
+            self.turn_release_end_pending_logged(session_id, "via=eager+end");
+            self.turn_clear_agent_progress(session_id);
+            return;
+        }
+
+        // (3) Submitted, no chunks. For autofix this would leave the bar
+        //     stuck in Pending; clear it explicitly.
+        let (buf, is_autofix) = match &self.session_tab(session_id).turn {
+            TurnState::Streaming { buf, prompt } => (buf.clone(), prompt.autofix.is_some()),
+            TurnState::Submitted(_) => {
+                self.turn_close_no_chunks(session_id);
+                return;
+            }
+            // Idle / already-surfaced+end_done — nothing to do.
+            _ => return,
+        };
+
+        // (4) Final parse on the streaming buffer.
+        if is_autofix {
+            self.turn_close_finalize_autofix(session_id, &buf);
+        } else {
+            self.turn_close_finalize_planner(session_id, buf);
+        }
+        self.turn_clear_agent_progress(session_id);
+    }
+
+    /// Path (3): close a turn that received `AgentMessageEnd` with no
+    /// streamed content. Emits `autofix_state_cleared` if it was an
+    /// autofix turn so the bottom bar doesn't stick in Pending.
+    fn turn_close_no_chunks(&mut self, session_id: &str) {
+        let tab = self.session_tab_mut(session_id);
+        let prompt = tab.turn.prompt().cloned().expect("prompt set");
+        let autofix_pane = prompt.autofix.as_ref().map(|a| a.target_pane_id.clone());
+        tab.turn = TurnState::Surfaced {
+            prompt,
+            outcome: TurnOutcome::Empty,
+            end_pending: true,
+        };
+        if let Some(pane) = autofix_pane {
+            self.emit_autofix_state_cleared(&pane);
+            self.autofix_pane_id = None;
+        }
+        self.turn_release_end_pending(session_id);
+        self.turn_clear_agent_progress(session_id);
+    }
+
+    /// Path (4a): autofix Streaming buffer reached `AgentMessageEnd` with
+    /// no eager surface. Parse and route to Fix / Explain / Ignore.
+    fn turn_close_finalize_autofix(&mut self, session_id: &str, buf: &str) {
+        match parse_autofix_response(buf) {
+            AutofixDecision::Fix(recommendations) => {
+                self.turn_surface_fix(session_id, recommendations, "autofix_fix");
+                self.turn_release_end_pending(session_id);
+            }
+            AutofixDecision::Explain { title, explanation } => {
+                self.turn_surface_explain(session_id, title, explanation, "autofix_explain");
+                self.turn_release_end_pending(session_id);
+            }
+            AutofixDecision::Ignore => {
+                let pane_id = self.autofix_pane_id.clone();
+                self.log_selection_phase_for(
+                    session_id,
+                    "autofix_ignore",
+                    &format!("pane={:?}", pane_id),
+                );
+                if let Some(pane_id) = pane_id {
+                    self.emit_autofix_state_cleared(&pane_id);
+                }
+                self.autofix_pane_id = None;
+                let tab = self.session_tab_mut(session_id);
+                let prompt = tab.turn.prompt().cloned().expect("prompt set");
+                tab.turn = TurnState::Surfaced {
+                    prompt,
+                    outcome: TurnOutcome::Empty,
+                    end_pending: false,
+                };
+            }
+        }
+    }
+
+    /// Path (4b): non-autofix Streaming buffer. Try `RecommendationSet`
+    /// parse first; on failure, commit as a chat turn (chat-mode answer).
+    fn turn_close_finalize_planner(&mut self, session_id: &str, buf: String) {
+        let parsed = parse_recommendation_set(&buf).and_then(|r| {
+            validate_recommendation_set_for_coordinator_target(&r, self.pane_id.as_deref())
+        });
+        match parsed {
             Ok(recommendations) => {
-                self.surface_recommendation(session_id, recommendations, "selection_ready")
+                self.turn_surface_recommendation(session_id, recommendations, "selection_ready");
+                self.turn_release_end_pending(session_id);
             }
             Err(err) => {
+                let chars = buf.chars().count();
                 let error_text = format!("{:#}", err).replace('\n', " | ");
-                let chars = text.chars().count();
-                let has_prompt = self.session_tab(session_id).current_prompt_text.is_some();
-                {
-                    let tab = self.session_tab_mut(session_id);
-                    tab.clear_recommendations();
-                    tab.pending_completed_turn = None;
-                }
                 self.log_selection_phase_for(
                     session_id,
                     "selection_parse_failed",
-                    &format!(
-                        "response_chars={} error={:?}",
-                        chars, error_text
-                    ),
+                    &format!("response_chars={} error={:?}", chars, error_text),
                 );
                 let tab = self.session_tab_mut(session_id);
-                if has_prompt {
-                    // JSON parse failed → treat the agent's response as a
-                    // plain chat answer (chat mode in terminal-agent.md).
-                    // Default-expand so the answer is immediately visible
-                    // without forcing the user to Tab+Enter to reveal it.
-                    tab.stage_completed_turn(text, true);
-                    tab.commit_pending_completed_turn();
-                    tab.clear_chat_history();
-                } else {
-                    tab.prompt_in_flight = false;
-                    tab.progress_status = None;
-                    tab.agent_streaming = false;
-                }
-                FinalizeOutcome::None
+                let prompt = tab.turn.prompt().cloned().expect("prompt set");
+                let mut details = tab.current_turn_details();
+                details.push(ChatMessage::Agent(buf));
+                tab.completed_turns.push(CompletedTurn {
+                    prompt: prompt.text.clone(),
+                    details,
+                    expanded: true,
+                });
+                tab.messages.clear();
+                tab.tool_calls.clear();
+                tab.scroll_to_bottom();
+                // Route through `turn_release_end_pending` so
+                // `prompt_complete` fires on this terminal path too.
+                tab.turn = TurnState::Surfaced {
+                    prompt,
+                    outcome: TurnOutcome::ChatTurn,
+                    end_pending: true,
+                };
+                self.turn_release_end_pending(session_id);
             }
         }
     }
 
-    /// Eagerly surface a planner recommendation card the moment the streamed
-    /// buffer parses, instead of waiting for `AgentMessageEnd` (gated behind
-    /// Copilot's Stop/SessionEnd hooks, ~8s on Windows).
-    fn try_eager_finalize_planner(&mut self, session_id: &str) {
-        let tab = self.session_tab(session_id);
-        if tab.eagerly_finalized || !tab.pending_agent_response.contains("```") {
-            return;
-        }
-        let text = tab.pending_agent_response.clone();
-        let parsed = parse_recommendation_set(&text).and_then(|r| {
-            validate_recommendation_set_for_coordinator_target(&r, self.pane_id.as_deref())
-        });
-        if let Ok(recommendations) = parsed {
-            self.surface_recommendation(session_id, recommendations, "selection_ready_eager");
-            self.session_tab_mut(session_id).eagerly_finalized = true;
+    /// Variant of `turn_release_end_pending` with a custom `via=` log tag
+    /// for the eager-surface path. `turn_release_end_pending` uses
+    /// `via=end_only`; `via=eager+end` lets `prompt_timing` consumers
+    /// distinguish.
+    fn turn_release_end_pending_logged(&mut self, session_id: &str, via: &str) {
+        let tab = self.session_tab_mut(session_id);
+        if let TurnState::Surfaced {
+            end_pending,
+            prompt,
+            ..
+        } = &mut tab.turn
+        {
+            if *end_pending {
+                *end_pending = false;
+                let prompt_id = prompt.id;
+                let submitted_at = prompt.submitted_at_unix_s;
+                prompt_timing_log(prompt_id, submitted_at, "prompt_complete", via);
+            }
         }
     }
 
-    /// Surface a planner recommendation card and commit the chat turn.
-    /// Shared between `selection_ready_eager` (streamed) and `selection_ready`
-    /// (end-of-turn) paths.
-    fn surface_recommendation(
+    /// Helper called at every turn-close path. Clears the agent-supplied
+    /// progress override and the shimmer animation phase; the UI spinner
+    /// otherwise drives off `tab.turn.spinner_label()`.
+    fn turn_clear_agent_progress(&mut self, session_id: &str) {
+        let tab = self.session_tab_mut(session_id);
+        tab.progress_status = None;
+        tab.activity_frame = 0;
+    }
+
+    /// User pressed Enter while a card was visible — dispatch the selected
+    /// choice to the coordinator and transition to `Surfaced { Empty, .. }`
+    /// while preserving the ACP single-flight gate.
+    pub fn turn_execute_card(&mut self, session_id: &str) {
+        let Some(mut choice) = self.selected_recommendation_choice().cloned() else {
+            return;
+        };
+        let tab = self.session_tab(session_id);
+        let TurnState::Surfaced {
+            outcome: TurnOutcome::Recommendation(_),
+            ..
+        } = &tab.turn
+        else {
+            return;
+        };
+        let insert_only =
+            self.session_tab(session_id).selected_button == 1 && self.is_send_choice(&choice);
+        // Autofill parent for Send actions when this is an autofix turn.
+        if let Some(pane_id) = self
+            .session_tab(session_id)
+            .turn
+            .prompt()
+            .and_then(|p| p.autofix.as_ref())
+            .map(|a| a.target_pane_id.clone())
+        {
+            for action in &mut choice.actions {
+                if let crate::coordinator::RecommendedAction::Send { ref mut parent, .. } = action {
+                    if parent.is_empty() {
+                        *parent = pane_id.clone();
+                    }
+                }
+            }
+        }
+        let armed_pane = self
+            .session_tab(session_id)
+            .turn
+            .prompt()
+            .and_then(|p| p.autofix.as_ref())
+            .map(|a| a.target_pane_id.clone());
+        let _ = self
+            .recommendation_tx
+            .send(crate::coordinator::ChoiceExecution { choice, insert_only });
+        if let Some(pane_id) = armed_pane {
+            self.emit_autofix_state_cleared(&pane_id);
+        }
+        self.autofix_pane_id = None;
+        let tab = self.session_tab_mut(session_id);
+        let TurnState::Surfaced { prompt, end_pending, .. } =
+            std::mem::replace(&mut tab.turn, TurnState::Idle)
+        else {
+            unreachable!()
+        };
+        tab.selected_recommendation = 0;
+        tab.selected_button = 0;
+        tab.rec_scroll.reset();
+        // commit pending turn (in case eager surface staged one).
+        tab.turn = TurnState::Surfaced {
+            prompt,
+            outcome: TurnOutcome::Empty,
+            end_pending,
+        };
+    }
+
+    /// User pressed Esc — cancel the in-flight turn. Bumps
+    /// `autofix_generation` so any chunks that arrive after this point are
+    /// dropped by the stale-check in `turn_observe_chunk`.
+    pub fn turn_cancel(&mut self, session_id: &str) {
+        self.autofix_generation = self.autofix_generation.wrapping_add(1);
+        let pane_id = self
+            .session_tab(session_id)
+            .turn
+            .prompt()
+            .and_then(|p| p.autofix.as_ref())
+            .map(|a| a.target_pane_id.clone())
+            .or_else(|| self.autofix_pane_id.clone());
+        if let Some(pane_id) = pane_id {
+            self.emit_autofix_state_cleared(&pane_id);
+        }
+        self.autofix_pane_id = None;
+        let tab = self.session_tab_mut(session_id);
+        tab.selected_recommendation = 0;
+        tab.selected_button = 0;
+        tab.rec_scroll.reset();
+        tab.progress_status = None;
+        tab.activity_frame = 0;
+        tab.turn = TurnState::Idle;
+    }
+
+    // ── Internal surface helpers (shared between eager and end-of-turn). ──
+
+    /// Surface a planner-mode recommendation card.
+    fn turn_surface_recommendation(
         &mut self,
         session_id: &str,
         recommendations: RecommendationSet,
         phase_name: &str,
-    ) -> FinalizeOutcome {
+    ) {
         let rec_idx = recommended_choice_index(&recommendations);
         let choice_count = recommendations.choices.len();
         let recommended_choice = recommendations.recommended_choice;
         let summary = format_recommendations_for_chat(&recommendations);
-        let tab = self.session_tab_mut(session_id);
-        tab.stage_completed_turn(summary, false);
-        tab.commit_pending_completed_turn();
-        // The turn's details now own a clone of `messages` (sans User).
-        // Drop the live buffer so the chat doesn't double-render the same
-        // prompt as both an active User bubble and a folded turn header.
-        tab.messages.clear();
-        tab.tool_calls.clear();
-        tab.selected_recommendation = rec_idx;
-        tab.selected_button = 0;
-        tab.rec_scroll.reset();
-        tab.recommendations = Some(recommendations);
-        tab.selection_visible_pending = true;
-        tab.selected_completed_turn_idx = None;
-        tab.prompt_in_flight = false;
-        tab.agent_streaming = false;
-        tab.progress_status = None;
-        tab.activity_frame = 0;
-        tab.pending_thought_response.clear();
         self.log_selection_phase_for(
             session_id,
             phase_name,
@@ -4607,51 +4885,47 @@ impl App {
                 choice_count, recommended_choice
             ),
         );
-        FinalizeOutcome::SelectionReady
+        let tab = self.session_tab_mut(session_id);
+        let prompt = tab.turn.prompt().cloned().expect("prompt set");
+        let mut details = tab.current_turn_details();
+        details.push(ChatMessage::Agent(summary));
+        tab.completed_turns.push(CompletedTurn {
+            prompt: prompt.text.clone(),
+            details,
+            expanded: false,
+        });
+        tab.messages.clear();
+        tab.tool_calls.clear();
+        tab.scroll_to_bottom();
+        tab.selected_recommendation = rec_idx;
+        tab.selected_button = 0;
+        tab.rec_scroll.reset();
+        tab.selection_visible_pending = true;
+        tab.selected_completed_turn_idx = None;
+        tab.progress_status = None;
+        tab.activity_frame = 0;
+        tab.turn = TurnState::Surfaced {
+            prompt,
+            outcome: TurnOutcome::Recommendation(recommendations),
+            end_pending: true,
+        };
     }
 
-    /// Eagerly surface a Fix card or Explain chat turn the moment the
-    /// streamed buffer parses, instead of waiting for `AgentMessageEnd`
-    /// (which on Windows is gated behind Copilot's Stop/SessionEnd hooks,
-    /// ~7.5s). `Ignore` falls through to the end-of-turn path.
-    fn try_eager_finalize_autofix(&mut self, session_id: &str) {
-        if self.autofix_pane_id.is_none() {
-            return;
-        }
-        let tab = self.session_tab(session_id);
-        if tab.eagerly_finalized || !tab.pending_agent_response.contains("```") {
-            return;
-        }
-        let text = tab.pending_agent_response.clone();
-        match parse_autofix_response(&text) {
-            AutofixDecision::Fix(recommendations) => {
-                self.surface_autofix_fix(session_id, recommendations, "autofix_fix_eager");
-                self.session_tab_mut(session_id).eagerly_finalized = true;
-            }
-            AutofixDecision::Explain { title, explanation } => {
-                self.surface_autofix_explain(
-                    session_id,
-                    title,
-                    explanation,
-                    "autofix_explain_eager",
-                );
-                self.session_tab_mut(session_id).eagerly_finalized = true;
-            }
-            AutofixDecision::Ignore => {}
-        }
-    }
-
-    /// Surface a Fix recommendation as an Armed card. Shared between
-    /// `autofix_fix_eager` (streamed) and `autofix_fix` (end-of-turn) paths.
-    fn surface_autofix_fix(
+    /// Surface an autofix Fix recommendation as an Armed card.
+    fn turn_surface_fix(
         &mut self,
         session_id: &str,
         recommendations: RecommendationSet,
         phase_name: &str,
-    ) -> FinalizeOutcome {
-        let pane_id = match self.autofix_pane_id.clone() {
-            Some(p) => p,
-            None => return FinalizeOutcome::None,
+    ) {
+        let pane_id = self
+            .session_tab(session_id)
+            .turn
+            .prompt()
+            .and_then(|p| p.autofix.as_ref())
+            .map(|a| a.target_pane_id.clone());
+        let Some(pane_id) = pane_id else {
+            return;
         };
         self.log_selection_phase_for(
             session_id,
@@ -4665,30 +4939,35 @@ impl App {
         self.emit_autofix_state_armed(&pane_id, &preview);
         let rec_idx = recommended_choice_index(&recommendations);
         let tab = self.session_tab_mut(session_id);
+        let prompt = tab.turn.prompt().cloned().expect("prompt set");
         tab.selected_recommendation = rec_idx;
-        tab.recommendations = Some(recommendations);
         tab.selection_visible_pending = true;
-        tab.prompt_in_flight = false;
-        tab.agent_streaming = false;
         tab.progress_status = None;
         tab.activity_frame = 0;
-        tab.pending_thought_response.clear();
-        FinalizeOutcome::SelectionReady
+        tab.turn = TurnState::Surfaced {
+            prompt,
+            outcome: TurnOutcome::Recommendation(recommendations),
+            end_pending: true,
+        };
     }
 
-    /// Surface an Explain response as a chat turn + bottom-bar suggestion
-    /// indicator. Shared between `autofix_explain_eager` (streamed) and
-    /// `autofix_explain` (end-of-turn) paths.
-    fn surface_autofix_explain(
+    /// Surface an autofix Explain answer as a chat turn + bottom-bar
+    /// Suggested indicator.
+    fn turn_surface_explain(
         &mut self,
         session_id: &str,
         title: String,
         explanation: String,
         phase_name: &str,
-    ) -> FinalizeOutcome {
-        let pane_id = match self.autofix_pane_id.clone() {
-            Some(p) => p,
-            None => return FinalizeOutcome::None,
+    ) {
+        let pane_id = self
+            .session_tab(session_id)
+            .turn
+            .prompt()
+            .and_then(|p| p.autofix.as_ref())
+            .map(|a| a.target_pane_id.clone());
+        let Some(pane_id) = pane_id else {
+            return;
         };
         self.log_selection_phase_for(
             session_id,
@@ -4699,99 +4978,58 @@ impl App {
             ),
         );
 
-        // Stage the explanation as a chat turn so opening the agent pane
-        // reveals it. The autofix prompt is internal so we use a
-        // human-readable label as the turn's "prompt" line.
-        let turn_prompt = format!("Auto-diagnosed error in pane {pane_id}");
+        let turn_prompt_label = format!("Auto-diagnosed error in pane {pane_id}");
         {
             let tab = self.session_tab_mut(session_id);
             let mut details = tab.current_turn_details();
             details.push(ChatMessage::Agent(explanation));
-            tab.pending_completed_turn = Some(CompletedTurn {
-                prompt: turn_prompt,
+            tab.completed_turns.push(CompletedTurn {
+                prompt: turn_prompt_label,
                 details,
                 expanded: false,
             });
-            tab.commit_pending_completed_turn();
+            tab.messages.clear();
+            tab.tool_calls.clear();
+            tab.scroll_to_bottom();
         }
 
         self.emit_autofix_state_suggested(&pane_id, &title);
-
-        // No executable action to remember, but keep `suggested_pane_id` so a
-        // successful next command in the same pane can dismiss the bottom-bar
-        // indicator.
         self.suggested_pane_id = Some(pane_id.clone());
         self.autofix_pane_id = None;
+
         let tab = self.session_tab_mut(session_id);
-        tab.clear_recommendations();
-        tab.prompt_in_flight = false;
-        tab.agent_streaming = false;
+        let prompt = tab.turn.prompt().cloned().expect("prompt set");
+        tab.selected_recommendation = 0;
+        tab.selected_button = 0;
+        tab.rec_scroll.reset();
         tab.progress_status = None;
         tab.activity_frame = 0;
-        tab.pending_thought_response.clear();
-        FinalizeOutcome::None
-    }
-
-    fn finalize_autofix_response_for(&mut self, session_id: &str, text: String) -> FinalizeOutcome {
-        let pane_id = match self.autofix_pane_id.clone() {
-            Some(p) => p,
-            None => return FinalizeOutcome::None,
+        tab.turn = TurnState::Surfaced {
+            prompt,
+            outcome: TurnOutcome::ChatTurn,
+            end_pending: true,
         };
-
-        match parse_autofix_response(&text) {
-            AutofixDecision::Fix(recommendations) => {
-                self.surface_autofix_fix(session_id, recommendations, "autofix_fix")
-            }
-            AutofixDecision::Explain { title, explanation } => {
-                self.surface_autofix_explain(session_id, title, explanation, "autofix_explain")
-            }
-            AutofixDecision::Ignore => {
-                self.log_selection_phase_for(session_id, "autofix_ignore", &format!("pane={pane_id}"));
-                self.autofix_pane_id = None;
-                self.emit_autofix_state_cleared(&pane_id);
-                let tab = self.session_tab_mut(session_id);
-                tab.clear_recommendations();
-                tab.prompt_in_flight = false;
-                tab.progress_status = None;
-                tab.agent_streaming = false;
-                FinalizeOutcome::None
-            }
-        }
     }
 
-    fn log_selection_phase_for(&self, session_id: &str, phase: &str, details: &str) {
-        // log against the in-flight tab so traces stay coherent with where
-        // the prompt was submitted, even after the user switches tabs.
-        let tab = self.session_tab(session_id);
-        if let (Some(prompt_id), Some(submitted_at_unix_s)) =
-            (tab.current_prompt_id, tab.current_prompt_submitted_at_unix_s)
+    /// Flip `end_pending=false` after a final-path surface. Mirrors the
+    /// `prompt_complete` log used by the eager path.
+    fn turn_release_end_pending(&mut self, session_id: &str) {
+        let tab = self.session_tab_mut(session_id);
+        if let TurnState::Surfaced {
+            end_pending,
+            prompt,
+            ..
+        } = &mut tab.turn
         {
-            prompt_timing_log(prompt_id, submitted_at_unix_s, phase, details);
+            if *end_pending {
+                *end_pending = false;
+                let prompt_id = prompt.id;
+                let submitted_at = prompt.submitted_at_unix_s;
+                prompt_timing_log(prompt_id, submitted_at, "prompt_complete", "via=end_only");
+            }
         }
-    }
-
-    fn log_selection_visible_if_needed(&mut self) {
-        let tab = self.current_tab();
-        if !tab.selection_visible_pending || tab.recommendations.is_none() {
-            return;
-        }
-        let details = format!(
-            "choice_count={} selected_index={}",
-            tab.recommendations
-                .as_ref()
-                .map(|set| set.choices.len())
-                .unwrap_or(0),
-            tab.selected_recommendation
-        );
-        let session_id = tab.session_id.clone();
-        if let Some(sid) = session_id {
-            self.log_selection_phase_for(&sid, "selection_visible", &details);
-        }
-        self.current_tab_mut().selection_visible_pending = false;
     }
 }
-
-const THOUGHT_PREVIEW_MAX_CHARS: usize = 1024;
 
 /// Computes the rendered height (in terminal rows) of a recommendation card.
 pub(crate) fn rec_card_height(choice: &RecommendationChoice, panel_width: u16) -> usize {
@@ -4895,24 +5133,6 @@ fn format_recommendations_for_chat(set: &RecommendationSet) -> String {
     }
 
     out
-}
-
-fn append_thought_preview(buffer: &mut String, chunk: &str) {
-    if chunk.is_empty() {
-        return;
-    }
-
-    buffer.push_str(chunk);
-    let char_count = buffer.chars().count();
-    if char_count <= THOUGHT_PREVIEW_MAX_CHARS {
-        return;
-    }
-
-    let tail: String = buffer
-        .chars()
-        .skip(char_count.saturating_sub(THOUGHT_PREVIEW_MAX_CHARS))
-        .collect();
-    *buffer = format!("...{tail}");
 }
 
 /// Extract a short preview string from the recommended choice's first
@@ -5810,7 +6030,7 @@ mod tests {
             "autofix must not arm an agent CLI pane on its own exit"
         );
         assert!(
-            !app.current_tab().prompt_in_flight,
+            app.current_tab().turn.is_idle(),
             "no autofix prompt should have been sent"
         );
     }
@@ -5838,7 +6058,7 @@ mod tests {
             "autofix must still arm normal panes when a command fails"
         );
         assert!(
-            app.current_tab().prompt_in_flight,
+            !app.current_tab().turn.is_idle(),
             "autofix prompt should be in-flight"
         );
     }
@@ -5889,7 +6109,7 @@ mod tests {
              would throw E_FAIL"
         );
         assert!(
-            !app.current_tab().prompt_in_flight,
+            app.current_tab().turn.is_idle(),
             "no autofix prompt should be in-flight"
         );
         // The user still gets a system message about the pane closing.
@@ -6083,5 +6303,214 @@ mod tests {
             s.pane_session_id.is_none(),
             "pane binding should be cleared after close"
         );
+    }
+
+    // ─── turn-state integration tests ──────────────────────────────────────
+    //
+    // Drive `App` directly through the turn-state transitions in
+    // `doc/specs/turn-state-refactor.md`'s table. We use the active tab's
+    // `DEFAULT_TAB_ID` as the session key — `session_tab_mut` falls back to
+    // the active tab when the id is unknown, which keeps these tests free
+    // of ACP wiring.
+
+    fn submit_test_prompt(app: &mut App, text: &str) {
+        let prompt = SubmittedPrompt {
+            id: 42,
+            text: text.into(),
+            submitted_at_unix_s: 0.0,
+            autofix: None,
+        };
+        app.turn_submit_prompt(DEFAULT_TAB_ID, prompt);
+    }
+
+    fn submit_autofix_prompt(app: &mut App, pane: &str) {
+        app.autofix_generation = app.autofix_generation.wrapping_add(1);
+        app.autofix_pane_id = Some(pane.into());
+        let prompt = SubmittedPrompt {
+            id: 99,
+            text: "diagnose this".into(),
+            submitted_at_unix_s: 0.0,
+            autofix: Some(AutofixContext {
+                target_pane_id: pane.into(),
+                generation: app.autofix_generation,
+            }),
+        };
+        app.turn_submit_prompt(DEFAULT_TAB_ID, prompt);
+    }
+
+    #[test]
+    fn submit_clears_messages_and_pushes_user_bubble() {
+        let mut app = test_app();
+        app.current_tab_mut()
+            .messages
+            .push(ChatMessage::System("stale".into()));
+        submit_test_prompt(&mut app, "hello");
+        let tab = app.current_tab();
+        assert!(matches!(tab.turn, TurnState::Submitted(_)));
+        assert!(
+            !tab.turn.accepts_new_prompt(),
+            "Submitted blocks new prompts"
+        );
+        assert_eq!(tab.messages.len(), 1, "stale System bubble was cleared");
+        assert!(matches!(tab.messages[0], ChatMessage::User(ref t) if t == "hello"));
+    }
+
+    #[test]
+    fn first_message_chunk_transitions_to_streaming_with_buf() {
+        let mut app = test_app();
+        submit_test_prompt(&mut app, "hi");
+        let advanced =
+            app.turn_observe_chunk(DEFAULT_TAB_ID, ChunkKind::Message, "partial");
+        assert!(advanced, "first message chunk must advance the buffer");
+        let tab = app.current_tab();
+        assert_eq!(tab.turn.buffer(), Some("partial"));
+        assert!(tab.turn.is_streaming());
+    }
+
+    #[test]
+    fn thought_chunk_first_transitions_with_empty_buf() {
+        let mut app = test_app();
+        submit_test_prompt(&mut app, "hi");
+        let advanced =
+            app.turn_observe_chunk(DEFAULT_TAB_ID, ChunkKind::Thought, "thinking…");
+        assert!(!advanced, "thought chunks never advance the buffer");
+        let tab = app.current_tab();
+        assert!(tab.turn.is_streaming());
+        assert_eq!(tab.turn.buffer(), Some(""));
+    }
+
+    #[test]
+    fn end_with_no_eager_chat_fallback_commits_completed_turn() {
+        let mut app = test_app();
+        submit_test_prompt(&mut app, "why blue?");
+        // Pure prose — won't parse as a RecommendationSet, falls to chat.
+        app.turn_observe_chunk(
+            DEFAULT_TAB_ID,
+            ChunkKind::Message,
+            "Light scatters in the atmosphere.",
+        );
+        app.turn_close(DEFAULT_TAB_ID);
+        let tab = app.current_tab();
+        assert!(
+            matches!(
+                tab.turn,
+                TurnState::Surfaced {
+                    outcome: TurnOutcome::ChatTurn,
+                    end_pending: false,
+                    ..
+                }
+            ),
+            "got {:?}",
+            tab.turn
+        );
+        assert!(tab.turn.accepts_new_prompt(), "chat fallback unblocks input");
+        assert_eq!(tab.completed_turns.len(), 1);
+        assert_eq!(tab.completed_turns[0].prompt, "why blue?");
+    }
+
+    #[test]
+    fn end_with_no_chunks_clears_autofix_bottom_bar() {
+        let mut app = test_app();
+        submit_autofix_prompt(&mut app, "pane-7");
+        assert!(app.autofix_pane_id.is_some());
+        // No chunks arrived; AgentMessageEnd fires.
+        app.turn_close(DEFAULT_TAB_ID);
+        let tab = app.current_tab();
+        assert!(
+            matches!(
+                tab.turn,
+                TurnState::Surfaced {
+                    outcome: TurnOutcome::Empty,
+                    end_pending: false,
+                    ..
+                }
+            ),
+            "got {:?}",
+            tab.turn
+        );
+        assert!(
+            app.autofix_pane_id.is_none(),
+            "autofix_pane_id must be cleared so the bar leaves Pending"
+        );
+    }
+
+    #[test]
+    fn stale_autofix_chunks_dropped_when_generation_diverges() {
+        let mut app = test_app();
+        submit_autofix_prompt(&mut app, "pane-1");
+        // Simulate an Esc cancel or a newer trigger bumping the counter.
+        app.autofix_generation = app.autofix_generation.wrapping_add(1);
+        let advanced =
+            app.turn_observe_chunk(DEFAULT_TAB_ID, ChunkKind::Message, "stale");
+        assert!(!advanced, "stale-gen chunks must be dropped");
+        let tab = app.current_tab();
+        assert!(
+            matches!(tab.turn, TurnState::Submitted(_)),
+            "state unchanged on stale drop, got {:?}",
+            tab.turn
+        );
+        assert_eq!(tab.turn.buffer(), None);
+    }
+
+    #[test]
+    fn stale_autofix_at_close_resets_to_idle() {
+        let mut app = test_app();
+        submit_autofix_prompt(&mut app, "pane-1");
+        // A chunk advances state to Streaming.
+        app.turn_observe_chunk(DEFAULT_TAB_ID, ChunkKind::Message, "partial");
+        // Generation diverges (newer trigger / Esc).
+        app.autofix_generation = app.autofix_generation.wrapping_add(1);
+        app.turn_close(DEFAULT_TAB_ID);
+        assert!(
+            app.current_tab().turn.is_idle(),
+            "stale-close must reset to Idle, got {:?}",
+            app.current_tab().turn
+        );
+    }
+
+    #[test]
+    fn cancel_bumps_generation_and_returns_to_idle() {
+        let mut app = test_app();
+        submit_autofix_prompt(&mut app, "pane-1");
+        let gen_before = app.autofix_generation;
+        app.turn_cancel(DEFAULT_TAB_ID);
+        assert_eq!(app.autofix_generation, gen_before.wrapping_add(1));
+        assert!(app.current_tab().turn.is_idle());
+        assert!(app.autofix_pane_id.is_none());
+    }
+
+    #[test]
+    fn end_pending_blocks_new_prompts_until_message_end() {
+        // Eager-surface path: user submits → JSON streams → recommendation
+        // surfaces before AgentMessageEnd. While end_pending=true the UI
+        // gate must hold. AgentMessageEnd then releases it.
+        let mut app = test_app();
+        submit_test_prompt(&mut app, "first");
+        // RecommendationSet shape that survives `validate_recommendation_set`.
+        let json = r#"```json
+{"recommended_choice":1,"choices":[{"choice":1,"title":"do it","rationale":"r","actions":[{"type":"send","parent":"pane-X","input":"ls"}]}]}
+```"#;
+        app.turn_observe_chunk(DEFAULT_TAB_ID, ChunkKind::Message, json);
+        app.turn_try_eager_surface(DEFAULT_TAB_ID);
+        let tab = app.current_tab();
+        assert!(
+            matches!(
+                tab.turn,
+                TurnState::Surfaced {
+                    outcome: TurnOutcome::Recommendation(_),
+                    end_pending: true,
+                    ..
+                }
+            ),
+            "expected eager surface, got {:?}",
+            tab.turn
+        );
+        assert!(
+            !tab.turn.accepts_new_prompt(),
+            "end_pending=true must hold the UI gate"
+        );
+        // AgentMessageEnd flips end_pending=false.
+        app.turn_close(DEFAULT_TAB_ID);
+        assert!(app.current_tab().turn.accepts_new_prompt());
     }
 }

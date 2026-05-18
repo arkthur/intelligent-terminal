@@ -74,10 +74,10 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         (area, None)
     };
 
-    let rec_height = if app.current_tab().recommendations.is_some() {
-        Constraint::Length(app.rec_panel_height())
+    let rec_panel_h = if app.current_tab().turn.recommendations().is_some() {
+        app.rec_panel_height()
     } else {
-        Constraint::Length(0)
+        0
     };
     let input_height = {
         let tab = app.current_tab();
@@ -95,16 +95,8 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     if !hint_visible {
         app.transient_hint = None;
     }
-    let hint_height = if hint_visible {
-        Constraint::Length(1)
-    } else {
-        Constraint::Length(0)
-    };
-    let rec_hint_height = if app.current_tab().recommendations.is_some() {
-        Constraint::Length(1)
-    } else {
-        Constraint::Length(0)
-    };
+    let hint_h: u16 = if hint_visible { 1 } else { 0 };
+    let rec_hint_h: u16 = if app.current_tab().turn.recommendations().is_some() { 1 } else { 0 };
 
     // The host (Windows Terminal) renders the agent bar in XAML above this
     // pane, so wta uses the full pane area for chat / recommendations / input.
@@ -112,20 +104,25 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     // Layout: chat sized to its content, rec panel right below, blank
     // filler, optional one-row transient hint, optional one-row rec nav
     // hint (sits directly above the input box whenever recs are visible),
-    // input at the bottom. Without the explicit chat height, a short chat
-    // would let the `Min(1)` chat constraint absorb all spare space and
-    // push the rec panel to the bottom of the pane, leaving a large empty
-    // band between the prompt and the cards.
+    // input at the bottom. Cap chat at `pane_height - rec - input - hints`
+    // so the recommendation card always renders in full — chat_scroll lets
+    // the user reach older history if it overflows.
     let chat_content_width = main_area.width.saturating_sub(2); // h_chat 1+1 padding
-    let chat_height = chat::estimated_block_height(app, chat_content_width);
+    let chat_estimate = chat::estimated_block_height(app, chat_content_width);
+    let reserved_below = rec_panel_h
+        .saturating_add(input_height)
+        .saturating_add(hint_h)
+        .saturating_add(rec_hint_h);
+    let chat_max = main_area.height.saturating_sub(reserved_below).max(1);
+    let chat_height = chat_estimate.min(chat_max);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(chat_height),
-            rec_height,
+            Constraint::Length(rec_panel_h),
             Constraint::Min(0),
-            hint_height,
-            rec_hint_height,
+            Constraint::Length(hint_h),
+            Constraint::Length(rec_hint_h),
             Constraint::Length(input_height),
         ])
         .split(main_area);
@@ -152,7 +149,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             frame.render_widget(line, chunks[3]);
         }
     }
-    if app.current_tab().recommendations.is_some() {
+    if app.current_tab().turn.recommendations().is_some() {
         recommendations::render_hint(frame, chunks[4]);
     }
     input::render(frame, app, chunks[5]);
@@ -203,7 +200,7 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
         area
     };
 
-    let rec_height = if app.current_tab().recommendations.is_some() {
+    let rec_height = if app.current_tab().turn.recommendations().is_some() {
         Constraint::Length(app.rec_panel_height())
     } else {
         Constraint::Length(0)
@@ -228,7 +225,7 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
     } else {
         Constraint::Length(0)
     };
-    let rec_hint_height = if app.current_tab().recommendations.is_some() {
+    let rec_hint_height = if app.current_tab().turn.recommendations().is_some() {
         Constraint::Length(1)
     } else {
         Constraint::Length(0)

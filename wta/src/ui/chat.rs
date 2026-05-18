@@ -21,7 +21,9 @@ pub fn estimated_block_height(app: &App, area_width: u16) -> u16 {
     let tab = app.current_tab();
     let wrap_width = (area_width as usize).max(1);
 
-    let activity = if tab.prompt_in_flight && pending_stream_height(tab, wrap_width) == 0 {
+    let activity = if tab.turn.spinner_label().is_some()
+        && pending_stream_height(tab, wrap_width) == 0
+    {
         1usize
     } else {
         0
@@ -114,7 +116,7 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
 
     for (idx, msg) in app.current_tab().messages.iter().enumerate().rev() {
         let is_last_message = idx + 1 == app.current_tab().messages.len();
-        let mut message_lines = build_message_lines(msg, is_last_message, app.current_tab().agent_streaming, wrap_width);
+        let mut message_lines = build_message_lines(msg, is_last_message, app.current_tab().turn.is_streaming(), wrap_width);
         reversed_lines.extend(message_lines.drain(..).rev());
         if reversed_lines.len() >= requested_lines {
             truncated = true;
@@ -165,7 +167,7 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
         format!(
             "messages={} pending_chars={} requested_lines={} visible_height={} area={}x{}",
             app.current_tab().messages.len(),
-            app.current_tab().pending_agent_response.chars().count(),
+            app.current_tab().turn.buffer().map(|b| b.chars().count()).unwrap_or(0),
             requested_lines,
             visible_height,
             area.width,
@@ -217,7 +219,7 @@ fn build_completed_turn_lines<'a>(
 
 fn build_activity_line(app: &App) -> Option<Line<'static>> {
     let tab = app.current_tab();
-    if !tab.prompt_in_flight || pending_render_text(tab).is_some() {
+    if tab.turn.spinner_label().is_none() || pending_render_text(tab).is_some() {
         return None;
     }
     Some(Line::from(shimmer::shimmer_spans(
@@ -282,10 +284,8 @@ fn extract_json_string_field(text: &str, field: &str) -> Option<String> {
 ///   card replaces it on eager/end-of-turn finalize.
 /// - Pure prose: stream as-is.
 fn pending_render_text(tab: &crate::app::TabSession) -> Option<Cow<'_, str>> {
-    if !tab.prompt_in_flight {
-        return None;
-    }
-    let text = tab.pending_agent_response.as_str();
+    // Pending text is only meaningful while the turn is actively streaming.
+    let text = tab.turn.buffer()?;
     let trimmed = text.trim_start();
     if trimmed.is_empty() {
         return None;
@@ -318,25 +318,6 @@ fn build_pending_stream_lines<'a>(app: &App, wrap_width: usize) -> Vec<Line<'a>>
         theme::DOT_AGENT,
         theme::AGENT_TEXT,
     );
-    lines
-}
-
-fn build_pending_text_lines<'a>(label: &str, text: &'a str, style: Style) -> Vec<Line<'a>> {
-    let mut lines = Vec::new();
-    lines.push(Line::from(Span::styled(format!("{label}:"), theme::DIM)));
-
-    for line_text in text.lines() {
-        lines.push(Line::from(Span::styled(
-            truncate_render_text(line_text),
-            style,
-        )));
-    }
-
-    if text.lines().next().is_none() {
-        lines.push(Line::from(Span::styled("", style)));
-    }
-
-    lines.push(Line::default());
     lines
 }
 

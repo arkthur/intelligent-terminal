@@ -652,10 +652,10 @@ async fn complete_prompt_request<T, E: std::fmt::Display>(
             // complete with a stop reason"). In practice GitHub Copilot
             // occasionally flushes a few trailing AgentMessageChunk
             // notifications a few hundred microseconds AFTER the
-            // PromptResponse, which leaves `pending_agent_response`
-            // truncated when `AgentMessageEnd` triggers finalize. We sleep
-            // briefly so stragglers land in pending_agent_response before
-            // finalize_agent_response_for takes ownership of it.
+            // PromptResponse, which leaves the streaming buffer truncated
+            // when `AgentMessageEnd` triggers `App::turn_close`. We sleep
+            // briefly so the stragglers land in the buffer before the
+            // state machine commits the turn.
             //
             // Once Copilot honors the spec, this delay can be removed.
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;

@@ -20,7 +20,7 @@ use crate::theme;
 /// fit. This avoids the previous "tall card in squashed pane → nothing
 /// renders" failure mode.
 pub fn render(frame: &mut Frame, app: &App, area: Rect) {
-    let Some(recs) = app.current_tab().recommendations.as_ref() else { return };
+    let Some(recs) = app.current_tab().turn.recommendations() else { return };
     if area.width == 0 || area.height == 0 {
         return;
     }
