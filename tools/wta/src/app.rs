@@ -2689,7 +2689,6 @@ impl App {
                 tab.pending_agent_response.clear();
                 tab.pending_user_replay.clear();
                 tab.timing_note = None;
-                tab.pending_completed_turn = None;
                 tab.messages.push(ChatMessage::Error(message));
                 tab.scroll_to_bottom();
             }
@@ -2790,7 +2789,7 @@ impl App {
                 if tab.progress_status.is_none() {
                     tab.progress_status = Some("Thinking...".to_string());
                 }
-                append_thought_preview(&mut tab.pending_thought_response, &text);
+                tab.pending_thought_response.push_str(&text);
             }
             AppEvent::AgentMessageChunk { session_id, text } => {
                 let tab = self.session_tab_mut(&session_id);
