@@ -865,7 +865,6 @@ pub struct TabSession {
     // Streaming state
     pub prompt_in_flight: bool,
     pub agent_streaming: bool,
-    pub pending_thought_response: String,
     pub pending_agent_response: String,
     /// Accumulator for `session/update` user_message_chunk events
     /// arriving during an ACP `session/load` replay (the historical
@@ -963,7 +962,6 @@ impl TabSession {
             let text = std::mem::take(&mut self.pending_agent_response);
             self.messages.push(ChatMessage::Agent(text));
         }
-        self.pending_thought_response.clear();
     }
 
     /// Cycle the past-turn selection toward older entries.
@@ -2685,11 +2683,10 @@ impl App {
                 tab.agent_streaming = false;
                 tab.loading_session = false;
                 tab.progress_status = None;
-                tab.pending_thought_response.clear();
                 tab.pending_agent_response.clear();
                 tab.pending_user_replay.clear();
                 tab.timing_note = None;
-                tab.pending_completed_turn = None;
+                tab.turn = TurnState::Idle;
                 tab.messages.push(ChatMessage::Error(message));
                 tab.scroll_to_bottom();
             }
@@ -2779,18 +2776,9 @@ impl App {
                 self.current_tab_mut().scroll_to_bottom();
             }
             AppEvent::AgentThoughtChunk { session_id, text } => {
-                let tab = self.session_tab_mut(&session_id);
-                // If the user cancelled this prompt (or it already
-                // completed) we drop the late chunk rather than re-arming
-                // the spinner. During session/load replay
-                // (`loading_session`) we accept chunks regardless.
-                if !tab.prompt_in_flight && !tab.loading_session {
-                    return;
-                }
-                if tab.progress_status.is_none() {
-                    tab.progress_status = Some("Thinking...".to_string());
-                }
-                append_thought_preview(&mut tab.pending_thought_response, &text);
+                // Late chunk after cancel / completion is dropped by
+                // `turn_observe_chunk` (state isn't Submitted/Streaming).
+                self.turn_observe_chunk(&session_id, ChunkKind::Thought, &text);
             }
             AppEvent::AgentMessageChunk { session_id, text } => {
                 let tab = self.session_tab_mut(&session_id);
@@ -2808,7 +2796,6 @@ impl App {
                 }
                 tab.agent_streaming = true;
                 tab.progress_status = None;
-                tab.pending_thought_response.clear();
                 tab.pending_agent_response.push_str(&text);
 
                 // Append to the streaming buffer. The state machine drops
