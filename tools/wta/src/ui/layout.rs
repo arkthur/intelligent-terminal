@@ -52,6 +52,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         let tab_id = app.tab_id.as_deref().unwrap_or(DEFAULT_TAB_ID).to_string();
         let load_state = app.history_load_state;
         let activity_frame = app.activity_frame as usize;
+        let cli_filter = app.current_cli_filter();
         let tab = app.tab_sessions.entry(tab_id).or_default();
         agents_view::render(
             frame,
@@ -60,6 +61,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             &mut tab.agents_list_state,
             load_state,
             activity_frame,
+            cli_filter.as_ref(),
         );
         return;
     }
@@ -86,16 +88,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 
     // Expire the transient hint before deciding whether to reserve a row.
     // Cheap and keeps the layout in lockstep with the rest of the draw.
-    // Also show welcome hint as a transient hint on first-ever connect.
     let now = std::time::Instant::now();
-    let welcome_visible = app.show_welcome_hint
-        && app.state == crate::app::ConnectionState::Connected;
-    let hint_visible = welcome_visible
-        || app
-            .transient_hint
-            .as_ref()
-            .map(|(_, deadline)| now < *deadline)
-            .unwrap_or(false);
+    let hint_visible = app
+        .transient_hint
+        .as_ref()
+        .map(|(_, deadline)| now < *deadline)
+        .unwrap_or(false);
     if !hint_visible {
         app.transient_hint = None;
     }
@@ -146,14 +144,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     recommendations::render(frame, app, h_rec[1]);
 
     if hint_visible {
-        if welcome_visible {
-            // First-run shortcut hint
-            let line = Line::from(Span::styled(
-                "  (Ctrl+Shift+. to show/hide agent pane \u{2022} Ctrl+Alt+/ to show/hide agent session)",
-                Style::default().fg(Color::DarkGray),
-            ));
-            frame.render_widget(line, chunks[3]);
-        } else if let Some((text, _)) = app.transient_hint.as_ref() {
+        if let Some((text, _)) = app.transient_hint.as_ref() {
             let line = Line::from(Span::styled(
                 format!("  {}", text),
                 Style::default().fg(Color::DarkGray),

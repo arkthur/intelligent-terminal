@@ -28,17 +28,44 @@ pub fn render(
     list_state: &mut ListState,
     history_load_state: HistoryLoadState,
     activity_frame: usize,
+    cli_filter: Option<&CliSource>,
 ) {
     // No in-TUI header: the "Agent sessions" title lives in the C++ agent
     // bar above this pane (AgentPaneContent::SetSessionsView), so we render
     // the list flush against the top of `area` and don't reserve any space
-    // for chrome here.
-    let list_area = area;
+    // for chrome there.
+    //
+    // Footer keybinding hint: reserve the bottom row of `area` so the
+    // shortcut legend stays anchored to the pane bottom regardless of how
+    // many session rows are visible. When the pane is so short that the
+    // hint would crowd out the list entirely (height < 2), drop the hint
+    // and give every row back to the list — the user can still discover
+    // the bindings via Tab/F1/the chat-mode prompt.
+    let (list_area, hint_area) = if area.height >= 2 {
+        let hint = Rect {
+            x: area.x,
+            y: area.y + area.height - 1,
+            width: area.width,
+            height: 1,
+        };
+        let list = Rect { height: area.height - 1, ..area };
+        (list, Some(hint))
+    } else {
+        (area, None)
+    };
 
-    let sorted = reg.iter_sorted();
+    let sorted = reg.iter_sorted_filtered(cli_filter);
+    tracing::info!(
+        target: "agents_view_filter",
+        filter = ?cli_filter,
+        visible = sorted.len(),
+        total = reg.iter_sorted().len(),
+        "rendering agent sessions list"
+    );
     tracing::debug!(
         target: "agents_render",
         total = sorted.len(),
+        filter = ?cli_filter,
         first_three = ?sorted.iter().take(3).map(|s| (
             s.key.clone(),
             format!("{:?}", s.status),
@@ -59,6 +86,9 @@ pub fn render(
         spans.extend(shimmer::shimmer_spans("Loading...", activity_frame));
         let loading = Paragraph::new(Line::from(spans));
         f.render_widget(loading, list_area);
+        if let Some(hint_area) = hint_area {
+            render_footer_hint(f, hint_area);
+        }
         return;
     }
 
@@ -75,6 +105,31 @@ pub fn render(
     // rather than a full-row reverse-video bar.
     let list = List::new(rows);
     f.render_stateful_widget(list, list_area, list_state);
+
+    if let Some(hint_area) = hint_area {
+        render_footer_hint(f, hint_area);
+    }
+}
+
+/// Bottom-of-pane keybinding legend. Single line, dim foreground so it
+/// reads as chrome and not as a row. Truncated with an ellipsis when the
+/// pane is too narrow to fit the full text — a partial hint is still more
+/// useful than a wrapped or clipped one.
+fn render_footer_hint(f: &mut Frame, area: Rect) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+    const HINT: &str =
+        "(↑ ↓ to navigate • Enter to launch session in new tab • Shift+enter to launch session in agent pane • Esc to exit)";
+    // Leading two-space gutter matches the list row padding so the hint
+    // aligns with row titles rather than the pane edge.
+    let avail = (area.width as usize).saturating_sub(2);
+    let text  = trunc(HINT, avail);
+    let line  = Line::from(vec![
+        Span::raw("  "),
+        Span::styled(text, Style::default().fg(MUTED_WHITE)),
+    ]);
+    f.render_widget(Paragraph::new(line), area);
 }
 
 fn row_for(s: &AgentSession, selected: bool, row_width: usize) -> ListItem<'static> {

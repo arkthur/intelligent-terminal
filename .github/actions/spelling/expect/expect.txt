@@ -794,6 +794,7 @@ Inputkeyinfo
 Inputreadhandledata
 INPUTSCOPE
 INSERTMODE
+intelligentterminal
 INTERACTIVITYBASE
 INTERCEPTCOPYPASTE
 internalevent

@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate rust_i18n;
+
 mod agent_check;
 mod agent_registry;
 mod agent_sessions;
@@ -35,6 +38,68 @@ use std::sync::Arc;
 use shell::wt_channel::{CliChannel, WtChannel};
 use shell::ShellManager;
 
+i18n!("locales", fallback = "en-US");
+
+/// Normalize a detected OS locale to the closest available locale file.
+/// Mimics Windows MRT behavior with script-aware affinity matching.
+///
+/// Examples:
+///   - `de-AT` → `de-DE` (only one German variant available)
+///   - `zh-HK` → `zh-TW` (Traditional Chinese affinity)
+///   - `zh-SG` → `zh-CN` (Simplified Chinese affinity)
+///   - `pt-MZ` → `pt-PT` (European Portuguese affinity)
+///   - `fr-BE` → `fr-FR` (only one French variant available)
+///   - `en-US` → `en-US` (exact match)
+fn normalize_locale(locale: &str) -> String {
+    let available = rust_i18n::available_locales!();
+
+    // 1. Exact match (case-insensitive)
+    if available.iter().any(|l| l.eq_ignore_ascii_case(locale)) {
+        return locale.to_string();
+    }
+
+    // 2. Script/region affinity for languages with multiple variants.
+    //    Aligns with Windows MRT language-distance behavior for our locale set.
+    let affinity_target = match locale.to_lowercase().as_str() {
+        // Chinese: script-based split
+        "zh-hk" | "zh-mo" | "zh-hant" => Some("zh-TW"),
+        "zh-sg" | "zh-hans" => Some("zh-CN"),
+        // English: Commonwealth regions → en-GB
+        "en-au" | "en-nz" | "en-ie" | "en-in" | "en-sg" | "en-za" | "en-hk"
+        | "en-my" | "en-ph" | "en-pk" | "en-ng" | "en-ke" | "en-gh" => Some("en-GB"),
+        // Spanish: Latin American regions → es-MX
+        "es-ar" | "es-co" | "es-cl" | "es-pe" | "es-ve" | "es-ec" | "es-gt"
+        | "es-cu" | "es-bo" | "es-do" | "es-hn" | "es-py" | "es-sv" | "es-ni"
+        | "es-cr" | "es-pa" | "es-uy" | "es-pr" | "es-us" | "es-419" => Some("es-MX"),
+        // French: non-Canadian → fr-FR
+        "fr-be" | "fr-ch" | "fr-lu" | "fr-mc" | "fr-sn" | "fr-ci" | "fr-ml"
+        | "fr-cm" | "fr-mg" | "fr-cd" | "fr-dz" | "fr-tn" | "fr-ma" => Some("fr-FR"),
+        // Portuguese: non-Brazilian → pt-PT
+        "pt-ao" | "pt-mz" | "pt-gw" | "pt-tl" | "pt-cv" | "pt-st" => Some("pt-PT"),
+        // Serbian: script-based split
+        "sr-latn-ba" | "sr-latn-me" | "sr-latn-xk" => Some("sr-Latn-RS"),
+        "sr-cyrl-ba" | "sr-cyrl-me" | "sr-cyrl-xk" => Some("sr-Cyrl-RS"),
+        _ => None,
+    };
+
+    if let Some(target) = affinity_target {
+        if available.iter().any(|l| l.eq_ignore_ascii_case(target)) {
+            return target.to_string();
+        }
+    }
+
+    // 3. Fallback: strip territory, find any locale with same language prefix.
+    //    Safe for languages where we only have one regional variant (de, fr, ja, etc.)
+    if let Some(lang) = locale.split('-').next() {
+        let prefix = format!("{}-", lang.to_lowercase());
+        if let Some(found) = available.iter().find(|l| l.to_lowercase().starts_with(&prefix)) {
+            return found.to_string();
+        }
+    }
+
+    "en-US".to_string()
+}
+
 // ─── CLI Definition ─────────────────────────────────────────────────────────
 
 #[derive(Parser, Debug)]
@@ -53,6 +118,22 @@ struct Cli {
     /// Agent CLI command (e.g. "copilot --acp --stdio")
     #[arg(long, default_value = agent_registry::DEFAULT_ACP_COMMAND)]
     agent: String,
+
+    /// Canonical agent identifier (`copilot` / `claude` / `codex` / `gemini`
+    /// / `custom:<name>`). When the host (Windows Terminal) launches wta it
+    /// already knows which entry the user picked in settings, so it passes
+    /// the original `acpAgent` value through here. wta uses this id as the
+    /// authoritative identity for `current_agent_id` — driving the session-
+    /// management view's CLI filter, the preflight check, etc.
+    ///
+    /// When omitted (manual `wta` runs, older host builds, tests) wta falls
+    /// back to inferring the id by parsing the `--agent` command line via
+    /// `agent_registry::resolve_agent_id_from_cmd`. That fallback works for
+    /// bare names but is fragile for adapter-style launches (`npx … claude-
+    /// code-acp`) and full-path launches, so the host should always pass
+    /// `--agent-id` explicitly.
+    #[arg(long)]
+    agent_id: Option<String>,
 
     /// Model override for the ACP agent. Sent via ACP setSessionModel after
     /// handshake. Used by adapter-style launches (claude, codex via npx)
@@ -353,6 +434,12 @@ enum InitialView {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Detect and set the system locale for i18n.
+    // normalize_locale() maps unmatched regions to the canonical variant (e.g., de-AT → de-DE).
+    if let Some(locale) = sys_locale::get_locale() {
+        rust_i18n::set_locale(&normalize_locale(&locale));
+    }
+
     let cli = Cli::parse();
 
     // Legacy flags first (backward compat)
@@ -1613,8 +1700,40 @@ async fn run_acp_app(
             // Skip preflight when FRE is active — FRE has its own agent
             // selection + auth flow and doesn't need the preflight wizard.
             if cli.setup.is_none() {
-                let agent_id = agent_cmd.split_whitespace().next().unwrap_or(&agent_cmd);
-                app_state.current_agent_id = agent_check::check_agent(agent_id).id.clone();
+                // Prefer the canonical id the host passed via `--agent-id`
+                // — that's the user's actual setting value (`acpAgent`).
+                // Fall back to reverse-parsing the `--agent` command line
+                // for manual runs / older hosts. The fallback handles bare
+                // names cleanly but is fragile for adapter-style launches
+                // (`npx -y …claude-code-acp` → "claude") and full-path
+                // launches (`C:\…\copilot.exe` → "copilot"), which is the
+                // whole reason `--agent-id` exists.
+                let canonical_id: String = cli
+                    .agent_id
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_ascii_lowercase)
+                    .unwrap_or_else(|| {
+                        agent_registry::resolve_agent_id_from_cmd(&agent_cmd).to_string()
+                    });
+                app_state.current_agent_id = canonical_id.clone();
+                tracing::info!(
+                    target: "agents_view_filter",
+                    agent_id = %canonical_id,
+                    agent_cmd = %agent_cmd,
+                    source = if cli.agent_id.is_some() { "--agent-id" } else { "resolved-from-cmd" },
+                    "current_agent_id assigned",
+                );
+                // `agent_check::check_agent` accepts the canonical id and
+                // reuses the existing preflight code path (exe discovery,
+                // credential check). For adapter launches we deliberately
+                // probe the adapted CLI (`claude` / `codex`) rather than
+                // the `npx` wrapper, since auth lives on the underlying
+                // CLI's credential store. Custom agent ids (`custom:foo`)
+                // fall through to the unknown profile, which is fine —
+                // preflight is best-effort for those.
+                let agent_id = canonical_id.as_str();
                 let status = agent_check::check_agent(agent_id);
                 let preflight_result = app::PreflightResult {
                     agent_id: status.id.clone(),
@@ -1684,8 +1803,13 @@ async fn run_acp_app(
                 tracing::info!(target: "initial_view", "starting in Agents view");
                 app_state.current_tab_mut().current_view = app::View::Agents;
                 // Seed selection so Enter activates the first row immediately
-                // (mirrors the F2 enter-Agents path).
-                let has_sessions = !app_state.agent_sessions.iter_sorted().is_empty();
+                // (mirrors the F2 enter-Agents path). Honor the CLI filter so
+                // we don't seed Some(0) when there are no rows for the
+                // current agent CLI.
+                let has_sessions = !app_state
+                    .agent_sessions
+                    .iter_sorted_filtered(app_state.current_cli_filter().as_ref())
+                    .is_empty();
                 if has_sessions {
                     app_state.current_tab_mut().agents_list_state.select(Some(0));
                 }
