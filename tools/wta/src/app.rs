@@ -3724,15 +3724,18 @@ impl App {
             return;
         }
 
-        // If permission modal is showing, route keys there
+        // If permission card is showing, route keys there. Buttons are
+        // rendered horizontally inside the embedded card (same chrome as
+        // recommendations), so Left/Right move the focus; Up/Down kept as
+        // aliases for muscle memory from the prior modal.
         if let Some(ref mut perm) = self.current_tab_mut().permission {
             match key.code {
-                KeyCode::Up => {
+                KeyCode::Left | KeyCode::Up => {
                     if perm.selected > 0 {
                         perm.selected -= 1;
                     }
                 }
-                KeyCode::Down => {
+                KeyCode::Right | KeyCode::Down => {
                     if perm.selected < perm.options.len().saturating_sub(1) {
                         perm.selected += 1;
                     }
@@ -4346,6 +4349,16 @@ impl App {
         // for the nav hint just above the input.
         let ceiling = self.terminal_rows.saturating_sub(7);
         total.min(ceiling).max(floor)
+    }
+
+    /// Height of the embedded permission card. Returns 0 when no permission
+    /// is pending. Unlike `rec_panel_height`, the floor is the card's own
+    /// height (no `min(ceiling)`) — a permission prompt is modal-equivalent
+    /// in intent, so the full description must always be visible even if
+    /// that squeezes chat past the usual 7-row reserve.
+    pub fn permission_panel_height(&self) -> u16 {
+        let Some(perm) = self.current_tab().permission.as_ref() else { return 0 };
+        permission_card_height(perm, self.terminal_cols) as u16
     }
 
     /// Recompute `rec_scroll.max` from the current card heights and the
@@ -5538,6 +5551,29 @@ pub(crate) fn rec_card_height(choice: &RecommendationChoice, panel_width: u16) -
 
     // top_border + content + divider + buttons + bottom_border + blank = 5 fixed rows.
     5 + content_lines
+}
+
+/// Computes the rendered height (in terminal rows) of the embedded
+/// permission card. Same chrome budget as `rec_card_height` (8-cell
+/// horizontal padding for outer h_perm padding + borders + inner inset),
+/// but without the inter-card gap (only one card is ever shown).
+pub(crate) fn permission_card_height(perm: &PermissionState, panel_width: u16) -> usize {
+    let inner_width = (panel_width as usize).saturating_sub(8).max(1);
+    let content_lines: usize = perm
+        .description
+        .lines()
+        .map(|line| {
+            let chars = line.chars().count();
+            if chars == 0 {
+                1
+            } else {
+                chars.div_ceil(inner_width)
+            }
+        })
+        .sum::<usize>()
+        .max(1);
+    // top_border + content + divider + buttons + bottom_border = 4 + content_lines.
+    4 + content_lines
 }
 
 /// Render a parsed `RecommendationSet` as the agent's "reply" text in chat.

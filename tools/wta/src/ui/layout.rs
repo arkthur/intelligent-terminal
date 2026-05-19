@@ -79,6 +79,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     } else {
         0
     };
+    let perm_panel_h = app.permission_panel_height();
     let input_height = {
         let tab = app.current_tab();
         input::input_height(&tab.input, tab.cursor_pos, main_area.width)
@@ -114,6 +115,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     let chat_content_width = main_area.width.saturating_sub(2); // h_chat 1+1 padding
     let chat_estimate = chat::estimated_block_height(app, chat_content_width);
     let reserved_below = rec_panel_h
+        .saturating_add(perm_panel_h)
         .saturating_add(input_height)
         .saturating_add(hint_h)
         .saturating_add(rec_hint_h);
@@ -124,6 +126,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(chat_height),
             Constraint::Length(rec_panel_h),
+            Constraint::Length(perm_panel_h),
             Constraint::Min(0),
             Constraint::Length(hint_h),
             Constraint::Length(rec_hint_h),
@@ -131,7 +134,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         ])
         .split(main_area);
 
-    // Horizontal padding for chat and recommendations only
+    // Horizontal padding for chat, recommendations, and permission
     let h_chat = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)])
@@ -140,10 +143,17 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)])
         .split(chunks[1]);
+    let h_perm = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Length(1), Constraint::Min(0), Constraint::Length(1)])
+        .split(chunks[2]);
 
     chat::render(frame, app, h_chat[1]);
     app.sync_rec_scroll_max();
     recommendations::render(frame, app, h_rec[1]);
+    if app.current_tab().permission.is_some() {
+        permission::render(frame, app, h_perm[1]);
+    }
 
     if hint_visible {
         if welcome_visible {
@@ -152,37 +162,32 @@ pub fn render(frame: &mut Frame, app: &mut App) {
                 "  (Ctrl+Shift+. to show/hide agent pane \u{2022} Ctrl+Alt+/ to show/hide agent session)",
                 Style::default().fg(Color::DarkGray),
             ));
-            frame.render_widget(line, chunks[3]);
+            frame.render_widget(line, chunks[4]);
         } else if let Some((text, _)) = app.transient_hint.as_ref() {
             let line = Line::from(Span::styled(
                 format!("  {}", text),
                 Style::default().fg(Color::DarkGray),
             ));
-            frame.render_widget(line, chunks[3]);
+            frame.render_widget(line, chunks[4]);
         }
     }
     if app.current_tab().turn.recommendations().is_some() {
-        recommendations::render_hint(frame, chunks[4]);
+        recommendations::render_hint(frame, chunks[5]);
     }
-    input::render(frame, app, chunks[5]);
+    input::render(frame, app, chunks[6]);
 
     if let Some(debug_area) = debug_area {
         debug_panel::render(frame, app, debug_area);
     }
 
-    // Slash-command autocomplete: anchored above the input box. Drawn
-    // before permission/help so those overlays still cover it if they
-    // happen to be visible at the same time.
+    // Slash-command autocomplete: anchored above the input box. Drawn into
+    // the filler row between the perm panel and the hint row.
     if let Some(popup_state) = app.command_popup_state() {
-        command_popup::render_popup(frame, popup_state, chunks[2]);
+        command_popup::render_popup(frame, popup_state, chunks[3]);
     }
 
-    if app.current_tab().permission.is_some() {
-        permission::render(frame, app, area);
-    }
-
-    // `/help` overlay sits on top of everything (including permission) so
-    // the user can always dismiss it with Esc.
+    // `/help` overlay sits on top of everything so the user can always
+    // dismiss it with Esc.
     command_popup::render_help_overlay(frame, app, area);
 }
 
@@ -217,15 +222,15 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
     } else {
         Constraint::Length(0)
     };
+    let perm_height = Constraint::Length(app.permission_panel_height());
     let input_height = {
         let tab = app.current_tab();
         input::input_height(&tab.input, tab.cursor_pos, main_area.width)
     };
 
-    // Match the constraint layout in `render` — the hint rows sit between
-    // filler and input, so the input chunk is at index 5. Keep both in
-    // lockstep or the cursor lands on
-    // the wrong line.
+    // Match the constraint layout in `render` — chat / rec / perm / filler /
+    // hint / rec_hint / input, so the input chunk is at index 6. Keep both
+    // in lockstep or the cursor lands on the wrong line.
     let now = std::time::Instant::now();
     let hint_visible = app
         .transient_hint
@@ -250,6 +255,7 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
         .constraints([
             Constraint::Length(chat_height),
             rec_height,
+            perm_height,
             Constraint::Min(0),
             hint_height,
             rec_hint_height,
@@ -257,5 +263,5 @@ pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
         ])
         .split(main_area);
 
-    input::cursor_position(app, chunks[5])
+    input::cursor_position(app, chunks[6])
 }
