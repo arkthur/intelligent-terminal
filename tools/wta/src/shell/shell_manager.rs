@@ -6,11 +6,7 @@ use tokio::process::Child;
 use tokio::process::Command;
 
 use super::wt_channel::WtChannel;
-
-// Import the commandline builder from the shared fuzz-target module.
-#[path = "../shell_fuzz.rs"]
-mod shell_fuzz;
-use shell_fuzz::build_wt_commandline;
+use wta::build_wt_commandline;
 
 /// Configuration for creating a new terminal.
 pub struct TerminalConfig {
