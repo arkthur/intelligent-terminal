@@ -192,11 +192,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         void _ApplyStatusReport(const std::optional<::Microsoft::Terminal::AgentHooks::StatusReport>& report);
         winrt::fire_and_forget _RefreshAgentHooksStatusAsync();
         winrt::fire_and_forget _RunHooksInstallerAsync();
-
-        std::wstring _ResolveWtaExePath();
-        std::string _RunWtaCaptureStdout(const std::wstring& wtaPath,
-                                         const std::wstring& argsAfterExe,
-                                         DWORD timeoutMs);
     };
 };
 
