@@ -9,4 +9,4 @@
 
 mod shell_fuzz;
 
-pub use shell_fuzz::build_wt_commandline;
+pub use shell_fuzz::{build_wt_commandline, BuildCommandlineError};

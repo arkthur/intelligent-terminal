@@ -116,8 +116,11 @@ impl ShellManager {
         let id = self.next_id();
         let wt = self.wt()?;
 
-        // Build the commandline string for WT pane creation
-        let cmdline = build_wt_commandline(&config.command, &config.args);
+        // Build the commandline string for WT pane creation. Returns an
+        // error if the agent-supplied command path is unrepresentable
+        // (e.g. contains a literal `"`); propagate so the caller can
+        // surface it to the agent instead of crashing the wta process.
+        let cmdline = build_wt_commandline(&config.command, &config.args)?;
 
         // Create a new tab in WT with the command
         let mut params = serde_json::Map::new();

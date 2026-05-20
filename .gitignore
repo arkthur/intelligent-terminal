@@ -12,7 +12,6 @@ tools/wta/*.png
 tools/wta/fuzz/target/
 tools/wta/fuzz/corpus/
 tools/wta/fuzz/artifacts/
-tools/wta/fuzz/Cargo.lock
 
 # Claude Code local settings
 .claude/settings.local.json

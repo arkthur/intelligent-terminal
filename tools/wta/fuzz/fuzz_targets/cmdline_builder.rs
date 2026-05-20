@@ -11,7 +11,7 @@
 
 use arbitrary::Arbitrary;
 use libfuzzer_sys::fuzz_target;
-use wta::build_wt_commandline;
+use wta::{build_wt_commandline, BuildCommandlineError};
 
 #[derive(Arbitrary, Debug)]
 struct FuzzInput {
@@ -61,13 +61,20 @@ fuzz_target!(|input: FuzzInput| {
     }
 
     // `CommandLineToArgvW` parses argv[0] with no backslash escaping, so a
-    // literal `"` in the command is inherently unrepresentable — outside
-    // the encoder's supported input domain.
+    // literal `"` in the command is inherently unrepresentable. The encoder
+    // must return `QuoteInProgram` for these inputs — exercise that path.
     if input.command.contains('"') {
+        assert_eq!(
+            build_wt_commandline(&input.command, &input.args),
+            Err(BuildCommandlineError::QuoteInProgram),
+            "expected QuoteInProgram for command containing `\"`: {:?}",
+            input.command,
+        );
         return;
     }
 
-    let result = build_wt_commandline(&input.command, &input.args);
+    let result = build_wt_commandline(&input.command, &input.args)
+        .expect("encoder returned Err for an input it should accept");
     assert!(!result.is_empty());
 
     let input_has_nul =
