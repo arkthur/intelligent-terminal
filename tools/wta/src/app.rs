@@ -4403,13 +4403,17 @@ impl App {
     }
 
     /// Height of the embedded permission card. Returns 0 when no permission
-    /// is pending. Unlike `rec_panel_height`, the floor is the card's own
-    /// height (no `min(ceiling)`) — a permission prompt is modal-equivalent
-    /// in intent, so the full description must always be visible even if
-    /// that squeezes chat past the usual 7-row reserve.
+    /// is pending. The height grows to fit the description, but is capped so
+    /// the input area (3) and at least a minimal non-panel area remain
+    /// renderable in short terminals. Any overflow is left to the renderer to
+    /// clip/scroll within the allocated panel area.
     pub fn permission_panel_height(&self) -> u16 {
         let Some(perm) = self.current_tab().permission.as_ref() else { return 0 };
-        permission_card_height(perm, self.terminal_cols) as u16
+        let card_h = permission_card_height(perm, self.terminal_cols) as u16;
+        // Match the layout reserve used by recommendations: input (3) + a
+        // minimal chat area (3) + the nav/hint row (1).
+        let ceiling = self.terminal_rows.saturating_sub(7);
+        card_h.min(ceiling)
     }
 
     /// Recompute `rec_scroll.max` from the current card heights and the
