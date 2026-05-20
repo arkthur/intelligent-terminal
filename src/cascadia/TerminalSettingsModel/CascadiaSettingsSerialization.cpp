@@ -1999,6 +1999,7 @@ void CascadiaSettings::LogSettingChanges(bool isJsonLoad) const
                               "IntelligentFeatureConfigured",
                               TraceLoggingDescription("Event emitted when the user has an intelligent terminal feature configured"),
                               TraceLoggingValue("AutoFix", "FeatureName", "The name of the feature"),
+                              TraceLoggingValue(_globals->AutoFixEnabled(), "FeatureEnabled", "Whether the feature is enabled"),
                               TraceLoggingValue(branding, "Branding"),
                               TraceLoggingValue(distribution, "Distribution"),
                               TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
@@ -2006,10 +2007,15 @@ void CascadiaSettings::LogSettingChanges(bool isJsonLoad) const
         }
         if (changes.contains("global.agentPanePosition"))
         {
+            const auto position = _globals->AgentPanePosition();
+            const auto sanitizedPosition = (position == L"bottom" || position == L"right" || position == L"top" || position == L"left")
+                                               ? winrt::to_string(position)
+                                               : std::string{ "unknown" };
             TraceLoggingWrite(g_hSettingsModelProvider,
                               "IntelligentFeatureConfigured",
                               TraceLoggingDescription("Event emitted when the user has an intelligent terminal feature configured"),
                               TraceLoggingValue("AgentPanePosition", "FeatureName", "The name of the feature"),
+                              TraceLoggingValue(sanitizedPosition.c_str(), "FeatureValue", "The configured position value"),
                               TraceLoggingValue(branding, "Branding"),
                               TraceLoggingValue(distribution, "Distribution"),
                               TraceLoggingKeyword(MICROSOFT_KEYWORD_MEASURES),
