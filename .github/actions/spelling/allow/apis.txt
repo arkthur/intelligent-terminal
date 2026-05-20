@@ -88,6 +88,7 @@ MENUITEMINFOW
 MINIMIZEBOX
 MOUSELEAVE
 mov
+msrustup
 MULTIPLEUSE
 NCHITTEST
 NCLBUTTONDBLCLK
@@ -195,6 +196,7 @@ winsta
 winstamin
 wmemcmp
 wpc
+wta
 WSF
 WWH
 wwinmain

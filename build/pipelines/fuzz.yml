@@ -54,8 +54,7 @@ stages:
         - bash: |
             set -ex
             cd tools/wta
-            cargo +ms-nightly fuzz build cmdline_builder \
-              --config .cargo/intelligent_terminal_feed.toml
+            cargo +ms-nightly fuzz build cmdline_builder
           displayName: Build WTA fuzz targets
         - bash: |
             set -ex
