@@ -8,6 +8,7 @@
 
 #include "../inc/AgentRegistry.h"
 #include "../inc/WtaProcess.h"
+#include "../inc/ShellIntegration.h"
 
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::UI::Xaml;
@@ -230,24 +231,45 @@ namespace winrt::TerminalApp::implementation
             }
         }
 
-        // 2. Disable button immediately to prevent double-clicks
+        // 2. Disable button, hide previous error
         SaveButton().Content(winrt::box_value(L"Setting up..."));
         SaveButton().IsEnabled(false);
+        ErrorText().Visibility(Visibility::Collapsed);
 
-        // 3. Install prerequisites if needed
+        // 3. Install prerequisites if needed (blocking — cannot proceed without these)
         const bool needsCopilot = (agentId == L"copilot") && !_IsAgentInstalled(L"copilot");
         const bool needsNode = (agentId == L"claude" || agentId == L"codex") && !_IsNodeInstalled();
 
         if (needsCopilot)
         {
-            co_await _WingetInstallAsync(L"GitHub.Copilot");
+            bool ok = co_await _WingetInstallAsync(L"GitHub.Copilot");
+            auto self = weak.get();
+            if (!self) co_return;
+            if (!ok)
+            {
+                ErrorText().Text(L"\u26A0 Failed to install GitHub Copilot. Check your network and try again.");
+                ErrorText().Visibility(Visibility::Visible);
+                SaveButton().Content(winrt::box_value(L"Save"));
+                SaveButton().IsEnabled(true);
+                co_return;
+            }
         }
         if (needsNode)
         {
-            co_await _WingetInstallAsync(L"OpenJS.NodeJS.LTS");
+            bool ok = co_await _WingetInstallAsync(L"OpenJS.NodeJS.LTS");
+            auto self = weak.get();
+            if (!self) co_return;
+            if (!ok)
+            {
+                ErrorText().Text(L"\u26A0 Failed to install Node.js. Check your network and try again.");
+                ErrorText().Visibility(Visibility::Visible);
+                SaveButton().Content(winrt::box_value(L"Save"));
+                SaveButton().IsEnabled(true);
+                co_return;
+            }
         }
 
-        // 4. Install hooks (idempotent, --cli scoped to selected agent)
+        // 4. Install hooks (non-blocking — agent works without hooks)
         {
             auto self = weak.get();
             if (!self) co_return;
@@ -255,7 +277,24 @@ namespace winrt::TerminalApp::implementation
             co_await _InstallHooksAsync(agentId);
         }
 
-        // 5. Back on UI thread — complete
+        // 5. Install shell integration for autofix (if enabled)
+        {
+            auto self = weak.get();
+            if (!self) co_return;
+
+            bool doShellInteg = AutoErrorToggle().IsOn();
+
+            if (doShellInteg)
+            {
+                co_await winrt::resume_background();
+                namespace SI = ::Microsoft::Terminal::ShellIntegration;
+                SI::InstallForTarget(SI::Target::Pwsh);
+                SI::InstallForTarget(SI::Target::WindowsPowerShell);
+            }
+        }
+
+        // 6. Resume UI thread before touching controls / raising events
+        co_await winrt::resume_foreground(Dispatcher());
         {
             auto self = weak.get();
             if (!self) co_return;

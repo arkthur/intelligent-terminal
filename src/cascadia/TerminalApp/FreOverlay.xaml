@@ -89,14 +89,9 @@
                             </Grid.RowDefinitions>
                             <Border Grid.Row="0" Background="#FF0C0C0C" CornerRadius="7,7,0,0"
                                     Margin="6,6,6,0">
-                                <StackPanel VerticalAlignment="Center"
-                                            HorizontalAlignment="Center" Spacing="6">
-                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7BA;"
-                                              Foreground="#50FFFFFF" FontSize="20" />
-                                    <TextBlock Text="⚠ Error detected: Ctrl+Shift to fix"
-                                               Foreground="#FFFFD700" FontSize="11"
-                                               HorizontalAlignment="Center" />
-                                </StackPanel>
+                                <Image Source="ms-appx:///FREAssets/FRE_Asset1.png"
+                                       Stretch="UniformToFill"
+                                       VerticalAlignment="Bottom" />
                             </Border>
                             <StackPanel Grid.Row="1" Margin="16,14,16,16" Spacing="6">
                                 <TextBlock FontFamily="Segoe UI Variable Text, Segoe UI"
@@ -120,11 +115,9 @@
                             </Grid.RowDefinitions>
                             <Border Grid.Row="0" Background="#FF0C0C0C" CornerRadius="7,7,0,0"
                                     Margin="6,6,6,0">
-                                <StackPanel VerticalAlignment="Center"
-                                            HorizontalAlignment="Center" Spacing="6">
-                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE81C;"
-                                              Foreground="#50FFFFFF" FontSize="20" />
-                                </StackPanel>
+                                <Image Source="ms-appx:///FREAssets/FRE_Asset2.png"
+                                       Stretch="UniformToFill"
+                                       VerticalAlignment="Center" />
                             </Border>
                             <StackPanel Grid.Row="1" Margin="16,14,16,16" Spacing="6">
                                 <TextBlock FontFamily="Segoe UI Variable Text, Segoe UI"
@@ -190,36 +183,34 @@
                     <StackPanel Spacing="4">
                         <!--  Agent  -->
                         <Border Background="#19FFFFFF" CornerRadius="4" Padding="16,12">
-                            <StackPanel Spacing="8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="2">
-                                        <TextBlock FontSize="14" FontWeight="SemiBold"
-                                                   Foreground="White" Text="Agent" />
-                                        <TextBlock FontSize="12" Foreground="#99FFFFFF"
-                                                   TextWrapping="Wrap"
-                                                   Text="Choose the agent CLI used in the agent pane. Any compatible ACP CLI will be detected." />
-                                    </StackPanel>
-                                    <ComboBox x:Name="AgentComboBox" Grid.Column="1"
-                                              MinWidth="220"
-                                              VerticalAlignment="Center"
-                                              SelectionChanged="_OnAgentSelectionChanged">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate x:DataType="local:FreAgentEntry">
-                                                <TextBlock Text="{x:Bind DisplayLabel}" />
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                </Grid>
-                                <!--  Info hint: shown for Claude/Codex which need Node.js  -->
-                                <TextBlock x:Name="AgentInstallHint"
-                                           FontSize="12" Foreground="#99FFFFFF"
-                                           TextWrapping="Wrap" Visibility="Collapsed"
-                                           Text="ℹ This agent requires Node.js and NPX, which will be installed automatically if not already present." />
-                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock FontSize="14" FontWeight="SemiBold"
+                                               Foreground="White" Text="Agent" />
+                                    <TextBlock FontSize="12" Foreground="#99FFFFFF"
+                                               TextWrapping="Wrap"
+                                               Text="Choose the agent CLI used in the agent pane. Any compatible ACP CLI will be detected." />
+                                    <TextBlock x:Name="AgentInstallHint"
+                                               FontSize="12" Foreground="#99FFFFFF"
+                                               TextWrapping="Wrap" Visibility="Collapsed"
+                                               Margin="0,4,0,0"
+                                               Text="ℹ This agent requires Node.js and NPX, which will be installed automatically if not already present." />
+                                </StackPanel>
+                                <ComboBox x:Name="AgentComboBox" Grid.Column="1"
+                                          MinWidth="220"
+                                          VerticalAlignment="Center"
+                                          SelectionChanged="_OnAgentSelectionChanged">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="local:FreAgentEntry">
+                                            <TextBlock Text="{x:Bind DisplayLabel}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
                         </Border>
 
                         <!--  Auto-error detection  -->
@@ -238,33 +229,39 @@
                                 </StackPanel>
                                 <ToggleSwitch x:Name="AutoErrorToggle" Grid.Column="1"
                                               IsOn="True" VerticalAlignment="Center"
+                                              HorizontalAlignment="Right" MinWidth="0"
                                               OnContent="On" OffContent="Off" />
                             </Grid>
                         </Border>
 
                         <!--  Session management  -->
                         <Border Background="#19FFFFFF" CornerRadius="4" Padding="16,12">
-                            <StackPanel Spacing="8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Spacing="2">
-                                        <TextBlock FontSize="14" FontWeight="SemiBold"
-                                                   Foreground="White" Text="Session management" />
-                                        <TextBlock FontSize="12" Foreground="#99FFFFFF"
-                                                   TextWrapping="Wrap"
-                                                   Text="Give Intelligent Terminal permission to track the status of your running or active agents." />
-                                    </StackPanel>
-                                    <ToggleSwitch x:Name="SessionManagementToggle" Grid.Column="1"
-                                                  IsOn="True" VerticalAlignment="Center"
-                                                  OnContent="On" OffContent="Off" />
-                                </Grid>
-                                <TextBlock FontSize="12" Foreground="#99FFFFFF"
-                                           TextWrapping="Wrap"
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
+                                    <TextBlock FontSize="14" FontWeight="SemiBold"
+                                               Foreground="White" Text="Session management" />
+                                    <TextBlock FontSize="12" Foreground="#99FFFFFF"
+                                               TextWrapping="Wrap"
+                                               Text="Give Intelligent Terminal permission to track the status of your running or active agents." />
+                                </StackPanel>
+                                <ToggleSwitch x:Name="SessionManagementToggle"
+                                              Grid.Row="0" Grid.Column="1" Grid.RowSpan="2"
+                                              IsOn="True" VerticalAlignment="Center"
+                                              HorizontalAlignment="Right" MinWidth="0"
+                                              OnContent="On" OffContent="Off" />
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           FontSize="12" Foreground="#99FFFFFF"
+                                           TextWrapping="Wrap" Margin="0,6,0,0"
                                            Text="ℹ Enabling this will install integration hooks to track sessions across your agent CLIs." />
-                            </StackPanel>
+                            </Grid>
                         </Border>
 
                         <!--  Pane position  -->
@@ -289,8 +286,13 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <!--  Bottom: Save Button  -->
+                <!--  Bottom: Error text + Save Button  -->
                 <Grid Grid.Row="2">
+                    <TextBlock x:Name="ErrorText"
+                               HorizontalAlignment="Left" VerticalAlignment="Center"
+                               Foreground="#FFFF6B6B" FontSize="13"
+                               TextWrapping="Wrap" MaxWidth="400"
+                               Visibility="Collapsed" />
                     <Button x:Name="SaveButton"
                             HorizontalAlignment="Right" VerticalAlignment="Center"
                             Width="120" Height="32"

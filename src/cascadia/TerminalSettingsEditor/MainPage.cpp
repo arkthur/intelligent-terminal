@@ -870,6 +870,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             ShowLoadWarningsDialog.raise(*this, _settingsClone.Warnings());
         }
+
+        // Install shell integration if autofix was enabled.
+        // Only raise once — _InitShellIntegration handles both targets
+        // and shows a single dialog when done.
+        if (_settingsClone.GlobalSettings().AutoFixEnabled())
+        {
+            InitShellIntegrationRequested.raise(*this, ShellIntegrationTarget::Pwsh);
+        }
     }
 
     void MainPage::ResetButton_Click(const IInspectable& /*sender*/, const RoutedEventArgs& /*args*/)

@@ -52,6 +52,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         let tab_id = app.tab_id.as_deref().unwrap_or(DEFAULT_TAB_ID).to_string();
         let load_state = app.history_load_state;
         let activity_frame = app.activity_frame as usize;
+        let cli_filter = app.current_cli_filter();
         let tab = app.tab_sessions.entry(tab_id).or_default();
         agents_view::render(
             frame,
@@ -60,6 +61,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             &mut tab.agents_list_state,
             load_state,
             activity_frame,
+            cli_filter.as_ref(),
         );
         return;
     }

@@ -6,6 +6,7 @@
 
 #include "TerminalPage.h"
 #include "ScratchpadContent.h"
+#include "../inc/ShellIntegration.h"
 #include "../WinRTUtils/inc/WtExeUtils.h"
 #include "../../types/inc/utils.hpp"
 #include "../TerminalSettingsAppAdapterLib/TerminalSettings.h"
@@ -1783,287 +1784,34 @@ namespace winrt::TerminalApp::implementation
 
         co_await winrt::resume_background();
 
-        const wchar_t* shellExe = (target == ShellIntegrationTarget::Pwsh) ? L"pwsh" : L"powershell";
+        namespace SI = ::Microsoft::Terminal::ShellIntegration;
 
-        // Spawn the shell to discover $PROFILE path
-        auto cmdline = fmt::format(FMT_COMPILE(L"{} -NoProfile -NoLogo -NonInteractive -Command \"Write-Output $PROFILE\""), shellExe);
+        // Install for both PowerShell 7 and Windows PowerShell 5.1
+        const auto pwshResult = SI::InstallForTarget(SI::Target::Pwsh);
+        const auto wpResult = SI::InstallForTarget(SI::Target::WindowsPowerShell);
 
-        SECURITY_ATTRIBUTES sa{};
-        sa.nLength = sizeof(sa);
-        sa.bInheritHandle = TRUE;
-
-        wil::unique_handle readPipe, writePipe;
-        if (!CreatePipe(readPipe.addressof(), writePipe.addressof(), &sa, 0))
-        {
-            co_await wil::resume_foreground(dispatcher);
-            if (auto strong = weak.get())
-            {
-                strong->_ShowShellIntegrationDialog(
-                    RS_(L"InitShellIntegrationErrorTitle"),
-                    RS_(L"InitShellIntegrationErrorMessage"));
-            }
-            co_return;
-        }
-        SetHandleInformation(readPipe.get(), HANDLE_FLAG_INHERIT, 0);
-
-        STARTUPINFOW si{};
-        si.cb = sizeof(si);
-        si.dwFlags = STARTF_USESTDHANDLES;
-        si.hStdOutput = writePipe.get();
-        si.hStdError = writePipe.get();
-        si.hStdInput = nullptr;
-
-        wil::unique_process_information pi;
-        if (!CreateProcessW(nullptr,
-                            cmdline.data(),
-                            nullptr,
-                            nullptr,
-                            TRUE,
-                            CREATE_NO_WINDOW,
-                            nullptr,
-                            nullptr,
-                            &si,
-                            &pi))
-        {
-            co_await wil::resume_foreground(dispatcher);
-            if (auto strong = weak.get())
-            {
-                strong->_ShowShellIntegrationDialog(
-                    RS_(L"InitShellIntegrationErrorTitle"),
-                    RS_(L"InitShellIntegrationErrorMessage"));
-            }
-            co_return;
-        }
-
-        // Close write end so ReadFile will EOF when process exits
-        writePipe.reset();
-
-        const auto waitResult = WaitForSingleObject(pi.hProcess, 10000);
-        if (waitResult != WAIT_OBJECT_0)
-        {
-            TerminateProcess(pi.hProcess, 1);
-            co_await wil::resume_foreground(dispatcher);
-            if (auto strong = weak.get())
-            {
-                strong->_ShowShellIntegrationDialog(
-                    RS_(L"InitShellIntegrationErrorTitle"),
-                    RS_(L"InitShellIntegrationErrorMessage"));
-            }
-            co_return;
-        }
-
-        char buffer[4096]{};
-        DWORD bytesRead = 0;
-        ReadFile(readPipe.get(), buffer, sizeof(buffer) - 1, &bytesRead, nullptr);
-
-        std::string rawOutput(buffer, bytesRead);
-        while (!rawOutput.empty() && (rawOutput.back() == '\n' || rawOutput.back() == '\r' || rawOutput.back() == ' '))
-        {
-            rawOutput.pop_back();
-        }
-
-        if (rawOutput.empty())
-        {
-            co_await wil::resume_foreground(dispatcher);
-            if (auto strong = weak.get())
-            {
-                strong->_ShowShellIntegrationDialog(
-                    RS_(L"InitShellIntegrationErrorTitle"),
-                    RS_(L"InitShellIntegrationErrorMessage"));
-            }
-            co_return;
-        }
-
-        const auto profilePathW = til::u8u16(rawOutput);
-        const std::filesystem::path profilePath{ profilePathW };
-        const auto profileDir = profilePath.parent_path();
-        const auto scriptPath = profileDir / L"shell-integration.ps1";
-
-        // Shell integration script content
-        static constexpr std::wstring_view shellIntegrationScript{
-            LR"(# Shell Integration — non-invasive prompt wrapper
-# Emits OSC 133 (command marks / exit code) and OSC 9;9 (CWD) escape
-# sequences WITHOUT altering the visual appearance of the user's prompt.
-#
-# USAGE: dot-source this AFTER the user's profile has loaded:
-#   . "path\to\shell-integration.ps1"
-#
-# Compatible with Windows PowerShell 5.1+ and PowerShell 7+.
-# Safe to source multiple times (idempotent guard).
-
-if (-not $Global:__ShellInteg_Installed) {
-
-    # ── Escape characters (PS 5.1 doesn't support `e / `a literals) ──
-    $Global:__ShellInteg_ESC = [char]0x1B   # ESC
-    $Global:__ShellInteg_BEL = [char]0x07   # BEL (OSC string terminator)
-
-    # ── Snapshot the user's current prompt before we touch it ──────────
-    $Global:__ShellInteg_OriginalPrompt = $function:prompt
-    $Global:__ShellInteg_LastHistoryId  = -1
-    $Global:__ShellInteg_Installed      = $true
-
-    function Global:__ShellInteg_GetLastExitCode {
-        # $? still reflects the *user's* last command here because this
-        # is the very first call inside the prompt function.
-        if ($? -eq $True) { return 0 }
-        $entry = Get-History -Count 1
-        if ($entry -and $Error[0].InvocationInfo.HistoryId -eq $entry.Id) {
-            return -1          # PowerShell-level error
-        }
-        return $LastExitCode   # native command exit code
-    }
-
-    function prompt {
-        # ── Capture exit code FIRST — before anything else can clobber $? ──
-        $gle   = $(__ShellInteg_GetLastExitCode)
-        $entry = Get-History -Count 1
-        $loc   = $executionContext.SessionState.Path.CurrentLocation
-        $E     = $Global:__ShellInteg_ESC
-        $B     = $Global:__ShellInteg_BEL
-
-        $prefix = ''
-        $suffix = ''
-
-        # ── Previous command finished (OSC 133;D with exit code) ──
-        # Only emit when a genuinely new history entry exists — this avoids:
-        #   • missing the 1st command (old sentinel -1 blocked the whole block)
-        #   • stale error on empty Enter (no command ran, no completion to report)
-        if ($entry -and $entry.Id -ne $Global:__ShellInteg_LastHistoryId) {
-            $prefix += "${E}]133;D;${gle}${B}"
-        }
-
-        # ── Prompt started (OSC 133;A) ──
-        $prefix += "${E}]133;A${B}"
-
-        # ── Report current working directory (OSC 9;9) ──
-        $prefix += "${E}]9;9;`"${loc}`"${B}"
-
-        # ── Prompt ended, command input starts (OSC 133;B) ──
-        $suffix = "${E}]133;B${B}"
-
-        # ── Delegate to the user's ORIGINAL prompt — visual output is theirs ──
-        $originalOutput = & $Global:__ShellInteg_OriginalPrompt
-
-        $Global:__ShellInteg_LastHistoryId = if ($entry) { $entry.Id } else { -1 }
-
-        return "${prefix}${originalOutput}${suffix}"
-    }
-}
-)"
-        };
-
-        const auto dotSourceLine = fmt::format(
-            FMT_COMPILE(L"\n# Shell integration \u2014 emit OSC 133 (exit code) + OSC 9;9 (CWD) without\n"
-                        L"# altering the visual prompt.  Must load LAST so it can wrap whatever\n"
-                        L"# prompt function exists at this point.\n"
-                        L". \"{}\""),
-            scriptPath.wstring());
-
-        // Check if already configured
-        bool alreadyConfigured = false;
-        if (std::filesystem::exists(profilePath))
-        {
-            std::ifstream profileIn(profilePath, std::ios::binary);
-            if (profileIn)
-            {
-                std::string contents((std::istreambuf_iterator<char>(profileIn)),
-                                     std::istreambuf_iterator<char>());
-                profileIn.close();
-                if (contents.find("shell-integration.ps1") != std::string::npos)
-                {
-                    alreadyConfigured = true;
-                }
-            }
-        }
-
-        if (alreadyConfigured)
-        {
-            co_return;
-        }
-
-        // Ensure the profile directory exists
-        std::error_code ec;
-        std::filesystem::create_directories(profileDir, ec);
-        if (ec)
-        {
-            co_await wil::resume_foreground(dispatcher);
-            if (auto strong = weak.get())
-            {
-                strong->_ShowShellIntegrationDialog(
-                    RS_(L"InitShellIntegrationErrorTitle"),
-                    RS_(L"InitShellIntegrationErrorMessage"));
-            }
-            co_return;
-        }
-
-        // Write shell-integration.ps1
-        {
-            std::ofstream scriptOut(scriptPath, std::ios::binary | std::ios::trunc);
-            if (!scriptOut)
-            {
-                co_await wil::resume_foreground(dispatcher);
-                if (auto strong = weak.get())
-                {
-                    strong->_ShowShellIntegrationDialog(
-                        RS_(L"InitShellIntegrationErrorTitle"),
-                        RS_(L"InitShellIntegrationErrorMessage"));
-                }
-                co_return;
-            }
-            const auto scriptUtf8 = til::u16u8(shellIntegrationScript);
-            scriptOut.write(scriptUtf8.data(), scriptUtf8.size());
-        }
-
-        // Back up existing $PROFILE before modifying it
-        if (std::filesystem::exists(profilePath))
-        {
-            // Generate timestamp + content hash for a unique backup name
-            const auto now = std::chrono::system_clock::now();
-            const auto tt = std::chrono::system_clock::to_time_t(now);
-            struct tm tm{};
-            localtime_s(&tm, &tt);
-            wchar_t timeBuf[32]{};
-            wcsftime(timeBuf, std::size(timeBuf), L"%Y%m%d-%H%M%S", &tm);
-
-            // Read existing content for hash
-            std::ifstream backupIn(profilePath, std::ios::binary);
-            std::string backupContent((std::istreambuf_iterator<char>(backupIn)),
-                                      std::istreambuf_iterator<char>());
-            backupIn.close();
-            const auto contentHash = std::hash<std::string>{}(backupContent);
-
-            const auto backupPath = fmt::format(FMT_COMPILE(L"{}.bak.{}.{:08x}"),
-                                                profilePath.wstring(),
-                                                timeBuf,
-                                                contentHash & 0xFFFFFFFF);
-            std::filesystem::copy_file(profilePath, backupPath, std::filesystem::copy_options::overwrite_existing, ec);
-            // Non-fatal if backup fails — proceed anyway
-        }
-
-        // Append dot-source line to $PROFILE
-        {
-            std::ofstream profileOut(profilePath, std::ios::binary | std::ios::app);
-            if (!profileOut)
-            {
-                co_await wil::resume_foreground(dispatcher);
-                if (auto strong = weak.get())
-                {
-                    strong->_ShowShellIntegrationDialog(
-                        RS_(L"InitShellIntegrationErrorTitle"),
-                        RS_(L"InitShellIntegrationErrorMessage"));
-                }
-                co_return;
-            }
-            const auto lineUtf8 = til::u16u8(dotSourceLine);
-            profileOut.write(lineUtf8.data(), lineUtf8.size());
-        }
+        const bool allAlreadyInstalled = pwshResult.alreadyInstalled && wpResult.alreadyInstalled;
+        const bool anyFailure = !pwshResult.success || !wpResult.success;
 
         co_await wil::resume_foreground(dispatcher);
         if (auto strong = weak.get())
         {
-            strong->_ShowShellIntegrationDialog(
-                RS_(L"InitShellIntegrationSuccessTitle"),
-                RS_(L"InitShellIntegrationSuccessMessage"));
+            if (allAlreadyInstalled)
+            {
+                // Already configured — no dialog needed
+            }
+            else if (anyFailure)
+            {
+                strong->_ShowShellIntegrationDialog(
+                    RS_(L"InitShellIntegrationErrorTitle"),
+                    RS_(L"InitShellIntegrationErrorMessage"));
+            }
+            else
+            {
+                strong->_ShowShellIntegrationDialog(
+                    RS_(L"InitShellIntegrationSuccessTitle"),
+                    RS_(L"InitShellIntegrationSuccessMessage"));
+            }
         }
     }
 

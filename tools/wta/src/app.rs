@@ -626,7 +626,14 @@ pub struct AcpModelInfo {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DispatchedCommandKind {
     FocusPane,
-    SplitPaneResume,
+    /// Plain Enter on a terminal-state row in the session management
+    /// view: open a new WT tab whose primary pane runs
+    /// `<cli> --resume <key>`. (Previously this was a split-pane in the
+    /// current tab — see commit history; the new-tab variant keeps the
+    /// originating tab clean and matches user expectation that
+    /// resuming a historical session is a "go open my session" action,
+    /// not a "split my workspace" action.)
+    NewTabResume,
     /// Shift+Enter in the session management view — resume a historical
     /// session in the agent pane of a new tab via WT-side coordination +
     /// ACP session/load.
@@ -1519,6 +1526,18 @@ impl App {
         }
     }
 
+    /// Filter to apply to the F2 session-management view based on which
+    /// agent CLI the WTA agent pane is currently driving. Returns
+    /// `Some(CliSource::*)` when `current_agent_id` resolves to a tracked
+    /// CLI (copilot / claude / gemini) so only matching rows are listed.
+    /// Returns `None` when no agent has been selected yet or the agent is
+    /// not one the session registry tracks (codex / unknown) — in that
+    /// case the view falls back to showing every row so the user can still
+    /// see and resume their history.
+    pub fn current_cli_filter(&self) -> Option<crate::agent_sessions::CliSource> {
+        crate::agent_sessions::CliSource::from_agent_id(&self.current_agent_id)
+    }
+
     /// Enter handler for the F2 Agents view. For live rows (Idle / Working
     /// / Attention / Error), focus the underlying WT pane. For terminal-
     /// state rows (Ended / Historical), spawn a new pane that runs the
@@ -1563,22 +1582,28 @@ impl App {
         }
     }
 
-    /// Spawn a new WT pane that runs `<cli> <resume_flag> <session_key>`
-    /// to rehydrate a Historical/Ended agent session from the CLI's
-    /// on-disk session store. Silent no-op for CLIs without a resume
-    /// flag (Codex today) or unknown CLI sources.
+    /// Open a new WT tab whose primary pane runs `<cli> <resume_flag>
+    /// <session_key>` to rehydrate a Historical/Ended agent session from
+    /// the CLI's on-disk session store. Silent no-op for CLIs without a
+    /// resume flag (Codex today) or unknown CLI sources.
     ///
     /// Flow:
     ///   1. Apply `ResumeDispatched` synchronously so a rapid second Enter
     ///      on the same row no-ops while this resume is in flight.
-    ///   2. Issue `wtcli --json split-pane -c "<cli> <flag> <key>"` on a
-    ///      background thread via `spawn_wtcli_split_then_focus_with_callback`
-    ///      — that helper also focuses the new pane and gives us back its
-    ///      GUID once the split succeeds.
+    ///   2. Issue `wtcli --json new-tab -c "<cli> <flag> <key>" -d "<cwd>"`
+    ///      on a background thread via
+    ///      `spawn_wtcli_split_then_focus_with_callback` — the helper is
+    ///      generic (parses `session_id` from JSON and focuses the new
+    ///      pane), so it works equally well for new-tab and split-pane.
+    ///      Routing through `new-tab` keeps the originating tab clean
+    ///      and matches user expectation that resuming a historical
+    ///      session is a "go open my session" action, not a "split my
+    ///      workspace" action.
     ///   3. The callback posts `AgentSessionEvent(ResumePaneAssigned{...})`
-    ///      through `agent_event_tx` so the registry can bind the new pane
-    ///      to the row even for hook-less CLIs (Gemini), allowing a later
-    ///      `PaneClosed` to transition the row back to Ended.
+    ///      through `agent_event_tx` so the registry can bind the new
+    ///      tab's primary pane GUID to the row even for hook-less CLIs
+    ///      (Gemini), allowing a later `PaneClosed` to transition the
+    ///      row back to Ended.
     fn dispatch_resume(&mut self, s: &crate::agent_sessions::AgentSession) {
         let cli_id = match s.cli_source {
             crate::agent_sessions::CliSource::Claude  => "claude",
@@ -1609,30 +1634,32 @@ impl App {
 
         // Per-CLI session stores are keyed by an encoding of the *current*
         // working directory (e.g. Claude looks under
-        // `~/.claude/projects/<encoded-cwd>/<id>.jsonl`; Copilot and Gemini
-        // behave similarly). `wtcli split-pane` doesn't accept --cwd
-        // (`src/tools/wtcli/main.cpp:360-402`) so the new pane inherits the
-        // splitting pane's cwd by default. Without a `cd /d` prefix the
-        // CLI reports `No conversation found with session ID: <id>` even
+        // `~/.claude/projects/<encoded-cwd>/<id>.jsonl`; Copilot and
+        // Gemini behave similarly). Without the right cwd the CLI
+        // reports `No conversation found with session ID: <id>` even
         // though the JSONL exists on disk.
         //
-        // We always wrap in `cmd /c` because:
-        //   1. The `cd /d ... && ...` chain requires a shell, and
-        //   2. npm-installed CLIs (`copilot.cmd`, `claude.cmd`,
-        //      `gemini.cmd`) need cmd.exe's PATHEXT resolution to launch
-        //      from a bare name (`CreateProcess` returns 0x80070002 for
-        //      `.cmd` shims).
-        let cwd_string = s.cwd.to_string_lossy();
-        let launch_commandline = if cwd_string.is_empty() {
-            format!("cmd /c {}", commandline)
-        } else {
-            format!("cmd /c cd /d \"{}\" && {}", cwd_string, commandline)
-        };
-        let argv = vec![
-            "split-pane".to_string(),
+        // `wtcli new-tab` exposes `-d <cwd>` (see
+        // `src/tools/wtcli/main.cpp:326-353` → COM `CreateTab(...,
+        // startingDirectory, ...)`) so the new tab's primary pane
+        // launches in the historical session's project root directly,
+        // without needing a `cd /d` shell prefix.
+        //
+        // We still wrap the CLI invocation in `cmd /c` because
+        // npm-installed CLIs (`copilot.cmd`, `claude.cmd`, `gemini.cmd`)
+        // need cmd.exe's PATHEXT resolution to launch from a bare name
+        // (`CreateProcess` returns 0x80070002 for `.cmd` shims).
+        let cwd_string = s.cwd.to_string_lossy().to_string();
+        let launch_commandline = format!("cmd /c {}", commandline);
+        let mut argv = vec![
+            "new-tab".to_string(),
             "-c".to_string(),
             launch_commandline.clone(),
         ];
+        if !cwd_string.is_empty() {
+            argv.push("-d".to_string());
+            argv.push(cwd_string.clone());
+        }
 
         // Optimistic state flip: bump Historical/Ended -> Idle so a rapid
         // second Enter on the same row sees a non-terminal status and
@@ -1645,6 +1672,9 @@ impl App {
         // for hook-less CLIs (Gemini) so a future `PaneClosed` can
         // transition the row to Ended; harmless duplicate work for
         // Claude/Copilot whose hooks beat us to the same binding.
+        // `wtcli new-tab --json` emits a `session_id` field on the new
+        // tab's primary pane in the same shape as `split-pane --json`,
+        // so the existing helper handles both.
         let cb_key = key.clone();
         let event_tx = self.agent_event_tx.clone();
         let on_pane_id: Option<Box<dyn FnOnce(String) + Send + 'static>> = match event_tx {
@@ -1666,13 +1696,14 @@ impl App {
             cli = %cli_id,
             commandline = %commandline,
             launch_commandline = %launch_commandline,
-            "dispatch_resume: split-pane scheduled",
+            cwd = %cwd_string,
+            "dispatch_resume: new-tab scheduled",
         );
 
         #[cfg(test)]
         {
             self.last_dispatched_command = Some(DispatchedCommand {
-                kind: DispatchedCommandKind::SplitPaneResume,
+                kind: DispatchedCommandKind::NewTabResume,
                 session_id: None,
                 argv,
             });
@@ -1859,11 +1890,17 @@ impl App {
     /// `agent_sessions` via `AppEvent::HistoricalSessionsLoaded`. Subsequent
     /// calls are no-ops — the registry is cached for this wta's lifetime.
     ///
-    /// Called from the F2 toggle into the Agents view. Pre-F2 the scan
-    /// would be pure overhead — chat mode never reads historical entries —
-    /// and on a populated machine the scan is ~10s of disk I/O, so an
-    /// eager-load at startup would either block the LocalSet (slowing the
-    /// first agent_status event) or churn the disk on every model switch.
+    /// Called eagerly from `run_acp_app` right after `set_event_tx` so the
+    /// scan starts overlapping with ACP startup and is usually done by the
+    /// time the user first opens the Agents view. Also called defensively
+    /// from the F2 / `/sessions` toggle in case startup raced ahead of
+    /// `set_event_tx` (Setup/FRE mode — `event_tx` not yet wired, so the
+    /// eager call early-returns and the F2 press picks it up).
+    ///
+    /// Pre-eager-load this was strictly lazy because each wta restart
+    /// (model switch, new agent pane) re-pays the ~10s scan. The eager
+    /// kick is gated to the ACP TUI mode for the same reason — short-lived
+    /// modes (`delegate`, `mcp`, CLI helpers) never call this.
     pub fn ensure_history_loaded(&mut self) {
         if self.history_load_state != HistoryLoadState::NotStarted {
             return;
@@ -2985,7 +3022,10 @@ impl App {
                 // activates immediately. Mirrors the F2 enter-Agents path.
                 if self.current_tab().current_view == View::Agents
                     && self.current_tab().agents_list_state.selected().is_none()
-                    && !self.agent_sessions.iter_sorted().is_empty()
+                    && !self
+                        .agent_sessions
+                        .iter_sorted_filtered(self.current_cli_filter().as_ref())
+                        .is_empty()
                 {
                     self.current_tab_mut().agents_list_state.select(Some(0));
                 }
@@ -3169,8 +3209,10 @@ impl App {
                         "sessions" | "agents" => {
                             let entering_agents =
                                 self.current_tab().current_view != View::Agents;
-                            let has_sessions =
-                                !self.agent_sessions.iter_sorted().is_empty();
+                            let has_sessions = !self
+                                .agent_sessions
+                                .iter_sorted_filtered(self.current_cli_filter().as_ref())
+                                .is_empty();
                             {
                                 let tab = self.current_tab_mut();
                                 tab.current_view = View::Agents;
@@ -3650,7 +3692,8 @@ impl App {
         // selection cursor are per-tab on `TabSession` so each WT tab
         // keeps its own picker state across switches.
         if self.current_tab().current_view == View::Agents {
-            let count = self.agent_sessions.iter_sorted().len();
+            let filter = self.current_cli_filter();
+            let count = self.agent_sessions.iter_sorted_filtered(filter.as_ref()).len();
             match key.code {
                 KeyCode::Down => {
                     let cur = self.current_tab().agents_list_state.selected().unwrap_or(0);
@@ -3667,7 +3710,7 @@ impl App {
                     if let Some(idx) = self.current_tab().agents_list_state.selected() {
                         let selected = self
                             .agent_sessions
-                            .iter_sorted()
+                            .iter_sorted_filtered(filter.as_ref())
                             .get(idx)
                             .map(|s| (*s).clone());
                         if let Some(s) = selected {
@@ -3693,7 +3736,7 @@ impl App {
                     if let Some(idx) = self.current_tab().agents_list_state.selected() {
                         let target = self
                             .agent_sessions
-                            .iter_sorted()
+                            .iter_sorted_filtered(filter.as_ref())
                             .get(idx)
                             .map(|s| (s.key.clone(), s.status.clone()));
                         if let Some((key, status)) = target {
@@ -3704,7 +3747,12 @@ impl App {
                             if matches!(status, Ended | Historical) {
                                 self.agent_sessions.remove(&key);
                                 // Keep the cursor in-bounds after eviction.
-                                let new_count = self.agent_sessions.iter_sorted().len();
+                                // Re-query through the same filter so the
+                                // selection clamp matches the rendered list.
+                                let new_count = self
+                                    .agent_sessions
+                                    .iter_sorted_filtered(filter.as_ref())
+                                    .len();
                                 let tab = self.current_tab_mut();
                                 if new_count == 0 {
                                     tab.agents_list_state.select(None);
@@ -4298,7 +4346,10 @@ impl App {
                 // the Agents picker and seed a selection so Enter/Up/Down
                 // are immediately useful. Esc / F2 still close the view.
                 // Per-tab — only flips the active tab's view state.
-                let has_sessions = !self.agent_sessions.iter_sorted().is_empty();
+                let has_sessions = !self
+                    .agent_sessions
+                    .iter_sorted_filtered(self.current_cli_filter().as_ref())
+                    .is_empty();
                 {
                     let tab = self.current_tab_mut();
                     if tab.agents_list_state.selected().is_none() && has_sessions {
@@ -6414,7 +6465,7 @@ mod tests {
     }
 
     #[test]
-    fn enter_on_history_row_dispatches_split_pane_with_resume() {
+    fn enter_on_history_row_dispatches_new_tab_with_resume() {
         use crate::agent_sessions::{CliSource, SessionEvent};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         use std::path::PathBuf;
@@ -6438,23 +6489,36 @@ mod tests {
         let cmd = app
             .last_dispatched_command_for_test()
             .expect("a command was dispatched");
-        assert_eq!(cmd.kind, DispatchedCommandKind::SplitPaneResume);
+        assert_eq!(cmd.kind, DispatchedCommandKind::NewTabResume);
         let argv = cmd.argv.join(" ");
-        assert!(argv.contains("split-pane"), "argv: {}", argv);
-        // The actual command may or may not be wrapped with `cmd /c` depending
-        // on whether `claude.exe` exists on the test runner's PATH. Accept
-        // both forms so the test isn't environment-dependent.
+        // The dispatch must use `wtcli new-tab` (not `split-pane`) so the
+        // resumed CLI lands in its own WT tab instead of carving up the
+        // originating tab.
+        assert!(argv.contains("new-tab"), "argv: {}", argv);
         assert!(
-            argv.contains("claude --resume abc-123"),
+            !argv.contains("split-pane"),
+            "argv must NOT use split-pane: {}",
+            argv
+        );
+        // The CLI invocation is still wrapped in `cmd /c` so .cmd shims
+        // resolve via PATHEXT, but the legacy `cd /d` prefix is gone —
+        // cwd is threaded through wtcli's `-d` flag now.
+        assert!(
+            argv.contains("cmd /c claude --resume abc-123"),
             "argv: {}",
             argv
         );
-        // Resume is keyed off the session's project cwd — the new pane's
-        // launch line must `cd /d` into it so the CLI's session store
-        // lookup (`~/.claude/projects/<encoded-cwd>/...`) succeeds.
         assert!(
-            argv.contains("cd /d \"/work/proj\""),
-            "expected cd /d prefix to original session cwd; argv: {}",
+            !argv.contains("cd /d"),
+            "argv must NOT contain cd /d (cwd is now passed via -d): {}",
+            argv
+        );
+        // Resume is keyed off the session's project cwd — the new tab's
+        // primary pane must start in that directory so the CLI's session
+        // store lookup (`~/.claude/projects/<encoded-cwd>/...`) succeeds.
+        assert!(
+            argv.contains("-d /work/proj"),
+            "expected -d <cwd>; argv: {}",
             argv
         );
     }
@@ -6462,10 +6526,11 @@ mod tests {
     #[test]
     fn shift_enter_on_history_row_dispatches_resume_in_agent_pane() {
         // Shift+Enter on a terminal-state row should route to the
-        // ResumeInAgentPane path, NOT the legacy SplitPaneResume — it
-        // emits `resume_in_new_agent_tab` to WT instead of splitting a
-        // normal pane locally. The dispatched-command tape captures the
-        // shape so downstream wiring can be regression-checked.
+        // ResumeInAgentPane path, NOT the legacy NewTabResume — it
+        // emits `resume_in_new_agent_tab` to WT instead of spawning a
+        // normal terminal tab locally. The dispatched-command tape
+        // captures the shape so downstream wiring can be
+        // regression-checked.
         use crate::agent_sessions::{CliSource, SessionEvent};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         use std::path::PathBuf;

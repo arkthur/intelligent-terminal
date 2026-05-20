@@ -594,11 +594,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         if (_GlobalSettings.AutoFixEnabled() == value) return;
         _GlobalSettings.AutoFixEnabled(value);
         _NotifyChanges(L"HasAutoFixEnabled", L"AutoFixEnabled");
-        if (value)
-        {
-            InitShellIntegrationRequested.raise(*this, ShellIntegrationTarget::Pwsh);
-            InitShellIntegrationRequested.raise(*this, ShellIntegrationTarget::WindowsPowerShell);
-        }
+        // Shell integration installation is now triggered on Save, not on toggle.
     }
 
     bool AIAgentsViewModel::HasAutoFixEnabled() const

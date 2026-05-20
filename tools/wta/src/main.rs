@@ -119,6 +119,22 @@ struct Cli {
     #[arg(long, default_value = agent_registry::DEFAULT_ACP_COMMAND)]
     agent: String,
 
+    /// Canonical agent identifier (`copilot` / `claude` / `codex` / `gemini`
+    /// / `custom:<name>`). When the host (Windows Terminal) launches wta it
+    /// already knows which entry the user picked in settings, so it passes
+    /// the original `acpAgent` value through here. wta uses this id as the
+    /// authoritative identity for `current_agent_id` — driving the session-
+    /// management view's CLI filter, the preflight check, etc.
+    ///
+    /// When omitted (manual `wta` runs, older host builds, tests) wta falls
+    /// back to inferring the id by parsing the `--agent` command line via
+    /// `agent_registry::resolve_agent_id_from_cmd`. That fallback works for
+    /// bare names but is fragile for adapter-style launches (`npx … claude-
+    /// code-acp`) and full-path launches, so the host should always pass
+    /// `--agent-id` explicitly.
+    #[arg(long)]
+    agent_id: Option<String>,
+
     /// Model override for the ACP agent. Sent via ACP setSessionModel after
     /// handshake. Used by adapter-style launches (claude, codex via npx)
     /// where the model can't be passed on the command line; native ACP
@@ -1684,8 +1700,40 @@ async fn run_acp_app(
             // Skip preflight when FRE is active — FRE has its own agent
             // selection + auth flow and doesn't need the preflight wizard.
             if cli.setup.is_none() {
-                let agent_id = agent_cmd.split_whitespace().next().unwrap_or(&agent_cmd);
-                app_state.current_agent_id = agent_check::check_agent(agent_id).id.clone();
+                // Prefer the canonical id the host passed via `--agent-id`
+                // — that's the user's actual setting value (`acpAgent`).
+                // Fall back to reverse-parsing the `--agent` command line
+                // for manual runs / older hosts. The fallback handles bare
+                // names cleanly but is fragile for adapter-style launches
+                // (`npx -y …claude-code-acp` → "claude") and full-path
+                // launches (`C:\…\copilot.exe` → "copilot"), which is the
+                // whole reason `--agent-id` exists.
+                let canonical_id: String = cli
+                    .agent_id
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_ascii_lowercase)
+                    .unwrap_or_else(|| {
+                        agent_registry::resolve_agent_id_from_cmd(&agent_cmd).to_string()
+                    });
+                app_state.current_agent_id = canonical_id.clone();
+                tracing::info!(
+                    target: "agents_view_filter",
+                    agent_id = %canonical_id,
+                    agent_cmd = %agent_cmd,
+                    source = if cli.agent_id.is_some() { "--agent-id" } else { "resolved-from-cmd" },
+                    "current_agent_id assigned",
+                );
+                // `agent_check::check_agent` accepts the canonical id and
+                // reuses the existing preflight code path (exe discovery,
+                // credential check). For adapter launches we deliberately
+                // probe the adapted CLI (`claude` / `codex`) rather than
+                // the `npx` wrapper, since auth lives on the underlying
+                // CLI's credential store. Custom agent ids (`custom:foo`)
+                // fall through to the unknown profile, which is fine —
+                // preflight is best-effort for those.
+                let agent_id = canonical_id.as_str();
                 let status = agent_check::check_agent(agent_id);
                 let preflight_result = app::PreflightResult {
                     agent_id: status.id.clone(),
@@ -1755,8 +1803,13 @@ async fn run_acp_app(
                 tracing::info!(target: "initial_view", "starting in Agents view");
                 app_state.current_tab_mut().current_view = app::View::Agents;
                 // Seed selection so Enter activates the first row immediately
-                // (mirrors the F2 enter-Agents path).
-                let has_sessions = !app_state.agent_sessions.iter_sorted().is_empty();
+                // (mirrors the F2 enter-Agents path). Honor the CLI filter so
+                // we don't seed Some(0) when there are no rows for the
+                // current agent CLI.
+                let has_sessions = !app_state
+                    .agent_sessions
+                    .iter_sorted_filtered(app_state.current_cli_filter().as_ref())
+                    .is_empty();
                 if has_sessions {
                     app_state.current_tab_mut().agents_list_state.select(Some(0));
                 }
@@ -1813,6 +1866,18 @@ async fn run_acp_app(
             }
 
             app_state.set_event_tx(event_tx.clone());
+
+            // Kick the historical-session scan immediately on agent-pane
+            // startup so the F2 sessions view is populated by the time the
+            // user opens it. The scan runs on a `spawn_blocking` thread and
+            // posts `HistoricalSessionsLoaded` back, so it never blocks the
+            // LocalSet or the first frame. Subsequent `ensure_history_loaded`
+            // calls (from F2 / `/sessions`) short-circuit on `Loading`/`Loaded`.
+            //
+            // Only the ACP TUI path reaches here — `wta delegate`, `wta mcp`,
+            // and CLI subcommands never construct an App that wires
+            // `event_tx`, so they don't pay this cost.
+            app_state.ensure_history_loaded();
 
             // If in setup mode, store ACP params for deferred start after login.
             if let Some((prompt_rx, cancel_rx, new_session_rx, load_session_rx, drop_session_rx, restart_rx)) = deferred_channels {
