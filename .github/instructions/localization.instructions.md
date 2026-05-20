@@ -206,7 +206,6 @@ Terms that should always be locked:
 | PATH | Environment variable |
 | PowerShell | Product name |
 | Copilot, Claude, Gemini | Brand names |
-| Intelligent Terminal | Product name — lock only for pseudo-locales (`{Locked=qps-ploc,qps-ploca,qps-plocm}`). Translate for all real locales. Example: zh-CN 智能终端, zh-TW 智慧終端機, ja-JP インテリジェント ターミナル |
 | JSON, YAML, XML | Technical formats |
 
 ### Translator guidance comments
