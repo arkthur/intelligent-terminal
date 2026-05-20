@@ -358,7 +358,8 @@
     <comment>This text is shown next to a list of choices.</comment>
   </data>
   <data name="Globals_TextMeasurement.HelpText" xml:space="preserve">
-    <value>Тђíš ċћǻήğэś ťћз ŵàγ ΐń¢ŏmίлġ ŧę×ţ īŝ ģгõųрέď ìŉтб çзŀľś. Ţĥę "Ġѓäφħėmз çĺüѕťèгś" ŏρťïőⁿ їѕ ťнē мőśŧ mбđёґη ąиð Ůńìςοðε-çôѓřěст ẃäў ŧθ đó şō, ŵћΐłе "ώçşẃįðτђ" ïš á ¢θmмбⁿ дρφгøдςћ öй ÙŅЇχ, ąήδ "Ẃΐñðбẁś €ôňşǿłз" ŕęрłĭċαтêş ţħэ щǻÿ įŧ ųšĕđ тõ ẅόřќ õл Ẁіηðòẃś. Čĥдйģіπģ τћίŝ šēтťϊńğ яεqϋϊѓзѕ д řėѕτăгţ θƒ Ẁїήđőώś Тėґmΐņāł ăńď įт ōπļý аρρĺΐèŝ тō āρрĺιςâŧϊôⁿş ℓãцŋçђěđ ƒřõм ώіţђìñ īť. !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!!</value>
+    <value>Тђíš ċћǻήğэś ťћз ŵàγ ΐń¢ŏmίлġ ŧę×ţ īŝ ģгõųрέď ìŉтб çзŀľś. Ţĥę "Ġѓäφħėmз çĺüѕťèгś" ŏρťïőⁿ їѕ ťнē мőśŧ mбđёґη ąиð Ůńìςοðε-çôѓřěст ẃäў ŧθ đó şō, ŵћΐłе "ώçşẃįðτђ" ïš á ¢θmмбⁿ дρφгøдςћ öй ÙŅЇχ, ąήδ "Ẃΐñðбẁś €ôňşǿłз" ŕęрłĭċαтêş ţħэ щǻÿ įŧ ųšĕđ тõ ẅόřќ õл Ẁіηðòẃś. Čĥдйģіπģ τћίŝ šēтťϊńğ яεqϋϊѓзѕ д řėѕτăгţ θƒ Intelligent Terminal ăńď įт ōπļý аρρĺΐèŝ тō āρрĺιςâŧϊôⁿş ℓãцŋçђěđ ƒřõм ώіţђìñ īť. !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!!</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" should not be pseudo-localized.</comment>
   </data>
   <data name="Globals_TextMeasurement_Graphemes.Text" xml:space="preserve">
     <value>Ġядφђêmé ¢łµѕţ℮ŗѕ !!! !!</value>
@@ -376,7 +377,8 @@
     <comment>A label for a drop down selector, referring to the East Asian Ambiguous Width Unicode specification.</comment>
   </data>
   <data name="Globals_AmbiguousWidth.HelpText" xml:space="preserve">
-    <value>Šеŧѕ тĥé ẃίďтн цšеď ƒθŕ Ёāѕť Дѕїāπ Δmъìĝůόųş ¢ĥǻŕǻćτєŗş. "Νǻяѓòш" (đéƒåųĺţ) ρґΐõѓіŧīźéѕ ċǿmραťĭвĭľΐτŷ, ẃђίļė "Ẁîδ℮" рŕīόŕïтϊźĕş гèáðàвіℓīτў ẁìτн мâйý ČЈК ƒблťś. Ĩл "Шϊďε" mőδє, şõmе áρφļĭĉªτιόņś мąу ⁿõт ẃóѓк çθřŕзçτłў αŋδ čäűѕє ℮ŗѓāŧíć ςŭѓşοґ mòνėmĕŋť. Ċђªŋĝϊйġ тнϊş śэттĩņģ ŕêqůįŗëš å ř℮ŝţâгŧ ōƒ Ẁίήďôωş Ţёŕмĭиàĺ ąηδ îт öŉłý ãφрŀįέѕ τő ąρрļĭсатįŏлŝ ℓаϋⁿćћ℮ð ƒřом шìтħїή îť. !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !</value>
+    <value>Šеŧѕ тĥé ẃίďтн цšеď ƒθŕ Ёāѕť Дѕїāπ Δmъìĝůόųş ¢ĥǻŕǻćτєŗş. "Νǻяѓòш" (đéƒåųĺţ) ρґΐõѓіŧīźéѕ ċǿmραťĭвĭľΐτŷ, ẃђίļė "Ẁîδ℮" рŕīόŕïтϊźĕş гèáðàвіℓīτў ẁìτн мâйý ČЈК ƒблťś. Ĩл "Шϊďε" mőδє, şõmе áρφļĭĉªτιόņś мąу ⁿõт ẃóѓк çθřŕзçτłў αŋδ čäűѕє ℮ŗѓāŧíć ςŭѓşοґ mòνėmĕŋť. Ċђªŋĝϊйġ тнϊş śэттĩņģ ŕêqůįŗëš å ř℮ŝţâгŧ ōƒ Intelligent Terminal ąηδ îт öŉłý ãφрŀįέѕ τő ąρрļĭсатįŏлŝ ℓаϋⁿćћ℮ð ƒřом шìтħїή îť. !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !!! !</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" should not be pseudo-localized.</comment>
   </data>
   <data name="Globals_AmbiguousWidth_Narrow.Text" xml:space="preserve">
     <value>Ŋǻŕґŏш !</value>
@@ -574,8 +576,8 @@
     <comment>{Locked="OSC 52"}{Locked="Manipulate Selection Data"}Header for a control to toggle support for applications to change the contents of the Windows system clipboard.</comment>
   </data>
   <data name="Globals_AllowHeadless.Header" xml:space="preserve">
-    <value>Ǻℓĺŏщ Ẁιйđòώѕ Тёŗмїⁿàļ тǿ řϋŋ ϊň тђě ьąςќġѓőůήď !!! !!! !!! !!! !!</value>
-    <comment>Header for a control to toggle support for Intelligent Terminal to run in the background.</comment>
+    <value>Ǻℓĺŏщ Intelligent Terminal тǿ řϋŋ ϊň тђě ьąςќġѓőůήď !!! !!! !!! !!! !!</value>
+    <comment>Header for a control to toggle support for Intelligent Terminal to run in the background. {Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" should not be pseudo-localized.</comment>
   </data>
   <data name="Globals_DebugFeaturesEnabled.Header" xml:space="preserve">
     <value>Єлάвĺé ðèъûġğįñģ ƒέàŧµřэš !!! !!! !</value>
@@ -2223,8 +2225,8 @@
     <comment>As in: Always VS Never</comment>
   </data>
   <data name="Settings_PortableModeNote.Text" xml:space="preserve">
-    <value>Ẅїηðσшѕ Ţеřmíńăľ īѕ ґϋййïŉģ ĭņ рόѓťáъℓė mōďе. !!! !!! !!! !!! !</value>
-    <comment>A disclaimer that indicates that Terminal is running in a mode that saves settings to a different folder.</comment>
+    <value>Intelligent Terminal īѕ ґϋййïŉģ ĭņ рόѓťáъℓė mōďе. !!! !!! !!! !!! !</value>
+    <comment>A disclaimer that indicates that Terminal is running in a mode that saves settings to a different folder. {Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" should not be pseudo-localized.</comment>
   </data>
   <data name="Settings_PortableModeInfoLink.NavigateUri" xml:space="preserve">
     <value>https://aka.ms/intelligentterminal/portable-mode</value>
@@ -2582,8 +2584,8 @@
     <comment>Header for a control to toggle allowing unfocused windows to have an acrylic background.</comment>
   </data>
   <data name="Globals_ShowAdminShield.Header" xml:space="preserve">
-    <value>Đįŝрļãу ã ŝħĭěļð ίπ ŧђê ţîťłë ъãѓ щћэπ Ẅīήđθщş Ţĕřмïńāľ ίѕ ŕůπŉïηģ åš Àδмιήίŝтяàтοґ !!! !!! !!! !!! !!! !!! !!! !!! </value>
-    <comment>Header for a control to toggle displaying a shield in the title bar of the app. "Admin" refers to elevated sessions like "run as Admin"</comment>
+    <value>Đįŝрļãу ã ŝħĭěļð ίπ ŧђê ţîťłë ъãѓ щћэπ Intelligent Terminal ίѕ ŕůπŉïηģ åš Àδмιήίŝтяàтοґ !!! !!! !!! !!! !!! !!! !!! !!! </value>
+    <comment>Header for a control to toggle displaying a shield in the title bar of the app. "Admin" refers to elevated sessions like "run as Admin" {Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" should not be pseudo-localized.</comment>
   </data>
   <data name="Globals_ShowTabsFullscreen.Header" xml:space="preserve">
     <value>Şĥбω ťãьŝ іή ƒūļℓ šĉґééл !!! !!! !</value>
