@@ -718,7 +718,9 @@ namespace winrt::TerminalApp::implementation
     // Arguments:
     // - <none>
     // Return Value:
-    // - The full command line for the first found CLI, or empty string if none found.
+    // - The bare agent id (e.g. "copilot", "claude") of the first found
+    //   CLI, or empty string if none found.  Callers must pass the result
+    //   through _BuildAgentCommandLine to get a launchable command.
     winrt::hstring TerminalPage::_DetectAgentCli() const
     {
         wchar_t buffer[MAX_PATH];
@@ -733,14 +735,7 @@ namespace winrt::TerminalApp::implementation
             if (SearchPathW(nullptr, agent.id.data(), L".exe", MAX_PATH, buffer, nullptr) > 0 ||
                 SearchPathW(nullptr, agent.id.data(), L".cmd", MAX_PATH, buffer, nullptr) > 0)
             {
-                // Return the full command line for this agent (same logic
-                // as _ResolveEffectiveAgentCliPath for known built-in ids).
-                const auto id = agent.id;
-                if (id == L"copilot")
-                {
-                    return winrt::hstring{ L"copilot --acp --stdio" };
-                }
-                return winrt::hstring{ id };
+                return winrt::hstring{ agent.id };
             }
         }
         return winrt::hstring{};
@@ -955,16 +950,54 @@ namespace winrt::TerminalApp::implementation
         }
     }
 
-    // Resolve the effective ACP agent commandline from structured settings.
-    // Build: "<agent> <acp_flags> [--model <model>]".
-    // The Rust agent_registry knows the ACP flags for each known agent, but the
-    // C++ side doesn't import Rust code — so we duplicate just the flag knowledge
-    // for the two ACP-capable agents.  WTA's registry is still the authority at
-    // runtime; this is only used to build the --agent value.
     // Check if this is a custom agent ID (starts with "custom:").
     static bool _IsCustomAgentId(const winrt::hstring& id)
     {
         return winrt::to_string(id).starts_with("custom:");
+    }
+
+    // Build a launchable command line from a bare agent id (e.g. "copilot"
+    // → "copilot --acp --stdio").  This is the single source of truth for
+    // id-to-commandline mapping; both the settings path and the auto-detect
+    // fallback route through here.
+    static winrt::hstring _BuildAgentCommandLine(
+        const winrt::hstring& agentId,
+        const winrt::hstring& model)
+    {
+        const auto lower = winrt::to_string(agentId);
+
+        // Adapter-style launches: claude/codex CLIs don't speak ACP themselves.
+        if (lower == "claude")
+        {
+            return winrt::hstring{ L"npx -y @zed-industries/claude-code-acp" };
+        }
+        if (lower == "codex")
+        {
+            return winrt::hstring{ L"npx -y @zed-industries/codex-acp" };
+        }
+
+        std::wstring cmd{ agentId };
+        if (lower == "copilot")
+        {
+            cmd += L" --acp --stdio";
+        }
+        else if (lower == "gemini")
+        {
+            cmd += L" --experimental-acp";
+        }
+
+        if (lower == "copilot" || lower == "gemini")
+        {
+            if (!model.empty())
+            {
+                cmd += L" --model ";
+                cmd += std::wstring_view{ model };
+            }
+            return winrt::hstring{ cmd };
+        }
+
+        // Unknown agent — return the bare id as-is.
+        return agentId;
     }
 
     static winrt::hstring _ResolveEffectiveAgentCliPath(
@@ -980,7 +1013,11 @@ namespace winrt::TerminalApp::implementation
             // which will itself only pick a policy-allowed agent.
             if (detectFallback)
             {
-                return detectFallback();
+                const auto detected = detectFallback();
+                if (!detected.empty())
+                {
+                    return _BuildAgentCommandLine(detected, globals.AcpModel());
+                }
             }
             return winrt::hstring{};
         }
@@ -992,49 +1029,7 @@ namespace winrt::TerminalApp::implementation
             if (!customCmd.empty()) return customCmd;
         }
 
-        // Built-in agents: append known ACP flags + model.
-        const auto lower = winrt::to_string(acpAgent);
-
-        // Adapter-style launches: claude/codex CLIs don't speak ACP themselves.
-        // We invoke the npm adapter via npx; the npm-installed claude/codex
-        // shim implies node/npx are present. Model is sent via ACP
-        // setSessionModel after handshake, not on the command line.
-        if (lower == "claude")
-        {
-            return winrt::hstring{ L"npx -y @zed-industries/claude-code-acp" };
-        }
-        if (lower == "codex")
-        {
-            return winrt::hstring{ L"npx -y @zed-industries/codex-acp" };
-        }
-
-        std::wstring cmd{ acpAgent };
-        if (lower == "copilot")
-        {
-            cmd += L" --acp --stdio";
-        }
-        else if (lower == "gemini")
-        {
-            cmd += L" --experimental-acp";
-        }
-
-        if (lower == "copilot" || lower == "gemini")
-        {
-            const auto acpModel = globals.AcpModel();
-            if (!acpModel.empty())
-            {
-                cmd += L" --model ";
-                cmd += std::wstring_view{ acpModel };
-            }
-            return winrt::hstring{ cmd };
-        }
-
-        // Unknown agent — try auto-detection as last resort.
-        if (detectFallback)
-        {
-            return detectFallback();
-        }
-        return acpAgent;
+        return _BuildAgentCommandLine(acpAgent, globals.AcpModel());
     }
 
     // Resolve the effective delegate agent name from structured settings.
