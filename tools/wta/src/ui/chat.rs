@@ -8,8 +8,6 @@ use crate::theme;
 use crate::ui::shimmer;
 use crate::ui_trace;
 
-const ACTIVITY_LABEL: &str = "Thinking…";
-
 const MAX_RENDER_LINE_CHARS: usize = 4096;
 
 /// Estimate the chat block's natural height (in visual rows) given the
@@ -145,7 +143,7 @@ pub fn render(frame: &mut Frame, app: &mut App, area: Rect) {
             Line::from(vec![
                 Span::styled("● ", Style::new().fg(Color::White).add_modifier(Modifier::BOLD)),
                 Span::styled(
-                    "Welcome to Intelligent Terminal!",
+                    t!("chat.welcome_title").into_owned(),
                     Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
                 ),
             ]),
@@ -238,10 +236,11 @@ fn build_activity_line(app: &App) -> Option<Line<'static>> {
     if tab.turn.spinner_label().is_none() || pending_render_text(tab).is_some() {
         return None;
     }
-    Some(Line::from(shimmer::shimmer_spans(
-        ACTIVITY_LABEL,
-        tab.activity_frame,
-    )))
+    let label = t!("chat.activity_thinking").into_owned();
+    let spans = shimmer::shimmer_spans(&label, tab.activity_frame);
+    // shimmer_spans returns Vec<Span<'static>> (borrows nothing), so
+    // taking the owned label out of scope is safe.
+    Some(Line::from(spans))
 }
 
 /// Incrementally extracts a JSON string field's decoded value from a
@@ -384,12 +383,12 @@ fn build_message_lines<'a>(
             )));
         }
         ChatMessage::Plan(entries) => {
-            lines.push(Line::from(Span::styled("Plan:", theme::PLAN_STYLE)));
+            lines.push(Line::from(Span::styled(t!("chat.plan_header").into_owned(), theme::PLAN_STYLE)));
             for entry in entries {
                 let marker = match entry.status {
-                    PlanEntryStatus::Completed => "[x]",
-                    PlanEntryStatus::InProgress => "[>]",
-                    PlanEntryStatus::Pending => "[ ]",
+                    PlanEntryStatus::Completed => t!("chat.plan_marker_completed").into_owned(),
+                    PlanEntryStatus::InProgress => t!("chat.plan_marker_in_progress").into_owned(),
+                    PlanEntryStatus::Pending => t!("chat.plan_marker_pending").into_owned(),
                 };
                 lines.push(Line::from(Span::styled(
                     format!("  {} {}", marker, truncate_render_text(&entry.content)),
