@@ -115,31 +115,15 @@ struct AgentConfig {
     acp_model: Option<String>,
 }
 
-/// Parsed fields from an `--agent-config` JSON blob, ready to overlay onto
-/// individual CLI args.
-struct AgentConfigOverlay {
-    agent: Option<String>,
-    agent_id: Option<String>,
-    delegate_agent: Option<String>,
-    delegate_model: Option<String>,
-    acp_model: Option<String>,
-}
-
-/// Parse a JSON `--agent-config` value and return the overlay fields.
+/// Parse a JSON `--agent-config` value and return the deserialized config.
 /// Returns `None` if `config_json` is `None`; errors on invalid JSON.
-fn parse_agent_config(config_json: Option<&str>) -> anyhow::Result<Option<AgentConfigOverlay>> {
+fn parse_agent_config(config_json: Option<&str>) -> anyhow::Result<Option<AgentConfig>> {
     match config_json {
         None => Ok(None),
         Some(json) => {
             let config: AgentConfig = serde_json::from_str(json)
                 .context("--agent-config: invalid JSON")?;
-            Ok(Some(AgentConfigOverlay {
-                agent: config.agent,
-                agent_id: config.agent_id,
-                delegate_agent: config.delegate_agent,
-                delegate_model: config.delegate_model,
-                acp_model: config.acp_model,
-            }))
+            Ok(Some(config))
         }
     }
 }

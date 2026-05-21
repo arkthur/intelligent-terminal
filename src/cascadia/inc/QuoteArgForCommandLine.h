@@ -7,8 +7,8 @@
 // Eliminates hand-rolled escaping throughout the codebase. Use this
 // whenever building a commandline string for CreateProcess/ShellExecute.
 //
-// Pure Win32 + STL, no WinRT dependency. Non-throwing API — returns
-// empty optional on invalid input (embedded NUL, invalid program path).
+// Pure Win32 + STL, no WinRT dependency. Returns empty optional on
+// invalid input (embedded NUL, invalid program path) or allocation failure.
 
 #pragma once
 
@@ -31,48 +31,55 @@ namespace Microsoft::Terminal::CommandLine
     //
     // NOTE: This is for argv[1..n] only. argv[0] (the program path) has
     // different rules — use QuoteProgramPath() for that.
-    inline std::optional<std::wstring> QuoteArgForCommandLine(std::wstring_view arg) noexcept
+    inline std::optional<std::wstring> QuoteArgForCommandLine(std::wstring_view arg)
     {
-        // Reject embedded NUL — it would truncate the commandline.
-        for (const auto ch : arg)
+        try
         {
-            if (ch == L'\0')
+            // Reject embedded NUL — it would truncate the commandline.
+            for (const auto ch : arg)
             {
-                return std::nullopt;
+                if (ch == L'\0')
+                {
+                    return std::nullopt;
+                }
             }
+
+            std::wstring result;
+            result.reserve(arg.size() + 8);
+            result.push_back(L'"');
+
+            size_t backslashes = 0;
+            for (const auto ch : arg)
+            {
+                if (ch == L'\\')
+                {
+                    ++backslashes;
+                }
+                else if (ch == L'"')
+                {
+                    // Double the accumulated backslashes, then emit \"
+                    result.append(backslashes * 2 + 1, L'\\');
+                    result.push_back(L'"');
+                    backslashes = 0;
+                }
+                else
+                {
+                    // Flush any accumulated backslashes as-is
+                    result.append(backslashes, L'\\');
+                    backslashes = 0;
+                    result.push_back(ch);
+                }
+            }
+            // Trailing backslashes must be doubled (they precede the closing `"`)
+            result.append(backslashes * 2, L'\\');
+            result.push_back(L'"');
+
+            return result;
         }
-
-        std::wstring result;
-        result.reserve(arg.size() + 8);
-        result.push_back(L'"');
-
-        size_t backslashes = 0;
-        for (const auto ch : arg)
+        catch (...)
         {
-            if (ch == L'\\')
-            {
-                ++backslashes;
-            }
-            else if (ch == L'"')
-            {
-                // Double the accumulated backslashes, then emit \"
-                result.append(backslashes * 2 + 1, L'\\');
-                result.push_back(L'"');
-                backslashes = 0;
-            }
-            else
-            {
-                // Flush any accumulated backslashes as-is
-                result.append(backslashes, L'\\');
-                backslashes = 0;
-                result.push_back(ch);
-            }
+            return std::nullopt;
         }
-        // Trailing backslashes must be doubled (they precede the closing `"`)
-        result.append(backslashes * 2, L'\\');
-        result.push_back(L'"');
-
-        return result;
     }
 
     // Quote a program path (argv[0]) for use in a Windows commandline string.
@@ -82,21 +89,28 @@ namespace Microsoft::Terminal::CommandLine
     // Windows file systems anyway).
     //
     // Returns std::nullopt if the path contains `"` or embedded NUL.
-    inline std::optional<std::wstring> QuoteProgramPath(std::wstring_view path) noexcept
+    inline std::optional<std::wstring> QuoteProgramPath(std::wstring_view path)
     {
-        for (const auto ch : path)
+        try
         {
-            if (ch == L'"' || ch == L'\0')
+            for (const auto ch : path)
             {
-                return std::nullopt;
+                if (ch == L'"' || ch == L'\0')
+                {
+                    return std::nullopt;
+                }
             }
+            std::wstring result;
+            result.reserve(path.size() + 2);
+            result.push_back(L'"');
+            result.append(path);
+            result.push_back(L'"');
+            return result;
         }
-        std::wstring result;
-        result.reserve(path.size() + 2);
-        result.push_back(L'"');
-        result.append(path);
-        result.push_back(L'"');
-        return result;
+        catch (...)
+        {
+            return std::nullopt;
+        }
     }
 
     // Build a JSON-encoded `--agent-config` argument from the given fields.
