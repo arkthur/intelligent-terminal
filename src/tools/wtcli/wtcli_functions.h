@@ -77,9 +77,11 @@ namespace wtcli
         }
 
         // Event JSON must be an object with a "params" object inside.
+        // Reject structurally invalid events when filters are active —
+        // missing fields can't match any filter.
         if (!ev.isObject() || !ev.isMember("params") || !ev["params"].isObject())
         {
-            return true;
+            return false;
         }
 
         if (!sessionIdFilter.empty())
