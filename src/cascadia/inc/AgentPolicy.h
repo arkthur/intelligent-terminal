@@ -28,22 +28,22 @@
 #include <mutex>
 #include <vector>
 
-// Case-insensitive comparison for agent IDs (e.g. "Copilot" should match "copilot").
-// Uses CompareStringOrdinal to avoid per-comparison heap allocations.
-struct CaseInsensitiveLess
-{
-    using is_transparent = void;
-    bool operator()(std::wstring_view a, std::wstring_view b) const
-    {
-        return CompareStringOrdinal(
-                   a.data(), static_cast<int>(a.size()),
-                   b.data(), static_cast<int>(b.size()),
-                   TRUE) == CSTR_LESS_THAN;
-    }
-};
-
 namespace Microsoft::Terminal::Settings::Model::AgentPolicy
 {
+    // Case-insensitive comparison for agent IDs (e.g. "Copilot" should match "copilot").
+    // Uses CompareStringOrdinal to avoid per-comparison heap allocations.
+    struct CaseInsensitiveLess
+    {
+        using is_transparent = void;
+        bool operator()(std::wstring_view a, std::wstring_view b) const
+        {
+            return CompareStringOrdinal(
+                       a.data(), static_cast<int>(a.size()),
+                       b.data(), static_cast<int>(b.size()),
+                       TRUE) == CSTR_LESS_THAN;
+        }
+    };
+
     // Whether a particular feature is allowed, blocked, or unset by policy.
     enum class PolicyState
     {

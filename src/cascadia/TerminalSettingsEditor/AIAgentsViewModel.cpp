@@ -266,11 +266,16 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     bool AIAgentsViewModel::IsCustomAcpAgentSelected()
     {
         if (_isAddingCustomAcpAgent) return false;
+        // If custom agents are blocked by GPO, treat as not selected even
+        // if the raw setting still has a custom: value from before policy
+        // was applied.
+        if (_GlobalSettings.IsCustomAgentPolicyLocked()) return false;
         return _StartsWithCustom(_GlobalSettings.AcpAgent());
     }
 
     winrt::hstring AIAgentsViewModel::CustomAcpCommandPreview()
     {
+        if (_GlobalSettings.IsCustomAgentPolicyLocked()) return winrt::hstring{};
         return _StartsWithCustom(_GlobalSettings.AcpAgent()) ? _GlobalSettings.AcpCustomCommand() : winrt::hstring{};
     }
 

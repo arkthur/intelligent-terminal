@@ -557,7 +557,8 @@ winrt::hstring GlobalAppSettings::EffectiveAcpAgent() const
         return agent;
     }
 
-    // Custom agents: check both AllowedAgents and AllowCustomAgents policies.
+    // Custom agents: only check AllowCustomAgents policy (AllowedAgents
+    // controls built-in agent IDs, not the custom: scheme).
     const auto agentStr = winrt::to_string(agent);
     if (agentStr.starts_with("custom:"))
     {

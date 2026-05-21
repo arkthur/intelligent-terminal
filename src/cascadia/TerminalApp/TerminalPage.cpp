@@ -713,12 +713,12 @@ namespace winrt::TerminalApp::implementation
     }
 
     // Method Description:
-    // - Auto-detects an installed agent CLI by searching the system PATH.
-    //   Checks for known CLIs in priority order: copilot, claude.
+    // - Auto-detects an installed agent CLI by iterating the GPO-filtered
+    //   built-in agent list and searching the system PATH for each.
     // Arguments:
     // - <none>
     // Return Value:
-    // - The name of the first found CLI, or empty string if none found.
+    // - The full command line for the first found CLI, or empty string if none found.
     winrt::hstring TerminalPage::_DetectAgentCli() const
     {
         wchar_t buffer[MAX_PATH];
@@ -730,7 +730,8 @@ namespace winrt::TerminalApp::implementation
         namespace Reg = ::Microsoft::Terminal::Settings::Model::AgentRegistry;
         for (const auto& agent : Reg::FilteredAcpAgents())
         {
-            if (SearchPathW(nullptr, agent.id.data(), L".exe", MAX_PATH, buffer, nullptr) > 0)
+            if (SearchPathW(nullptr, agent.id.data(), L".exe", MAX_PATH, buffer, nullptr) > 0 ||
+                SearchPathW(nullptr, agent.id.data(), L".cmd", MAX_PATH, buffer, nullptr) > 0)
             {
                 // Return the full command line for this agent (same logic
                 // as _ResolveEffectiveAgentCliPath for known built-in ids).
@@ -1072,8 +1073,11 @@ namespace winrt::TerminalApp::implementation
         const auto& globals = _settings.GlobalSettings();
         const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
 
-        // If no agent resolved and policy is the reason, show a policy message and bail.
-        if (agentCliPath.empty() && AgentPolicy::IsAllowedAgentsPolicyConfigured())
+        // If no agent resolved and policy blocks all agents, show a policy message and bail.
+        // Only show this when the filtered agent list is genuinely empty (policy blocks
+        // ALL agents), not when agents are allowed but simply not installed.
+        namespace Reg = ::Microsoft::Terminal::Settings::Model::AgentRegistry;
+        if (agentCliPath.empty() && AgentPolicy::IsAllowedAgentsPolicyConfigured() && Reg::FilteredAcpAgents().empty())
         {
             _agentPaneLog("ABORT: delegation blocked by GPO — no agents allowed");
             if (auto tip{ FindName(L"WindowIdToast").try_as<MUX::Controls::TeachingTip>() })
@@ -2219,8 +2223,9 @@ namespace winrt::TerminalApp::implementation
             const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
             if (agentCliPath.empty())
             {
-                // No agent resolved. If GPO is the reason, show a policy-specific message.
-                if (AgentPolicy::IsAllowedAgentsPolicyConfigured())
+                // No agent resolved. If GPO blocks all agents, show a policy-specific message.
+                namespace Reg2 = ::Microsoft::Terminal::Settings::Model::AgentRegistry;
+                if (AgentPolicy::IsAllowedAgentsPolicyConfigured() && Reg2::FilteredAcpAgents().empty())
                 {
                     _agentPaneLog("EARLY RETURN: all agents blocked by GPO policy");
                     if (auto tip{ FindName(L"WindowIdToast").try_as<MUX::Controls::TeachingTip>() })
