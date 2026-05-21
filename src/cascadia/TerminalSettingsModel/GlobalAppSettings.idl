@@ -139,7 +139,12 @@ namespace Microsoft.Terminal.Settings.Model
         Boolean EffectiveAutoFixEnabled { get; };
 
         // Whether GPO policy is actively restricting these settings.
-        // Used by the Settings UI to grey out / lock controls.
+        // GPO policy indicators.
+        // IsAgentPolicyLocked: AllowedAgents policy is active — agent
+        //   lists are filtered (dropdowns stay enabled, but show fewer options).
+        // IsCustomAgentPolicyLocked: AllowCustomAgents is disabled.
+        // IsAutoFixPolicyLocked / IsAgentSessionHooksPolicyLocked:
+        //   the corresponding toggle/button is disabled and forced off.
         Boolean IsAgentPolicyLocked { get; };
         Boolean IsCustomAgentPolicyLocked { get; };
         Boolean IsAutoFixPolicyLocked { get; };

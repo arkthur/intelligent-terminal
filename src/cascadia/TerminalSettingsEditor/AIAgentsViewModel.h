@@ -145,9 +145,6 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         {
             return IsAnyAgentCliDetected() && !IsAgentSessionHooksPolicyLocked();
         }
-        winrt::hstring CopilotHooksStatusText() const { return _copilotHooksSubtitle; }
-        winrt::hstring ClaudeHooksStatusText() const { return _claudeHooksSubtitle; }
-        winrt::hstring GeminiHooksStatusText() const { return _geminiHooksSubtitle; }
         bool IsInstallingAgentHooks() const noexcept { return _installingAgentHooks; }
         winrt::hstring AgentHooksInstallSummary() const { return _agentHooksInstallSummary; }
         bool HasAgentHooksInstallSummary() const noexcept { return !_agentHooksInstallSummary.empty(); }
