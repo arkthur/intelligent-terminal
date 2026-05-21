@@ -103,7 +103,7 @@ pub fn build_wt_commandline(
     Ok(cmdline)
 }
 
-#[cfg(test)]
+#[cfg(all(test, windows))]
 mod tests {
     use super::*;
 

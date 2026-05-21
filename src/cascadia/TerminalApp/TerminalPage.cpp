@@ -1215,6 +1215,10 @@ namespace winrt::TerminalApp::implementation
             {
                 cmdline += L" --cwd " + *q;
             }
+            else
+            {
+                _agentPaneLog("WARNING: delegate CWD contains invalid characters, omitting --cwd");
+            }
         }
 
         // Append the prompt as a positional argument (required by wta delegate).
@@ -1744,6 +1748,11 @@ namespace winrt::TerminalApp::implementation
             if (auto q = Microsoft::Terminal::CommandLine::QuoteArgForCommandLine(std::wstring_view{ stableId }))
             {
                 cmdline += L" --owner-tab-id " + *q;
+            }
+            else
+            {
+                _agentPaneLog("ABORT: owner-tab-id contains invalid characters");
+                return;
             }
         }
 
