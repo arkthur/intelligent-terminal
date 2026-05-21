@@ -1126,4 +1126,16 @@
   <data name="FreOverlay_ToggleOff" xml:space="preserve">
     <value>Desativado</value>
   </data>
+  <data name="AgentBlockedByPolicyTitle" xml:space="preserve">
+    <value>Os agentes de IA estão restritos</value>
+    <comment>Title shown when Group Policy blocks the user from opening the agent pane. "agent" refers to an AI intelligent agent (e.g., Copilot, Claude), not a proxy or human agent.</comment>
+  </data>
+  <data name="AgentBlockedByPolicySubtitle" xml:space="preserve">
+    <value>A política da sua organização não permite nenhum agente de IA. Entre em contato com o administrador de TI para obter ajuda.</value>
+    <comment>Subtitle shown when Group Policy blocks all AI agents from running.</comment>
+  </data>
+  <data name="FreOverlay_PolicyLocked" xml:space="preserve">
+    <value>Esta opção está restrita pela política da sua organização.</value>
+    <comment>Text shown below a disabled toggle in the first-run experience when Group Policy blocks the feature.</comment>
+  </data>
 </root>

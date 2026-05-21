@@ -127,6 +127,11 @@ namespace winrt::TerminalApp::implementation
         if (globals.IsAutoFixPolicyLocked())
         {
             AutoErrorToggle().IsEnabled(false);
+            const auto policyText = RS_(L"FreOverlay_PolicyLocked");
+            AutoErrorPolicyNotice().Text(policyText);
+            AutoErrorPolicyNotice().Visibility(Visibility::Visible);
+            // Accessibility: explain why the toggle is disabled
+            Automation::AutomationProperties::SetHelpText(AutoErrorToggle(), policyText);
         }
 
         // Session management toggle — honour AllowAgentSessionHooks GPO
@@ -134,6 +139,11 @@ namespace winrt::TerminalApp::implementation
         {
             SessionManagementToggle().IsOn(false);
             SessionManagementToggle().IsEnabled(false);
+            const auto policyText = RS_(L"FreOverlay_PolicyLocked");
+            SessionHooksPolicyNotice().Text(policyText);
+            SessionHooksPolicyNotice().Visibility(Visibility::Visible);
+            // Accessibility: explain why the toggle is disabled
+            Automation::AutomationProperties::SetHelpText(SessionManagementToggle(), policyText);
         }
     }
 
