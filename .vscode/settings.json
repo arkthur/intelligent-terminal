@@ -128,7 +128,4 @@
         "**/packages/**": true,
     },
     "sarif-viewer.connectToGithubCodeScanning": "on",
-    "C_Cpp.default.configurationProvider": "microsoft.vscode-nmake-tools",
-    "C_Cpp.formatting": "clang-format",
-    "editor.formatOnType": true,
 }
