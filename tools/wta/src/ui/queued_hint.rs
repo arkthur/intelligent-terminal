@@ -66,31 +66,35 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn truncate_to_width(text: &str, max_cells: usize) -> String {
-    use unicode_width::UnicodeWidthChar;
+    use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
     if max_cells == 0 {
         return String::new();
     }
+    // Fast path: fits as-is. Use the same width semantics for the check
+    // that we use during the truncation loop (zero-width → 1 cell), so a
+    // string with combining marks doesn't slip past this guard only to
+    // get clipped below.
+    if UnicodeWidthStr::width(text) <= max_cells {
+        return text.to_string();
+    }
+    // Reserve 1 cell up-front for the ellipsis so the displayed width
+    // is provably ≤ max_cells without a post-trim that could chew off
+    // the marker. When max_cells == 1, content_budget is 0 → we emit a
+    // bare `…` (preferred over a blank row).
+    let content_budget = max_cells.saturating_sub(1);
     let mut out = String::new();
     let mut used = 0usize;
     for ch in text.chars() {
-        let w = UnicodeWidthChar::width(ch).unwrap_or(0);
-        if used + w > max_cells {
-            // Replace the last char with an ellipsis if there's room.
-            if !out.is_empty() {
-                out.pop();
-                out.push('…');
-            } else {
-                // Very narrow budget (e.g. max_cells == 1 with a wide-char
-                // first glyph): nothing was emitted yet, so a blank row
-                // would render. Show '…' instead so the user knows there's
-                // hidden content.
-                out.push('…');
-            }
+        // Treat zero-width chars (combining marks, ZWJ) as 1 cell so they
+        // can't slip past the budget; mirrors `ui/input.rs::char_display_width`.
+        let w = UnicodeWidthChar::width(ch).unwrap_or(0).max(1);
+        if used + w > content_budget {
             break;
         }
         out.push(ch);
         used += w;
     }
+    out.push('…');
     out
 }
 
@@ -123,5 +127,31 @@ mod tests {
         // row. Regression for the Copilot-review edge case.
         let out = truncate_to_width("中文", 1);
         assert_eq!(out, "…", "got: {out:?}");
+    }
+
+    #[test]
+    fn truncate_respects_width_with_combining_marks() {
+        // Zero-width combining marks can't push the visible width past
+        // `max_cells`. Regression for the Copilot round-3 review case:
+        // `a\u{0301}b` with `max_cells=1` previously emitted `a…` which
+        // displays as 2 cells.
+        let out = truncate_to_width("a\u{0301}bcdef", 1);
+        let width = unicode_width::UnicodeWidthStr::width(out.as_str());
+        assert!(
+            width <= 1,
+            "truncated string {out:?} has display width {width}, expected ≤ 1"
+        );
+        assert!(out.contains('…'), "must keep the ellipsis marker; got {out:?}");
+    }
+
+    #[test]
+    fn truncate_wide_char_with_two_cell_budget_emits_ellipsis_only() {
+        // Two cells is enough for either the wide char OR the ellipsis,
+        // but not both. We choose the truncation marker over a partial
+        // word so the user knows there is hidden content.
+        let out = truncate_to_width("中文abc", 2);
+        let width = unicode_width::UnicodeWidthStr::width(out.as_str());
+        assert!(width <= 2, "got {out:?} width {width}");
+        assert!(out.contains('…'));
     }
 }
