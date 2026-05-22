@@ -6,6 +6,7 @@ mod debug_panel;
 mod input;
 mod layout;
 mod permission;
+mod queued_hint;
 mod recommendations;
 pub mod agents_view;
 pub mod setup;
