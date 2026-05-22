@@ -37,9 +37,13 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     // affects. FIFO dispatch order (next to send is the front) is conveyed
     // by the count alone — the user sees the queue shrink as the agent
     // works through it.
-    let preview_max = PREVIEW_MAX_CHARS.min(
-        area.width.saturating_sub(HORIZONTAL_PADDING) as usize,
-    );
+    //
+    // Account for the literal 2-space left padding we prepend on the render
+    // line below — otherwise long localized text gets clipped at the right
+    // edge for no reason. `area.width` is the row budget; subtract the same
+    // padding here so `truncate_to_width` lands on the actual visible width.
+    let visible_width = area.width.saturating_sub(HORIZONTAL_PADDING) as usize;
+    let preview_max = PREVIEW_MAX_CHARS.min(visible_width);
     let preview = tab
         .pending_prompts
         .back()
@@ -53,7 +57,7 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
     .into_owned();
     // Truncate again at the line level just in case the localized template
     // expands beyond the available width (e.g. RTL or longer translations).
-    let truncated = truncate_to_width(&text, area.width as usize);
+    let truncated = truncate_to_width(&text, visible_width);
     let line = Line::from(Span::styled(
         format!("  {}", truncated),
         theme::DIM,

@@ -5144,7 +5144,13 @@ impl App {
 
             let pane_context = PaneContext {
                 pane_id: self.pane_id.clone(),
-                tab_id: self.tab_id.clone(),
+                // Attribute the dispatched prompt to the WT tab whose queue
+                // we just drained — not `self.tab_id`, which tracks the
+                // currently focused WT tab. A background-tab drain
+                // attributed to the focused tab would route any
+                // tab-scoped follow-ups (`tab_changed` reordering,
+                // pane-context-aware autofix, etc.) to the wrong row.
+                tab_id: Some(tab_id.clone()),
                 window_id: self.window_id.clone(),
                 cwd: None,
                 source_pane_id: None,
@@ -6227,7 +6233,14 @@ mod tests {
 
     // Helper to create an App for testing (avoids needing real channels for simple state tests).
     fn test_app() -> App {
-        let (prompt_tx, _prompt_rx) = tokio::sync::mpsc::unbounded_channel();
+        test_app_with_prompt_rx().0
+    }
+
+    /// Same as `test_app` but also returns the prompt-channel receiver so
+    /// tests can introspect dispatched `PromptSubmission`s (e.g. verifying
+    /// `pane_context.tab_id` on a queue drain).
+    fn test_app_with_prompt_rx() -> (App, tokio::sync::mpsc::UnboundedReceiver<PromptSubmission>) {
+        let (prompt_tx, prompt_rx) = tokio::sync::mpsc::unbounded_channel();
         let (recommendation_tx, _recommendation_rx) = tokio::sync::mpsc::unbounded_channel();
         let (permission_tx, _permission_rx) = tokio::sync::mpsc::unbounded_channel();
         let (cancel_tx, _cancel_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -6236,7 +6249,8 @@ mod tests {
         let (drop_session_tx, _drop_session_rx) = tokio::sync::mpsc::unbounded_channel();
         let (restart_tx, _restart_rx) = tokio::sync::mpsc::unbounded_channel();
         let debug_capture = Arc::new(AtomicBool::new(false));
-        App::new(prompt_tx, recommendation_tx, permission_tx, cancel_tx, new_session_tx, load_session_tx, drop_session_tx, restart_tx, debug_capture, true, false)
+        let app = App::new(prompt_tx, recommendation_tx, permission_tx, cancel_tx, new_session_tx, load_session_tx, drop_session_tx, restart_tx, debug_capture, true, false);
+        (app, prompt_rx)
     }
 
     // ─── word boundary helpers ──────────────────────────────────────────────
@@ -7777,6 +7791,40 @@ mod tests {
         assert!(app.current_tab().input.is_empty());
         assert_eq!(app.current_tab().pending_prompts.len(), 1,
             "queue must be preserved; Esc on non-empty input clears draft only");
+    }
+
+    #[test]
+    fn drain_uses_loop_tab_id_for_pane_context_not_focused_tab() {
+        // Reproduces the Copilot-review bug fix: when a background (non-
+        // focused) tab drains, the dispatched PaneContext must carry the
+        // background tab's id, not `self.tab_id` (which tracks the
+        // currently focused WT tab).
+        let (mut app, mut rx) = test_app_with_prompt_rx();
+        app.state = ConnectionState::Connected;
+        app.pane_id = Some("pane-real".into());
+        app.window_id = Some("win-real".into());
+        // Focused tab is "focused-tab"; queue is on a different tab.
+        app.tab_id = Some("focused-tab".into());
+        let bg = "bg-tab".to_string();
+        // Seed both tabs so session_tab_mut / current_tab don't collide.
+        app.tab_sessions
+            .entry(bg.clone())
+            .or_default()
+            .pending_prompts
+            .push_back(QueuedPrompt { text: "bg-msg".into() });
+        // Background tab must also be Idle + Connected to be drainable.
+        // (Default TabSession is Idle, so nothing further to set.)
+        app.tab_sessions
+            .entry("focused-tab".into())
+            .or_default();
+
+        app.drain_pending_prompts();
+        let dispatched = rx.try_recv().expect("queued prompt was dispatched");
+        let ctx = dispatched.pane_context.as_ref().expect("pane context attached");
+        assert_eq!(ctx.tab_id.as_deref(), Some("bg-tab"),
+            "PaneContext.tab_id must reflect the drained tab, not the focused one");
+        assert_eq!(ctx.pane_id.as_deref(), Some("pane-real"));
+        assert_eq!(ctx.window_id.as_deref(), Some("win-real"));
     }
 
     #[test]
