@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
@@ -7,14 +7,14 @@
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
     <value>Nāu mai ki Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Whakaritea tō kaitiaki mō-roto hei āwhina i a koe ki te whakamarama i ngā hapa, tuhi tono, me te wewete mahi i te wāhi e mahi ana koe. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
     <value>He atu kōrero mō Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Noho i te rere me tō kaitiaki AI mō-roto</value>
@@ -37,7 +37,7 @@
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
     <value>Nāu mai ki Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Kōwhiria he aha hei whakarite ināianei. Ka taea e koe te huri i ēnei āhuatanga i ngā wā katoa i </value>
@@ -50,8 +50,8 @@
     <comment>In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AgentDescription.Text" xml:space="preserve">
-    <value>Kōwhiria te CLI kaitiaki e whakamahia ana i te papa kaitiaki. Ka kitea aunoa ngā ACP CLI e hono ana.</value>
-    <comment>{Locked="CLI","ACP"}
+    <value>Kōwhiria te kaitiaki e whakamahia ana i te papa kaitiaki. Ka kitea aunoa ngā kaitiaki ACP hototahi.</value>
+    <comment>{Locked="ACP"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AgentInstallHint.Text" xml:space="preserve">
@@ -64,19 +64,18 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
     <value>Tukua a Intelligent Terminal ki te uru ki tō anga me te kimi hapa aunoa.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
     <value>Whakahaere wāhanga</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>Tukua a Intelligent Terminal ki te aroturuki i te tūranga o ō kaitiaki e haere ana, e mahi ana rānei.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
-    <value>ℹ Mā te whakakā i tēnei ka tāuta ngā matau hono hei aroturuki wāhanga puta noa i ō CLI kaitiaki.</value>
-    <comment>{Locked="CLI"}
+    <value>ℹ Mā te whakakā i tēnei ka tāuta ngā hooks hono hei aroturuki wāhanga puta noa i ō kaitiaki.</value>
+    <comment>{Locked="hooks"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_PanePositionLabel.Text" xml:space="preserve">

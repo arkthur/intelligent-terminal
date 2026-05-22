@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!--
     Microsoft ResX Schema
@@ -120,14 +120,14 @@
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
     <value>Intelligent Terminal ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>ਗਲਤੀਆਂ ਸਮਝਾਉਣ, ਕਮਾਂਡਾਂ ਦਾ ਖਰੜਾ ਤਿਆਰ ਕਰਨ ਅਤੇ ਕੰਮਾਂ ਨੂੰ ਅਨਬਲੌਕ ਕਰਨ ਵਿੱਚ ਮਦਦ ਲਈ ਆਪਣਾ ਬਿਲਟ-ਇਨ ਸਹਾਇਕ ਸੈੱਟ ਅੱਪ ਕਰੋ, ਜਿੱਥੇ ਤੁਸੀਂ ਕੰਮ ਕਰਦੇ ਹੋ ਉੱਥੇ ਹੀ। </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
     <value>Intelligent Terminal ਬਾਰੇ ਹੋਰ ਜਾਣੋ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>ਆਪਣੇ ਬਿਲਟ-ਇਨ AI ਏਜੰਟ ਨਾਲ ਪ੍ਰਵਾਹ ਵਿੱਚ ਰਹੋ</value>
@@ -150,7 +150,7 @@
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
     <value>Intelligent Terminal ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>ਹੁਣ ਕੀ ਸੈੱਟ ਅੱਪ ਕਰਨਾ ਹੈ ਚੁਣੋ। ਤੁਸੀਂ ਇਹਨਾਂ ਨੂੰ ਕਦੇ ਵੀ ਬਦਲ ਸਕਦੇ ਹੋ </value>
@@ -163,8 +163,8 @@
     <comment>In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AgentDescription.Text" xml:space="preserve">
-    <value>ਏਜੰਟ ਪੈਨ ਵਿੱਚ ਵਰਤੇ ਜਾਣ ਵਾਲੇ ਏਜੰਟ CLI ਨੂੰ ਚੁਣੋ। ਕੋਈ ਵੀ ਅਨੁਕੂਲ ACP CLI ਆਪਣੇ ਆਪ ਖੋਜੀ ਜਾਵੇਗੀ।</value>
-    <comment>{Locked="CLI","ACP"}
+    <value>ਏਜੰਟ ਪੈਨ ਵਿੱਚ ਵਰਤੇ ਜਾਣ ਵਾਲੇ ਏਜੰਟ ਨੂੰ ਚੁਣੋ। ਕੋਈ ਵੀ ਅਨੁਕੂਲ ACP ਏਜੰਟ ਆਪਣੇ ਆਪ ਖੋਜਿਆ ਜਾਵੇਗਾ।</value>
+    <comment>{Locked="ACP"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AgentInstallHint.Text" xml:space="preserve">
@@ -177,19 +177,19 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
     <value>Intelligent Terminal ਨੂੰ ਤੁਹਾਡੇ ਸ਼ੈੱਲ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਅਤੇ ਗਲਤੀਆਂ ਨੂੰ ਸਵੈ-ਚਾਲਿਤ ਤੌਰ 'ਤੇ ਖੋਜਣ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ।</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
     <value>ਸੈਸ਼ਨ ਪ੍ਰਬੰਧਨ</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>Intelligent Terminal ਨੂੰ ਤੁਹਾਡੇ ਚੱਲ ਰਹੇ ਜਾਂ ਸਕ੍ਰਿਯ ਏਜੰਟਾਂ ਦੀ ਸਥਿਤੀ ਟਰੈਕ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ।</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
-    <value>ℹ ਇਸਨੂੰ ਸਮਰੱਥ ਕਰਨ ਨਾਲ ਤੁਹਾਡੇ ਏਜੰਟ CLI ਵਿੱਚ ਸੈਸ਼ਨਾਂ ਨੂੰ ਟਰੈਕ ਕਰਨ ਲਈ ਇੰਟੀਗ੍ਰੇਸ਼ਨ ਹੁੱਕ ਇੰਸਟਾਲ ਹੋਣਗੇ।</value>
-    <comment>{Locked="CLI"}
+    <value>ℹ ਇਸਨੂੰ ਸਮਰੱਥ ਕਰਨ ਨਾਲ ਤੁਹਾਡੇ ਏਜੰਟਾਂ ਵਿੱਚ ਸੈਸ਼ਨਾਂ ਨੂੰ ਟਰੈਕ ਕਰਨ ਲਈ ਇੰਟੀਗ੍ਰੇਸ਼ਨ hooks ਇੰਸਟਾਲ ਹੋਣਗੇ।</value>
+    <comment>{Locked="hooks"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_PanePositionLabel.Text" xml:space="preserve">

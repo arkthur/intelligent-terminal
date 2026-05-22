@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
@@ -7,14 +7,14 @@
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
     <value>Καλώς ήρθατε στο Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Ρυθμίστε τον ενσωματωμένο βοηθό σας για να σας βοηθά να εξηγείτε σφάλματα, να συντάσσετε εντολές και να ξεμπλοκάρετε εργασίες ακριβώς εκεί που εργάζεστε. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
     <value>Μάθετε περισσότερα για το Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Μείνετε στη ροή σας με τον ενσωματωμένο πράκτορα AI</value>
@@ -37,7 +37,7 @@
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
     <value>Καλώς ήρθατε στο Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Επιλέξτε τι θα ρυθμίσετε τώρα. Μπορείτε να τα αλλάξετε ανά πάσα στιγμή στις </value>
@@ -50,8 +50,8 @@
     <comment>In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AgentDescription.Text" xml:space="preserve">
-    <value>Επιλέξτε το CLI πράκτορα που χρησιμοποιείται στο πλαίσιο πράκτορα. Οποιοδήποτε συμβατό ACP CLI θα ανιχνευθεί αυτόματα.</value>
-    <comment>{Locked="CLI","ACP"}
+    <value>Επιλέξτε τον πράκτορα που χρησιμοποιείται στο πλαίσιο πράκτορα. Οποιοσδήποτε συμβατός πράκτορας ACP θα ανιχνευθεί αυτόματα.</value>
+    <comment>{Locked="ACP"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AgentInstallHint.Text" xml:space="preserve">
@@ -64,19 +64,18 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
     <value>Δώστε στο Intelligent Terminal δικαίωμα πρόσβασης στο κέλυφός σας και αυτόματης ανίχνευσης σφαλμάτων.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
     <value>Διαχείριση συνεδριών</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>Δώστε στο Intelligent Terminal δικαίωμα παρακολούθησης της κατάστασης των ενεργών πρακτόρων σας.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
-    <value>ℹ Η ενεργοποίηση αυτής της λειτουργίας θα εγκαταστήσει hooks ενσωμάτωσης για παρακολούθηση συνεδριών σε όλα τα CLI πρακτόρων σας.</value>
-    <comment>{Locked="CLI"}
+    <value>ℹ Η ενεργοποίηση αυτής της λειτουργίας θα εγκαταστήσει hooks ενσωμάτωσης για την παρακολούθηση συνεδριών σε όλους τους πράκτορές σας.</value>
+    <comment>{Locked="hooks"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_PanePositionLabel.Text" xml:space="preserve">

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
   <resheader name="version"><value>2.0</value></resheader>
@@ -7,14 +7,14 @@
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
     <value>እንኣን ወደ Intelligent Terminal በደህና መጡ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>የብት ውስጥ አገልጋይዎን ያቅኑ ስህተቶችን ለማብራራት፣ ትዕዛዞችን ለመድመቅ እና መጣርሆችን ለማንሳት መስሪያ በሚሰሩበት ያግዙዎት። </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
     <value>ስለ Intelligent Terminal ተጨማሪ ለማወቅ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>ከብት ውስጥ AI ኤጅንትዎ ጋር በፍስፍስ ይቀጡ</value>
@@ -37,7 +37,7 @@
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
     <value>እንኣን ወደ Intelligent Terminal በደህና መጡ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>አሁን ሚያቄሁትን ይምረጡ። በማንኛውም ግዜ መቀየር ይችላሉ </value>
@@ -50,8 +50,8 @@
     <comment>In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AgentDescription.Text" xml:space="preserve">
-    <value>በኤጅንት ገጽታ ውስጥ የሚጠቀመውን የኤጅንት CLI ይምረጡ። ማንኛውም ተዋሃግ የሆነ ACP CLI በራሱ ይታወቃል።</value>
-    <comment>{Locked="CLI","ACP"}
+    <value>በኤጅንት ገጽታ ውስጥ የሚጠቀመውን ኤጅንት ይምረጡ። ማንኛውም ተዋሃጅ የሆነ ACP ኤጅንት በራሱ ይታወቃል።</value>
+    <comment>{Locked="ACP"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AgentInstallHint.Text" xml:space="preserve">
@@ -64,19 +64,18 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
     <value>ለ Intelligent Terminal የሴልዎን ለማግኘት እና ስህተቶችን በራስ-ሰር ለማወቅ ፍቃድ ይስጡ።</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
     <value>የክፍለጣ አስተዳደር</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>ለ Intelligent Terminal የኤጅንቶችዎን ሁኔታ ለመከታተል ፍቃድ ይስጡ።</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
-    <value>ℹ ይህን ማንቃት በኤጅንት CLI ዎች ውስጥ ክፍለጣዎችን ለመከታተል የውህደት hook ዎችን ይጠቅማል።</value>
-    <comment>{Locked="CLI"}
+    <value>ℹ ይህን ማንቃት በኤጅንቶችዎ ውስጥ ክፍለጊዜዎችን ለመከታተል የውህደት hooks ይጭናል።</value>
+    <comment>{Locked="hooks"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_PanePositionLabel.Text" xml:space="preserve">

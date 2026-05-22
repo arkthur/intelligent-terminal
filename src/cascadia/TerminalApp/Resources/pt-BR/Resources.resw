@@ -1011,20 +1011,20 @@
     <value>O agente de IA não está disponível</value>
   </data>
   <data name="AgentNotConfiguredSubtitle" xml:space="preserve">
-    <value>Nenhum agente de IA foi encontrado. Instale um CLI de agente (por exemplo, copilot, gemini) e verifique se ele está no seu PATH ou configure um em Configurações &gt; Agentes de IA.</value>
-    <comment>{Locked="CLI","PATH","copilot","gemini"}</comment>
+    <value>Nenhum agente de IA foi encontrado. Instale um agente (por exemplo, copilot, gemini) e verifique se ele está no seu PATH ou configure um em Configurações &gt; Agentes de IA.</value>
+    <comment>{Locked="PATH","copilot","gemini"}</comment>
   </data>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
     <value>Bem-vindo ao Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Configure seu assistente integrado para ajudar você a explicar erros, redigir comandos e destravar tarefas exatamente onde trabalha. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
     <value>Saiba mais sobre o Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Mantenha o foco com seu agente de IA integrado</value>
@@ -1044,7 +1044,7 @@
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
     <value>Bem-vindo ao Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Escolha o que configurar agora. Você pode alterar essas opções a qualquer momento em </value>
@@ -1056,8 +1056,8 @@
     <value>Agente</value>
   </data>
   <data name="FreOverlay_AgentDescription.Text" xml:space="preserve">
-    <value>Escolha a CLI de agente usada no painel do agente. Qualquer CLI ACP compatível será detectada.</value>
-    <comment>{Locked="CLI","ACP"}</comment>
+    <value>Escolha o agente usado no painel do agente. Qualquer agente ACP compatível será detectado.</value>
+    <comment>{Locked="ACP"}</comment>
   </data>
   <data name="FreOverlay_AgentInstallHint.Text" xml:space="preserve">
     <value>ℹ Este agente requer Node.js e NPX, que serão instalados automaticamente se ainda não estiverem presentes.</value>
@@ -1068,18 +1068,18 @@
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
     <value>Conceda permissão ao Intelligent Terminal para acessar seu shell e detectar erros automaticamente.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
     <value>Gerenciamento de sessões</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>Conceda permissão ao Intelligent Terminal para rastrear o status dos seus agentes em execução ou ativos.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
-    <value>ℹ Habilitar isso instalará hooks de integração para rastrear sessões nas suas CLIs de agente.</value>
-    <comment>{Locked="CLI"}</comment>
+    <value>ℹ Habilitar isso instalará hooks de integração para rastrear sessões nos seus agentes.</value>
+    <comment>{Locked="hooks"}</comment>
   </data>
   <data name="FreOverlay_PanePositionLabel.Text" xml:space="preserve">
     <value>Posição do painel</value>

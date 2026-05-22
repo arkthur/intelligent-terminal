@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -958,11 +958,11 @@
   <data name="InitShellIntegrationErrorTitle" xml:space="preserve"><value>Fehler bei der Shellintegration</value></data>
   <data name="InitShellIntegrationErrorMessage" xml:space="preserve"><value>Die Shellintegration konnte nicht initialisiert werden. Der Pfad zu Ihrem PowerShell-Profil konnte nicht ermittelt werden. Stellen Sie sicher, dass die Ziel-Shell installiert ist.</value><comment>{Locked="PowerShell"}</comment></data>
   <data name="AgentNotConfiguredTitle" xml:space="preserve"><value>KI-Agent ist nicht verfügbar</value></data>
-  <data name="AgentNotConfiguredSubtitle" xml:space="preserve"><value>Es konnte kein KI-Agent gefunden werden. Installieren Sie eine Agent-CLI (z. B. copilot, gemini) und stellen Sie sicher, dass sie sich in Ihrem PATH befindet, oder konfigurieren Sie eine unter Einstellungen &gt; Agenten.</value><comment>{Locked="CLI","PATH","copilot","gemini"}</comment></data>
+  <data name="AgentNotConfiguredSubtitle" xml:space="preserve"><value>Es konnte kein KI-Agent gefunden werden. Installieren Sie einen Agenten (z. B. copilot, gemini) und stellen Sie sicher, dass er sich in Ihrem PATH befindet, oder konfigurieren Sie einen unter Einstellungen &gt; Agenten.</value><comment>{Locked="PATH","copilot","gemini"}</comment></data>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
     <value>Willkommen bei Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Richten Sie Ihren integrierten Assistenten ein, um Fehler zu erklären, Befehle zu entwerfen und Aufgaben direkt dort zu lösen, wo Sie arbeiten. </value>
@@ -973,7 +973,7 @@
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
     <value>Erfahren Sie mehr über Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Bleiben Sie im Fluss mit Ihrem integrierten KI-Agenten</value>
@@ -993,7 +993,7 @@
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
     <value>Willkommen bei Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Wählen Sie, was Sie jetzt einrichten möchten. Sie können diese Einstellungen jederzeit in den </value>
@@ -1005,8 +1005,8 @@
     <value>Agent</value>
   </data>
   <data name="FreOverlay_AgentDescription.Text" xml:space="preserve">
-    <value>Wählen Sie die Agent-CLI aus, die im Agentbereich verwendet wird. Jede kompatible ACP-CLI wird automatisch erkannt.</value>
-    <comment>{Locked="CLI","ACP"}</comment>
+    <value>Wählen Sie den Agenten aus, der im Agentbereich verwendet wird. Jeder kompatible ACP-Agent wird automatisch erkannt.</value>
+    <comment>{Locked="ACP"}</comment>
   </data>
   <data name="FreOverlay_AgentInstallHint.Text" xml:space="preserve">
     <value>ℹ Dieser Agent erfordert Node.js und NPX, die automatisch installiert werden, falls noch nicht vorhanden.</value>
@@ -1017,18 +1017,18 @@
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
     <value>Erteilen Sie Intelligent Terminal die Berechtigung, auf Ihre Shell zuzugreifen und Fehler automatisch zu erkennen.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
     <value>Sitzungsverwaltung</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>Erteilen Sie Intelligent Terminal die Berechtigung, den Status Ihrer laufenden oder aktiven Agenten zu verfolgen.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
+    <comment>{Locked="Intelligent Terminal",qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
-    <value>ℹ Durch Aktivieren werden Integrations-Hooks installiert, um Sitzungen über Ihre Agent-CLIs hinweg zu verfolgen.</value>
-    <comment>{Locked="CLI"}</comment>
+    <value>ℹ Durch Aktivieren werden Integrations-hooks installiert, um Sitzungen über Ihre Agenten hinweg zu verfolgen.</value>
+    <comment>{Locked="hooks"}</comment>
   </data>
   <data name="FreOverlay_PanePositionLabel.Text" xml:space="preserve">
     <value>Bereichsposition</value>

@@ -2768,8 +2768,8 @@
     <value>Agente</value>
   </data>
   <data name="AIAgents_AcpAgent.HelpText" xml:space="preserve">
-    <value>Escolha o CLI de agente usado no painel do agente. Qualquer CLI compatível com ACP será detectado.</value>
-    <comment>{Locked="ACP","CLI"}</comment>
+    <value>Escolha o agente usado no painel do agente. Qualquer agente compatível com ACP será detectado.</value>
+    <comment>Supplementary description for the agent pane agent setting. {Locked="ACP"}</comment>
   </data>
   <data name="AIAgents_AcpModel.Header" xml:space="preserve">
     <value>Modelo</value>
@@ -2802,8 +2802,8 @@
     <value>Instalar scripts de hook do agente</value>
   </data>
   <data name="AIAgents_HooksInstall.HelpText" xml:space="preserve">
-    <value>Necessário para o gerenciamento de sessões do agente. Instala hooks em cada CLI detectado (Copilot, Claude, Gemini) para que relatem sessões e status ao painel do agente. Reinicie todos os CLIs de agente abertos após a instalação.</value>
-    <comment>{Locked="CLI","CLIs","Copilot","Claude","Gemini"}</comment>
+    <value>Acompanhe sessões entre agentes. Necessário para o gerenciamento de sessões do agente.</value>
+    <comment>Description for the Agent Hooks install section.</comment>
   </data>
   <data name="AIAgents_HooksInstallButton.Content" xml:space="preserve">
     <value>Instalar hooks</value>

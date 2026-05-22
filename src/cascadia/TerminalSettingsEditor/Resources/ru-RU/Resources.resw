@@ -2768,8 +2768,8 @@
     <value>Агент</value>
   </data>
   <data name="AIAgents_AcpAgent.HelpText" xml:space="preserve">
-    <value>Выберите CLI-агент для панели агента. Все совместимые ACP CLI обнаруживаются автоматически.</value>
-    <comment>{Locked="ACP","CLI"}</comment>
+    <value>Выберите агента, используемого в панели агента. Любой совместимый агент ACP будет обнаружен автоматически.</value>
+    <comment>Supplementary description for the agent pane setting. {Locked="ACP"}</comment>
   </data>
   <data name="AIAgents_AcpModel.Header" xml:space="preserve">
     <value>Модель</value>
@@ -2802,8 +2802,8 @@
     <value>Установить скрипты Hooks для агентов</value>
   </data>
   <data name="AIAgents_HooksInstall.HelpText" xml:space="preserve">
-    <value>Требуется для управления сеансами агентов. Устанавливает Hooks в каждый обнаруженный CLI (Copilot, Claude, Gemini), чтобы панель агента получала сведения о сеансах и состоянии. После установки перезапустите все открытые CLI агентов.</value>
-    <comment>{Locked="CLI","CLIs","Copilot","Claude","Gemini"}</comment>
+    <value>Отслеживайте сеансы между агентами. Требуется для управления сеансами агентов.</value>
+    <comment>Help text shown under the expandable section header.</comment>
   </data>
   <data name="AIAgents_HooksInstallButton.Content" xml:space="preserve">
     <value>Установить Hooks</value>
