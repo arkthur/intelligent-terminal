@@ -1052,6 +1052,40 @@ namespace winrt::TerminalApp::implementation
         return delegateAgent;
     }
 
+    // Resolve the effective UI language for wta.
+    // Priority: explicit settings.json "language" override → MRT's resolved
+    // language qualifier (matches what XAML actually renders) → empty (let
+    // wta fall back to sys_locale).
+    //
+    // Without this, wta uses sys_locale::get_locale() (Windows
+    // GetUserDefaultUILanguage), which returns just the UI culture (e.g.
+    // "en-US"). The C++ XAML side uses MRT, which walks the preferred UI
+    // languages list and may resolve to a different locale (e.g.
+    // "zh-Hans-CN" / "zh-CN"). Passing the MRT-resolved language to wta
+    // keeps both sides in sync.
+    static winrt::hstring _ResolveEffectiveLanguage(
+        const winrt::Microsoft::Terminal::Settings::Model::GlobalAppSettings& globals)
+    {
+        if (const auto lang = globals.Language(); !lang.empty())
+        {
+            return lang;
+        }
+        try
+        {
+            const auto context{ winrt::Windows::ApplicationModel::Resources::Core::ResourceContext::GetForViewIndependentUse() };
+            const auto qualifiers{ context.QualifierValues() };
+            if (const auto language{ qualifiers.TryLookup(L"language") })
+            {
+                return winrt::hstring{ *language };
+            }
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
+        return winrt::hstring{};
+    }
+
     void TerminalPage::_DelegatePromptToAgent(const winrt::hstring& prompt)
     {
         _agentPaneLog("_DelegatePromptToAgent called, prompt='" + winrt::to_string(prompt) + "'");
@@ -1115,7 +1149,7 @@ namespace winrt::TerminalApp::implementation
             cmdline += L" --delegate-model " + quoteArg(std::wstring_view{ delegateModel });
         }
 
-        if (const auto lang = globals.Language(); !lang.empty())
+        if (const auto lang = _ResolveEffectiveLanguage(globals); !lang.empty())
         {
             cmdline += L" --language " + quoteArg(std::wstring_view{ lang });
         }
@@ -1875,7 +1909,7 @@ namespace winrt::TerminalApp::implementation
         {
             cmdline += L" --no-autofix";
         }
-        if (const auto lang = globals.Language(); !lang.empty())
+        if (const auto lang = _ResolveEffectiveLanguage(globals); !lang.empty())
         {
             std::wstring langStr{ lang };
             for (size_t pos = 0; (pos = langStr.find(L'"', pos)) != std::wstring::npos; pos += 2)
@@ -2283,8 +2317,11 @@ namespace winrt::TerminalApp::implementation
 
             // Pass the user's Language override so the agent pane displays
             // the same language as the Terminal chrome (aligns with the
-            // PrimaryLanguageOverride set by AppLogic).
-            if (const auto lang = globals.Language(); !lang.empty())
+            // PrimaryLanguageOverride set by AppLogic). When settings.json
+            // has no "language" override, fall back to the MRT-resolved
+            // language so wta matches XAML's choice rather than
+            // sys_locale's narrower UI culture.
+            if (const auto lang = _ResolveEffectiveLanguage(globals); !lang.empty())
             {
                 std::wstring langStr{ lang };
                 for (size_t pos = 0; (pos = langStr.find(L'"', pos)) != std::wstring::npos; pos += 2)
