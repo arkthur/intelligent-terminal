@@ -11,10 +11,10 @@ setup.title.sign_in: "[!!_Sign in required_!!]"
 setup.subtitle.copilot_missing: "[!!_Your agent \"%{agent}\" is not installed. Follow the steps below to install it. To switch agents, go to Settings._!!]"
 setup.subtitle.agent_missing: "[!!_Your agent \"%{agent}\" is not installed. Please reinstall it manually, then retry. To switch agents, go to Settings._!!]"
 setup.subtitle.copilot_auth: "[!!_Your agent \"%{agent}\" requires authentication. Follow the steps below to sign in. To switch agents, go to Settings._!!]"
-setup.subtitle.agent_auth: "[!!_Your agent \"%{agent}\" requires authentication. Please sign in via the agent CLI, then retry. To switch agents, go to Settings._!!]"
+setup.subtitle.agent_auth: "[!!_Your agent \"%{agent}\" requires authentication. Please sign in via the agent, then retry. To switch agents, go to Settings._!!]"
 
 # {Locked="Intelligent Terminal"}, {Locked="Settings"}
-setup.description.fre_line1: "[!!_Choose the default agent CLI you would like to use in Intelligent Terminal. You can_!!]"
+setup.description.fre_line1: "[!!_Choose the default agent you would like to use in Intelligent Terminal. You can_!!]"
 setup.description.fre_line2: "[!!_navigate to Settings to configure and set up your workspace._!!]"
 
 setup.option.reinstall: "[!!_Reinstall %{agent}_!!]"
@@ -65,7 +65,7 @@ commands.help_close_hint: "[!!_  Esc        Close this help_!!]"  # {Locked="Esc
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "[!!_(↑ ↓ to navigate • Enter to select • Esc to cancel)_!!]"
+recommendations.nav_hint: "[!!_(↑ ↓ to navigate suggestions • ← → to switch actions • Enter to select • Esc to cancel)_!!]"
 recommendations.button_run_command: "[!!_[ Run command ]_!!]"
 recommendations.button_insert_in_terminal: "[!!_Insert in Terminal_!!]"
 recommendations.button_open_in_new_tab: "[!!_Open in New Tab ↵_!!]"
@@ -103,7 +103,7 @@ agent.custom.auth_hint: "[!!_Make sure %{name} is installed and on your PATH._!!
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "[!!_Loading..._!!]"
 # {Locked="Enter","Shift+enter","Esc"} - key combinations, do not translate
-agents.footer_hint: "[!!_(↑ ↓ to navigate • Enter to launch session in new tab • Shift+enter to launch session in agent pane • Esc to exit)_!!]"
+agents.footer_hint: "[!!_(↑ ↓ to navigate suggestions • Enter to launch session in new tab • Shift+enter to launch session in agent pane • Esc to exit)_!!]"
 agents.status.active: "[!!_Active_!!]"
 agents.status.waiting_for_input: "[!!_Waiting for input_!!]"
 agents.status.error: "[!!_Error_!!]"
@@ -158,3 +158,28 @@ hooks.installed_but_disabled: "[!!_⚠ installed but disabled_!!]"
 hooks.not_installed: "[!!_✗ not installed_!!]"
 hooks.uninstall_skipped: "[!!_skipped (CLI not on PATH)_!!]"
 hooks.install_attempted: "[!!_wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log_!!]"
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+time.just_now: "just now"
+time.minutes_ago:
+  one: "%{count} minute ago"
+  other: "%{count} minutes ago"
+time.hours_ago:
+  one: "%{count} hour ago"
+  other: "%{count} hours ago"
+time.days_ago:
+  one: "%{count} day ago"
+  other: "%{count} days ago"
+time.date_format: "%{month} %{day}, %{year}"
+time.month:
+  "1": "January"
+  "2": "February"
+  "3": "March"
+  "4": "April"
+  "5": "May"
+  "6": "June"
+  "7": "July"
+  "8": "August"
+  "9": "September"
+  "10": "October"
+  "11": "November"
+  "12": "December"

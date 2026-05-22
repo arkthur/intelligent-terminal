@@ -11,10 +11,10 @@ setup.title.sign_in: "Autentificare necesară"
 setup.subtitle.copilot_missing: "Agentul \"%{agent}\" nu este instalat. Urmați pașii de mai jos pentru a-l instala. Pentru a schimba agentul, accesați Settings."
 setup.subtitle.agent_missing: "Agentul \"%{agent}\" nu este instalat. Reinstalați-l manual, apoi reîncercați. Pentru a schimba agentul, accesați Settings."
 setup.subtitle.copilot_auth: "Agentul \"%{agent}\" necesită autentificare. Urmați pașii de mai jos pentru a vă conecta. Pentru a schimba agentul, accesați Settings."
-setup.subtitle.agent_auth: "Agentul \"%{agent}\" necesită autentificare. Conectați-vă prin CLI-ul agentului, apoi reîncercați. Pentru a schimba agentul, accesați Settings."
+setup.subtitle.agent_auth: "Agentul \"%{agent}\" necesită autentificare. Conectați-vă prin agent, apoi reîncercați. Pentru a schimba agentul, accesați Settings."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Alegeți CLI-ul implicit al agentului pe care doriți să îl utilizați în Intelligent Terminal. Puteți"
+setup.description.fre_line1: "Alegeți agentul implicit pe care doriți să îl utilizați în Intelligent Terminal. Puteți"
 setup.description.fre_line2: "naviga la Settings pentru a configura spațiul de lucru."
 
 setup.option.reinstall: "Reinstalare %{agent}"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Închide acest ajutor"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ pentru navigare • Enter pentru selectare • Esc pentru anulare)"
+recommendations.nav_hint: "(↑ ↓ pentru navigare • ← → pentru comutarea butoanelor • Enter pentru selectare • Esc pentru anulare)"
 recommendations.button_run_command: "[ Rulează comanda ]"
 recommendations.button_insert_in_terminal: "Inserare în Terminal"
 recommendations.button_open_in_new_tab: "Deschide în filă nouă ↵"
@@ -158,3 +158,31 @@ hooks.installed_but_disabled: "⚠ installed but disabled"
 hooks.not_installed: "✗ not installed"
 hooks.uninstall_skipped: "skipped (CLI not on PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+time.just_now: "chiar acum"
+time.minutes_ago:
+  one: "acum %{count} minut"
+  few: "acum %{count} minute"
+  other: "acum %{count} de minute"
+time.hours_ago:
+  one: "acum %{count} oră"
+  few: "acum %{count} ore"
+  other: "acum %{count} de ore"
+time.days_ago:
+  one: "acum %{count} zi"
+  few: "acum %{count} zile"
+  other: "acum %{count} de zile"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "ianuarie"
+  "2": "februarie"
+  "3": "martie"
+  "4": "aprilie"
+  "5": "mai"
+  "6": "iunie"
+  "7": "iulie"
+  "8": "august"
+  "9": "septembrie"
+  "10": "octombrie"
+  "11": "noiembrie"
+  "12": "decembrie"

@@ -75,6 +75,21 @@ pub(crate) fn spawn_agent_process(agent_cmd: &str, cwd: Option<&Path>) -> Result
     // runtime, but doesn't apply to an ACP host. Scrub unconditionally;
     // other agents don't care.
     cmd.env_remove("CLAUDECODE");
+
+    // Forward the user's locale to the agent process via standard POSIX
+    // environment variables. Many agent CLIs (and the LLMs they speak to)
+    // honor `LANG` / `LC_ALL` to choose their response language. We keep the
+    // ACP wire format itself untouched — this is purely a hint for the
+    // agent's response language. Format: `<locale>.UTF-8` (BCP-47 with
+    // dashes converted to underscores, plus UTF-8 codeset).
+    {
+        let current_locale = rust_i18n::locale().to_string();
+        if !current_locale.is_empty() {
+            let posix_locale = format!("{}.UTF-8", current_locale.replace('-', "_"));
+            cmd.env("LANG", &posix_locale);
+            cmd.env("LC_ALL", &posix_locale);
+        }
+    }
     if let Some(cwd) = cwd {
         cmd.current_dir(cwd);
     }

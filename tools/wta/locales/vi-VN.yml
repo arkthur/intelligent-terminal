@@ -158,3 +158,26 @@ hooks.installed_but_disabled: "⚠ đã cài đặt nhưng bị tắt"
 hooks.not_installed: "✗ chưa cài đặt"
 hooks.uninstall_skipped: "đã bỏ qua (CLI không nằm trong PATH)"
 hooks.install_attempted: "Đã thử cài đặt wt-agent-hooks (idempotent). Chạy `wta hooks status` để kiểm tra kết quả. Nhật ký: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting ─────────────────────────────────────
+time.just_now: "vừa xong"
+time.minutes_ago:
+  other: "%{count} phút trước"
+time.hours_ago:
+  other: "%{count} giờ trước"
+time.days_ago:
+  other: "%{count} ngày trước"
+time.date_format: "%{day} %{month} năm %{year}"
+time.month:
+  "1": "tháng 1"
+  "2": "tháng 2"
+  "3": "tháng 3"
+  "4": "tháng 4"
+  "5": "tháng 5"
+  "6": "tháng 6"
+  "7": "tháng 7"
+  "8": "tháng 8"
+  "9": "tháng 9"
+  "10": "tháng 10"
+  "11": "tháng 11"
+  "12": "tháng 12"

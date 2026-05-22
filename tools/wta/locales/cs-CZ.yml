@@ -11,10 +11,10 @@ setup.title.sign_in: "Vyžadováno přihlášení"
 setup.subtitle.copilot_missing: "Váš agent \"%{agent}\" není nainstalován. Postupujte podle níže uvedených kroků a nainstalujte ho. Chcete-li přepnout agenta, přejděte do Settings."
 setup.subtitle.agent_missing: "Váš agent \"%{agent}\" není nainstalován. Přeinstalujte ho ručně a zkuste to znovu. Chcete-li přepnout agenta, přejděte do Settings."
 setup.subtitle.copilot_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Postupujte podle níže uvedených kroků a přihlaste se. Chcete-li přepnout agenta, přejděte do Settings."
-setup.subtitle.agent_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Přihlaste se přes CLI agenta a zkuste to znovu. Chcete-li přepnout agenta, přejděte do Settings."
+setup.subtitle.agent_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Přihlaste se přes agenta a zkuste to znovu. Chcete-li přepnout agenta, přejděte do Settings."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Vyberte výchozí CLI agenta, které chcete používat v Intelligent Terminal. Můžete"
+setup.description.fre_line1: "Vyberte výchozího agenta, kterého chcete používat v Intelligent Terminal. Můžete"
 setup.description.fre_line2: "přejít do Settings a nakonfigurovat svůj pracovní prostor."
 
 setup.option.reinstall: "Přeinstalovat %{agent}"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Zavřít tuto nápovědu"  # {Locked="Es
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ pro navigaci • Enter pro výběr • Esc pro zrušení)"
+recommendations.nav_hint: "(↑ ↓ pro navigaci • ← → pro přepínání tlačítek • Enter pro výběr • Esc pro zrušení)"
 recommendations.button_run_command: "[ Spustit příkaz ]"
 recommendations.button_insert_in_terminal: "Vložit do terminálu"
 recommendations.button_open_in_new_tab: "Otevřít v nové kartě ↵"
@@ -158,3 +158,36 @@ hooks.installed_but_disabled: "⚠ installed but disabled"
 hooks.not_installed: "✗ not installed"
 hooks.uninstall_skipped: "skipped (CLI not on PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+# CLDR plural categories for this locale; %{count} = numeric count.
+time.just_now: "právě teď"
+time.minutes_ago:
+  one: "před %{count} minutou"
+  few: "před %{count} minutami"
+  many: "před %{count} minutami"
+  other: "před %{count} minutami"
+time.hours_ago:
+  one: "před %{count} hodinou"
+  few: "před %{count} hodinami"
+  many: "před %{count} hodinami"
+  other: "před %{count} hodinami"
+time.days_ago:
+  one: "před %{count} dnem"
+  few: "před %{count} dny"
+  many: "před %{count} dny"
+  other: "před %{count} dny"
+time.date_format: "%{day}. %{month} %{year}"
+time.month:
+  "1": "ledna"
+  "2": "února"
+  "3": "března"
+  "4": "dubna"
+  "5": "května"
+  "6": "června"
+  "7": "července"
+  "8": "srpna"
+  "9": "září"
+  "10": "října"
+  "11": "listopadu"
+  "12": "prosince"

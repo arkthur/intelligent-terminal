@@ -11,10 +11,10 @@ setup.title.sign_in: "Oturum açma gerekli"
 setup.subtitle.copilot_missing: "Aracınız \"%{agent}\" yüklü değil. Yüklemek için aşağıdaki adımları izleyin. Aracı değiştirmek için Settings'e gidin."
 setup.subtitle.agent_missing: "Aracınız \"%{agent}\" yüklü değil. Lütfen elle yeniden yükleyin, ardından tekrar deneyin. Aracı değiştirmek için Settings'e gidin."
 setup.subtitle.copilot_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Oturum açmak için aşağıdaki adımları izleyin. Aracı değiştirmek için Settings'e gidin."
-setup.subtitle.agent_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Lütfen aracı CLI üzerinden oturum açın, ardından tekrar deneyin. Aracı değiştirmek için Settings'e gidin."
+setup.subtitle.agent_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Lütfen aracı üzerinden oturum açın, ardından tekrar deneyin. Aracı değiştirmek için Settings'e gidin."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Intelligent Terminal'de kullanmak istediğiniz varsayılan aracı CLI'yi seçin. Çalışma alanınızı"
+setup.description.fre_line1: "Intelligent Terminal'de kullanmak istediğiniz varsayılan aracı seçin. Çalışma alanınızı"
 setup.description.fre_line2: "yapılandırmak ve ayarlamak için Settings'e gidebilirsiniz."
 
 setup.option.reinstall: "%{agent} yeniden yükle"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Bu yardımı kapat"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ gezinmek için • Enter seçmek için • Esc iptal etmek için)"
+recommendations.nav_hint: "(↑ ↓ gezinmek için • ← → düğmeler arasında geçiş yapmak için • Enter seçmek için • Esc iptal etmek için)"
 recommendations.button_run_command: "[ Komutu çalıştır ]"
 recommendations.button_insert_in_terminal: "Terminal'e ekle"
 recommendations.button_open_in_new_tab: "Yeni Sekmede Aç ↵"
@@ -158,3 +158,25 @@ hooks.installed_but_disabled: "⚠ yüklü ancak devre dışı"
 hooks.not_installed: "✗ yüklü değil"
 hooks.uninstall_skipped: "atlandı (CLI PATH'te değil)"
 hooks.install_attempted: "wt-agent-hooks yüklemesi denendi (idempotent). Sonucu incelemek için `wta hooks status` çalıştırın. İzleme günlüğü: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time and date formatting ───────────────────────────────────────
+time.just_now: "az önce"
+time.minutes_ago:
+  other: "%{count} dakika önce"
+time.hours_ago:
+  other: "%{count} saat önce"
+time.days_ago:
+  other: "%{count} gün önce"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "Ocak"
+  "2": "Şubat"
+  "3": "Mart"
+  "4": "Nisan"
+  "5": "Mayıs"
+  "6": "Haziran"
+  "7": "Temmuz"
+  "8": "Ağustos"
+  "9": "Eylül"
+  "10": "Ekim"
+  "11": "Kasım"
+  "12": "Aralık"

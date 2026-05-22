@@ -158,3 +158,26 @@ hooks.installed_but_disabled: "⚠ naka-install pero naka-disable"
 hooks.not_installed: "✗ hindi naka-install"
 hooks.uninstall_skipped: "nilaktawan (wala ang CLI sa PATH)"
 hooks.install_attempted: "Sinubukang i-install ang wt-agent-hooks (idempotent). Patakbuhin ang `wta hooks status` para suriin ang resulta. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting ─────────────────────────────────────
+time.just_now: "ngayon lang"
+time.minutes_ago:
+  other: "%{count} minuto ang nakalipas"
+time.hours_ago:
+  other: "%{count} oras ang nakalipas"
+time.days_ago:
+  other: "%{count} araw ang nakalipas"
+time.date_format: "%{month} %{day}, %{year}"
+time.month:
+  "1": "Enero"
+  "2": "Pebrero"
+  "3": "Marso"
+  "4": "Abril"
+  "5": "Mayo"
+  "6": "Hunyo"
+  "7": "Hulyo"
+  "8": "Agosto"
+  "9": "Setyembre"
+  "10": "Oktubre"
+  "11": "Nobyembre"
+  "12": "Disyembre"

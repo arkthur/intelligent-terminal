@@ -4009,7 +4009,7 @@ namespace winrt::TerminalApp::implementation
                 diagBtn.IsEnabled(false);
                 ToolTipService::SetToolTip(
                     diagBtn,
-                    box_value(winrt::hstring{ L"Analyzing error…" }));
+                    box_value(RS_(L"Diagnostics_AnalyzingTooltip")));
                 if (icon)
                 {
                     icon.Foreground(
@@ -4017,7 +4017,7 @@ namespace winrt::TerminalApp::implementation
                 }
                 if (label)
                 {
-                    label.Text(L"Error detected: analyzing…");
+                    label.Text(RS_(L"Diagnostics_ErrorPendingLabel"));
                     label.Foreground(
                         SolidColorBrush{ ColorHelper::FromArgb(255, 0xD6, 0xB7, 0x00) });
                     label.Visibility(Visibility::Visible);
@@ -4032,8 +4032,7 @@ namespace winrt::TerminalApp::implementation
                 const auto hotkey = _diagnostics.hotkeyHint.empty()
                                         ? std::wstring{ L"Ctrl+Alt+." }
                                         : _diagnostics.hotkeyHint;
-                std::wstring labelText = L"Error detected: " + hotkey + L" to fix";
-                label.Text(winrt::hstring{ labelText });
+                label.Text(winrt::hstring{ RS_fmt(L"Diagnostics_ErrorArmedLabelFormat", hotkey) });
 
                 // Yellow warning color.
                 const auto accent = SolidColorBrush{
@@ -4049,19 +4048,24 @@ namespace winrt::TerminalApp::implementation
                     label.Visibility(Visibility::Visible);
                 }
 
-                std::wstring tooltip = L"Fix ready — " + hotkey + L" to apply";
+                std::wstring tooltip;
                 if (!_diagnostics.fixPreview.empty())
                 {
-                    tooltip += L": ";
+                    std::wstring preview;
                     if (_diagnostics.fixPreview.size() > 120)
                     {
-                        tooltip.append(_diagnostics.fixPreview, 0, 120);
-                        tooltip += L"…";
+                        preview.append(_diagnostics.fixPreview, 0, 120);
+                        preview += L"…";
                     }
                     else
                     {
-                        tooltip += _diagnostics.fixPreview;
+                        preview = _diagnostics.fixPreview;
                     }
+                    tooltip = RS_fmt(L"Diagnostics_FixReadyTooltipWithPreviewFormat", hotkey, preview);
+                }
+                else
+                {
+                    tooltip = RS_fmt(L"Diagnostics_FixReadyTooltipFormat", hotkey);
                 }
                 ToolTipService::SetToolTip(
                     diagBtn,
@@ -4085,19 +4089,19 @@ namespace winrt::TerminalApp::implementation
                 }
                 if (label)
                 {
-                    label.Text(L"Suggestion ready — open agent pane");
+                    label.Text(RS_(L"Diagnostics_SuggestionReadyLabel"));
                     label.Foreground(accent);
                     label.Visibility(Visibility::Visible);
                 }
 
-                std::wstring tooltip = L"Auto-fix declined to fix this directly. ";
+                std::wstring tooltip{ RS_(L"Diagnostics_SuggestionTooltipIntro") };
                 if (!_diagnostics.suggestionTitle.empty())
                 {
                     tooltip += L"\n";
                     tooltip += _diagnostics.suggestionTitle;
                     tooltip += L"\n";
                 }
-                tooltip += L"Click here or press Ctrl+Shift+. to open the agent pane and read the full suggestion.";
+                tooltip += RS_(L"Diagnostics_SuggestionTooltipInstruction");
                 ToolTipService::SetToolTip(
                     diagBtn,
                     box_value(winrt::hstring{ tooltip }));
@@ -4110,7 +4114,7 @@ namespace winrt::TerminalApp::implementation
                 diagBtn.IsEnabled(false);
                 ToolTipService::SetToolTip(
                     diagBtn,
-                    box_value(winrt::hstring{ L"Diagnostics" }));
+                    box_value(RS_(L"Diagnostics_Tooltip")));
                 if (icon)
                 {
                     // Neutral gray — Opacity=0.5 already makes it barely

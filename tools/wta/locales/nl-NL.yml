@@ -158,3 +158,29 @@ hooks.installed_but_disabled: "⚠ Geïnstalleerd maar uitgeschakeld"
 hooks.not_installed: "✗ Niet geïnstalleerd"
 hooks.uninstall_skipped: "Overgeslagen (CLI niet in PATH)"
 hooks.install_attempted: "wt-agent-hooks-installatie geprobeerd (idempotent). Voer `wta hooks status` uit om het resultaat te bekijken. Traceerlogboek: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+time.just_now: "zojuist"
+time.minutes_ago:
+  one: "%{count} minuut geleden"
+  other: "%{count} minuten geleden"
+time.hours_ago:
+  one: "%{count} uur geleden"
+  other: "%{count} uur geleden"
+time.days_ago:
+  one: "%{count} dag geleden"
+  other: "%{count} dagen geleden"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "januari"
+  "2": "februari"
+  "3": "maart"
+  "4": "april"
+  "5": "mei"
+  "6": "juni"
+  "7": "juli"
+  "8": "augustus"
+  "9": "september"
+  "10": "oktober"
+  "11": "november"
+  "12": "december"

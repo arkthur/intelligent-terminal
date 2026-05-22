@@ -1879,7 +1879,7 @@ namespace winrt::TerminalApp::implementation
 
         if (_windowIdToast != nullptr)
         {
-            WindowIdToast().Title(L"Terminal Protocol");
+            WindowIdToast().Title(RS_(L"TerminalProtocolTeachingTipTitle"));
             WindowIdToast().Subtitle(pipeName);
             _windowIdToast->Open();
         }

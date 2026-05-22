@@ -11,10 +11,10 @@ setup.title.sign_in: "Umeldung erfuerderlech"
 setup.subtitle.copilot_missing: "Ären Agent \"%{agent}\" ass net installéiert. Follegt de Schrëtt hei drënner fir en z'installéieren. Fir den Agent ze wiesselen, gitt op Settings."
 setup.subtitle.agent_missing: "Ären Agent \"%{agent}\" ass net installéiert. Installéiert en nach eng Kéier manuell an probéiert et nach eng Kéier. Fir den Agent ze wiesselen, gitt op Settings."
 setup.subtitle.copilot_auth: "Ären Agent \"%{agent}\" brauch eng Authentifizéierung. Follegt de Schrëtt hei drënner fir Iech unzemellen. Fir den Agent ze wiesselen, gitt op Settings."
-setup.subtitle.agent_auth: "Ären Agent \"%{agent}\" brauch eng Authentifizéierung. Mellt Iech iwwer den Agent CLI un an probéiert et nach eng Kéier. Fir den Agent ze wiesselen, gitt op Settings."
+setup.subtitle.agent_auth: "Ären Agent \"%{agent}\" brauch eng Authentifizéierung. Mellt Iech iwwer den Agent un an probéiert et nach eng Kéier. Fir den Agent ze wiesselen, gitt op Settings."
 
 # {Locked="Intelligent Terminal"}, {Locked="Settings"}
-setup.description.fre_line1: "Wielt de Standard-Agent CLI deen Dir am Intelligent Terminal benotze wëllt. Dir kënnt"
+setup.description.fre_line1: "Wielt de Standard-Agent deen Dir am Intelligent Terminal benotze wëllt. Dir kënnt"
 setup.description.fre_line2: "op Settings goen fir Ären Aarbechtsberäich ze konfiguréieren an anzeriichten."
 
 setup.option.reinstall: "%{agent} nei installéieren"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Dës Hëllef zoumaachen"  # {Locked="Esc
 
 # ── Recommandatiounen-Panell (src/ui/recommendations.rs) ───────────────────────────────
 # {Locked="Enter","Esc","↵"} - Schlësselnimm an Enter-Tast-Glyph, net iwwersetzen
-recommendations.nav_hint: "(↑ ↓ fir ze navigéieren • Enter fir auszewielen • Esc fir ofzebriechen)"
+recommendations.nav_hint: "(↑ ↓ fir ze navigéieren • ← → fir Knäppercher ze wiesselen • Enter fir auszewielen • Esc fir ofzebriechen)"
 recommendations.button_run_command: "[ Kommando ausféieren ]"
 recommendations.button_insert_in_terminal: "An den Terminal asetzen"
 recommendations.button_open_in_new_tab: "An engem neien Tab opmaachen ↵"
@@ -158,3 +158,29 @@ hooks.installed_but_disabled: "⚠ installéiert awer deaktivéiert"
 hooks.not_installed: "✗ net installéiert"
 hooks.uninstall_skipped: "iwwersprong (CLI net op PATH)"
 hooks.install_attempted: "wt-agent-hooks Installatioun probéiert (idempotent). Féiert `wta hooks status` aus fir d'Resultat z'iwwerpréiwen. Trace-Log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting (src/ui/agents_view.rs) ───────────────
+time.just_now: "elo grad"
+time.minutes_ago:
+  one: "virun %{count} Minutt"
+  other: "virun %{count} Minutten"
+time.hours_ago:
+  one: "virun %{count} Stonn"
+  other: "virun %{count} Stonnen"
+time.days_ago:
+  one: "virun %{count} Dag"
+  other: "virun %{count} Deeg"
+time.date_format: "%{day}. %{month} %{year}"
+time.month:
+  "1": "Januar"
+  "2": "Februar"
+  "3": "Mäerz"
+  "4": "Abrëll"
+  "5": "Mee"
+  "6": "Juni"
+  "7": "Juli"
+  "8": "August"
+  "9": "September"
+  "10": "Oktober"
+  "11": "November"
+  "12": "Dezember"

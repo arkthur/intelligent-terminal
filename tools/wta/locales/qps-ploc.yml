@@ -12,10 +12,10 @@ setup.title.sign_in: "[Ŝïğñ ïñ ŕéqûïŕéď!!]"
 setup.subtitle.copilot_missing: "[Ÿöûŕ åğéñţ \"%{agent}\" ïś ñöţ ïñśţåĺĺéď. Ƒöĺĺöŵ ţĥé śţéṗś ƀéĺöŵ ţö ïñśţåĺĺ ïţ. Ţö śŵïţçĥ åğéñţś, ğö ţö Settings.!!!! !!!! !!!! !!!! !!!!]"
 setup.subtitle.agent_missing: "[Ÿöûŕ åğéñţ \"%{agent}\" ïś ñöţ ïñśţåĺĺéď. Ṗĺéåśé ŕéïñśţåĺĺ ïţ ḿåñûåĺĺÿ, ţĥéñ ŕéţŕÿ. Ţö śŵïţçĥ åğéñţś, ğö ţö Settings.!!!! !!!! !!!! !!!! !!!!]"
 setup.subtitle.copilot_auth: "[Ÿöûŕ åğéñţ \"%{agent}\" ŕéqûïŕéś åûţĥéñţïçåţïöñ. Ƒöĺĺöŵ ţĥé śţéṗś ƀéĺöŵ ţö śïğñ ïñ. Ţö śŵïţçĥ åğéñţś, ğö ţö Settings.!!!! !!!! !!!! !!!! !!!!]"
-setup.subtitle.agent_auth: "[Ÿöûŕ åğéñţ \"%{agent}\" ŕéqûïŕéś åûţĥéñţïçåţïöñ. Ṗĺéåśé śïğñ ïñ ṽïå ţĥé åğéñţ CLI, ţĥéñ ŕéţŕÿ. Ţö śŵïţçĥ åğéñţś, ğö ţö Settings.!!!! !!!! !!!! !!!! !!!!]"
+setup.subtitle.agent_auth: "[Ÿöûŕ åğéñţ \"%{agent}\" ŕéqûïŕéś åûţĥéñţïçåţïöñ. Ṗĺéåśé śïğñ ïñ ṽïå ţĥé åğéñţ, ţĥéñ ŕéţŕÿ. Ţö śŵïţçĥ åğéñţś, ğö ţö Settings.!!!! !!!! !!!! !!!! !!!!]"
 
 # {Locked="Intelligent Terminal"}, {Locked="Settings"}
-setup.description.fre_line1: "[Çĥööśé ţĥé ďéƒåûĺţ åğéñţ CLI ÿöû ŵöûĺď ĺïķé ţö ûśé ïñ Intelligent Terminal. Ÿöû çåñ!!!! !!!! !!!! !!!!]"
+setup.description.fre_line1: "[Çĥööśé ţĥé ďéƒåûĺţ åğéñţ ÿöû ŵöûĺď ĺïķé ţö ûśé ïñ Intelligent Terminal. Ÿöû çåñ!!!! !!!! !!!! !!!!]"
 setup.description.fre_line2: "[ñåṽïğåţé ţö Settings ţö çöñƒïğûŕé åñď śéţ ûṗ ÿöûŕ ŵöŕķśṗåçé.!!!! !!!! !!!!]"
 
 setup.option.reinstall: "[Ŕéïñśţåĺĺ %{agent}!!]"
@@ -66,7 +66,7 @@ commands.help_close_hint: "[  Esc        Çĺöśé ţĥïś ĥéĺṗ!!!! !!!!]
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "[(↑ ↓ ţö ñåṽïğåţé • Enter ţö śéĺéçţ • Esc ţö çåñçéĺ)!!!! !!!! !!!! !!!!]"
+recommendations.nav_hint: "[(↑ ↓ ţö ñåṽïğåţé • ← → ţö śŵïţçĥ ɓûţţöñś • Enter ţö śéĺéçţ • Esc ţö çåñçéĺ)!!!! !!!! !!!! !!!!]"
 recommendations.button_run_command: "[[ Ŕûñ çöḿḿåñď ]!!]"
 recommendations.button_insert_in_terminal: "[Îñśéŕţ ïñ Ţéŕḿïñåĺ!!!! !!!!]"
 recommendations.button_open_in_new_tab: "[Öṗéñ ïñ Ñéŵ Ţåƀ ↵!!!! !!!!]"
@@ -159,3 +159,28 @@ hooks.installed_but_disabled: "[⚠ ïñśţåĺĺéď ƀûţ ďïśåƀĺéď!!
 hooks.not_installed: "[✗ ñöţ ïñśţåĺĺéď!!]"
 hooks.uninstall_skipped: "[śķïṗṗéď (CLI ñöţ öñ PATH)!!!! !!!!]"
 hooks.install_attempted: "[wt-agent-hooks ïñśţåĺĺ åţţéḿṗţéď (ïďéḿṗöţéñţ). Ŕûñ `wta hooks status` ţö ïñśṗéçţ ţĥé ŕéśûĺţ. Ţŕåçé ĺöğ: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log!!!! !!!! !!!! !!!! !!!! !!!! !!!!]"
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+time.just_now: "just now"
+time.minutes_ago:
+  one: "%{count} minute ago"
+  other: "%{count} minutes ago"
+time.hours_ago:
+  one: "%{count} hour ago"
+  other: "%{count} hours ago"
+time.days_ago:
+  one: "%{count} day ago"
+  other: "%{count} days ago"
+time.date_format: "%{month} %{day}, %{year}"
+time.month:
+  "1": "January"
+  "2": "February"
+  "3": "March"
+  "4": "April"
+  "5": "May"
+  "6": "June"
+  "7": "July"
+  "8": "August"
+  "9": "September"
+  "10": "October"
+  "11": "November"
+  "12": "December"

@@ -17,9 +17,9 @@ setup.title.sign_in: "Sign in required"
 setup.subtitle.copilot_missing: "Your agent \"%{agent}\" is not installed. Follow the steps below to install it. To switch agents, go to Settings."
 setup.subtitle.agent_missing: "Your agent \"%{agent}\" is not installed. Please reinstall it manually, then retry. To switch agents, go to Settings."
 setup.subtitle.copilot_auth: "Your agent \"%{agent}\" requires authentication. Follow the steps below to sign in. To switch agents, go to Settings."
-setup.subtitle.agent_auth: "Your agent \"%{agent}\" requires authentication. Please sign in via the agent CLI, then retry. To switch agents, go to Settings."
+setup.subtitle.agent_auth: "Your agent \"%{agent}\" requires authentication. Please sign in via the agent, then retry. To switch agents, go to Settings."
 
-setup.description.fre_line1: "Choose the default agent CLI you would like to use in Intelligent Terminal. You can"
+setup.description.fre_line1: "Choose the default agent you would like to use in Intelligent Terminal. You can"
 setup.description.fre_line2: "navigate to Settings to configure and set up your workspace."
 
 setup.option.reinstall: "Reinstall %{agent}"
@@ -73,7 +73,7 @@ commands.help_close_hint: "  Esc        Close this help"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ to navigate • Enter to select • Esc to cancel)"
+recommendations.nav_hint: "(↑ ↓ to navigate suggestions • ← → to switch actions • Enter to select • Esc to cancel)"
 recommendations.button_run_command: "[ Run command ]"
 recommendations.button_insert_in_terminal: "Insert in Terminal"
 recommendations.button_open_in_new_tab: "Open in New Tab ↵"
@@ -185,3 +185,44 @@ hooks.installed_but_disabled: "⚠ installed but disabled"
 hooks.not_installed: "✗ not installed"
 hooks.uninstall_skipped: "skipped (CLI not on PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+# rust-i18n plural keys: each *_ago key has `one` / `other` (CLDR English
+# plural categories). Locales with different plural rules should add the
+# categories they need: `zero` (e.g. ar), `two`, `few`, `many` (Slavic, ar),
+# `other` (default). %{count} = numeric count.
+# Locales that don't pluralize (zh, ja, ko, vi, th, …) only need `other`.
+time.just_now: "just now"
+time.minutes_ago:
+  one: "%{count} minute ago"
+  other: "%{count} minutes ago"
+time.hours_ago:
+  one: "%{count} hour ago"
+  other: "%{count} hours ago"
+time.days_ago:
+  one: "%{count} day ago"
+  other: "%{count} days ago"
+# Locale-specific date format for rows older than a week. Placeholders:
+#   %{month} = localized month name (full or abbreviated, locale's choice)
+#   %{day}   = numeric day-of-month
+#   %{year}  = 4-digit year
+# Reorder for locales that put day before month (de-DE, fr-FR, ru-RU, …) or
+# year first (zh-CN, ja-JP, ko-KR, hu-HU).
+time.date_format: "%{month} %{day}, %{year}"
+# Full month names for use with time.date_format. Some locales may prefer
+# abbreviated forms; that's fine — keep them consistent across the 12.
+# Numeric keys must be quoted strings so rust-i18n looks them up as
+# "time.month.1" instead of integer 1.
+time.month:
+  "1": "January"
+  "2": "February"
+  "3": "March"
+  "4": "April"
+  "5": "May"
+  "6": "June"
+  "7": "July"
+  "8": "August"
+  "9": "September"
+  "10": "October"
+  "11": "November"
+  "12": "December"

@@ -1,6 +1,6 @@
 # 设置界面标题
 # {Locked="Intelligent Terminal"} - 产品名，不翻译
-setup.title.first_run: "欢迎使用 Intelligent Terminal！"
+setup.title.first_run: "欢迎使用智能终端！"
 setup.title.agent_missing: "未找到智能体"
 setup.title.agent_error: "智能体连接失败"
 setup.title.switch_agent: "切换智能体"
@@ -11,10 +11,10 @@ setup.title.sign_in: "需要登录"
 setup.subtitle.copilot_missing: "您的智能体 \"%{agent}\" 尚未安装。请按照以下步骤安装。如需切换智能体，请前往设置。"
 setup.subtitle.agent_missing: "您的智能体 \"%{agent}\" 尚未安装。请手动重新安装，然后重试。如需切换智能体，请前往设置。"
 setup.subtitle.copilot_auth: "您的智能体 \"%{agent}\" 需要身份验证。请按照以下步骤登录。如需切换智能体，请前往设置。"
-setup.subtitle.agent_auth: "您的智能体 \"%{agent}\" 需要身份验证。请通过智能体 CLI 登录，然后重试。如需切换智能体，请前往设置。"
+setup.subtitle.agent_auth: "您的智能体 \"%{agent}\" 需要身份验证。请通过智能体登录，然后重试。如需切换智能体，请前往设置。"
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "选择您要在 Intelligent Terminal 中使用的默认智能体 CLI。您可以"
+setup.description.fre_line1: "选择您要在智能终端中使用的默认智能体。您可以"
 setup.description.fre_line2: "前往设置来配置和设定您的工作区。"
 
 setup.option.reinstall: "重新安装 %{agent}"
@@ -44,7 +44,7 @@ auth.hint_footer: "  按 Enter 登录，按 Esc 返回"  # {Locked="Enter","Esc"
 # ── 聊天视图 (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "思考中…"
 # {Locked="Intelligent Terminal"} - 产品名，不翻译
-chat.welcome_title: "欢迎使用 Intelligent Terminal！"
+chat.welcome_title: "欢迎使用智能终端！"
 chat.plan_header: "计划："
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        关闭此帮助"  # {Locked="Esc"}
 
 # ── 推荐面板 (src/ui/recommendations.rs) ───────────────────────────────────
 # {Locked="Enter","Esc","↵"} - 按键名称和回车键符号，不翻译
-recommendations.nav_hint: "(↑ ↓ 导航 • Enter 选择 • Esc 取消)"
+recommendations.nav_hint: "(↑ ↓ 导航 • ← → 切换按钮 • Enter 选择 • Esc 取消)"
 recommendations.button_run_command: "[ 运行命令 ]"
 recommendations.button_insert_in_terminal: "插入到终端"
 recommendations.button_open_in_new_tab: "在新标签页中打开 ↵"
@@ -158,3 +158,25 @@ hooks.installed_but_disabled: "⚠ 已安装但已禁用"
 hooks.not_installed: "✗ 未安装"
 hooks.uninstall_skipped: "已跳过（CLI 不在 PATH 上）"
 hooks.install_attempted: "wt-agent-hooks 安装已尝试（幂等）。运行 `wta hooks status` 检查结果。跟踪日志：%LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+time.just_now: "刚刚"
+time.minutes_ago:
+  other: "%{count} 分钟前"
+time.hours_ago:
+  other: "%{count} 小时前"
+time.days_ago:
+  other: "%{count} 天前"
+time.date_format: "%{year}年%{month}月%{day}日"
+time.month:
+  "1": "1月"
+  "2": "2月"
+  "3": "3月"
+  "4": "4月"
+  "5": "5月"
+  "6": "6月"
+  "7": "7月"
+  "8": "8月"
+  "9": "9月"
+  "10": "10月"
+  "11": "11月"
+  "12": "12月"

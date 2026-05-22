@@ -11,10 +11,10 @@ setup.title.sign_in: "ਸਾਈਨ ਇਨ ਲੋੜੀਂਦਾ ਹੈ"
 setup.subtitle.copilot_missing: "ਤੁਹਾਡਾ ਏਜੰਟ \"%{agent}\" ਇੰਸਟਾਲ ਨਹੀਂ ਹੈ। ਇੰਸਟਾਲ ਕਰਨ ਲਈ ਹੇਠਾਂ ਦਿੱਤੇ ਕਦਮਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ। ਏਜੰਟ ਬਦਲਣ ਲਈ Settings 'ਤੇ ਜਾਓ।"
 setup.subtitle.agent_missing: "ਤੁਹਾਡਾ ਏਜੰਟ \"%{agent}\" ਇੰਸਟਾਲ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਹੱਥੀਂ ਮੁੜ-ਇੰਸਟਾਲ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ। ਏਜੰਟ ਬਦਲਣ ਲਈ Settings 'ਤੇ ਜਾਓ।"
 setup.subtitle.copilot_auth: "ਤੁਹਾਡੇ ਏਜੰਟ \"%{agent}\" ਨੂੰ ਪ੍ਰਮਾਣਿਕਤਾ ਦੀ ਲੋੜ ਹੈ। ਸਾਈਨ ਇਨ ਕਰਨ ਲਈ ਹੇਠਾਂ ਦਿੱਤੇ ਕਦਮਾਂ ਦੀ ਪਾਲਣਾ ਕਰੋ। ਏਜੰਟ ਬਦਲਣ ਲਈ Settings 'ਤੇ ਜਾਓ।"
-setup.subtitle.agent_auth: "ਤੁਹਾਡੇ ਏਜੰਟ \"%{agent}\" ਨੂੰ ਪ੍ਰਮਾਣਿਕਤਾ ਦੀ ਲੋੜ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਏਜੰਟ CLI ਰਾਹੀਂ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ। ਏਜੰਟ ਬਦਲਣ ਲਈ Settings 'ਤੇ ਜਾਓ।"
+setup.subtitle.agent_auth: "ਤੁਹਾਡੇ ਏਜੰਟ \"%{agent}\" ਨੂੰ ਪ੍ਰਮਾਣੀਕਰਨ ਦੀ ਲੋੜ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਏਜੰਟ ਰਾਹੀਂ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ। ਏਜੰਟ ਬਦਲਣ ਲਈ Settings ਤੇ ਜਾਓ।"
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Intelligent Terminal ਵਿੱਚ ਵਰਤਣ ਲਈ ਡਿਫੌਲਟ ਏਜੰਟ CLI ਚੁਣੋ। ਤੁਸੀਂ"
+setup.description.fre_line1: "Intelligent Terminal ਵਿੱਚ ਵਰਤਣ ਲਈ ਡਿਫਾਲਟ ਏਜੰਟ ਚੁਣੋ। ਤੁਸੀਂ"
 setup.description.fre_line2: "ਆਪਣੇ ਵਰਕਸਪੇਸ ਨੂੰ ਕੌਂਫਿਗਰ ਅਤੇ ਸੈੱਟਅੱਪ ਕਰਨ ਲਈ Settings 'ਤੇ ਜਾ ਸਕਦੇ ਹੋ।"
 
 setup.option.reinstall: "%{agent} ਮੁੜ-ਇੰਸਟਾਲ ਕਰੋ"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        ਇਹ ਮਦਦ ਬੰਦ ਕਰੋ"  #
 
 # ── ਸਿਫ਼ਾਰਸ਼ ਪੈਨਲ (src/ui/recommendations.rs) ───────────────────────────────
 # {Locked="Enter","Esc","↵"} - ਕੀ ਨਾਮ ਅਤੇ Return-ਕੀ ਗਲਿਫ਼, ਅਨੁਵਾਦ ਨਾ ਕਰੋ
-recommendations.nav_hint: "(↑ ↓ ਨੈਵੀਗੇਟ ਕਰੋ • Enter ਚੁਣੋ • Esc ਰੱਦ ਕਰੋ)"
+recommendations.nav_hint: "(↑ ↓ ਨੈਵੀਗੇਟ ਕਰਨ ਲਈ • ← → ਬਟਨ ਬਦਲਣ ਲਈ • Enter ਚੁਣਨ ਲਈ • Esc ਰੱਦ ਕਰਨ ਲਈ)"
 recommendations.button_run_command: "[ ਕਮਾਂਡ ਚਲਾਓ ]"
 recommendations.button_insert_in_terminal: "ਟਰਮੀਨਲ ਵਿੱਚ ਸ਼ਾਮਲ ਕਰੋ"
 recommendations.button_open_in_new_tab: "ਨਵੀਂ ਟੈਬ ਵਿੱਚ ਖੋਲ੍ਹੋ ↵"
@@ -158,3 +158,29 @@ hooks.installed_but_disabled: "⚠ ਇੰਸਟਾਲ ਹੈ ਪਰ ਅਯੋਗ
 hooks.not_installed: "✗ ਇੰਸਟਾਲ ਨਹੀਂ ਹੈ"
 hooks.uninstall_skipped: "ਛੱਡ ਦਿੱਤਾ ਗਿਆ (CLI PATH 'ਤੇ ਨਹੀਂ ਹੈ)"
 hooks.install_attempted: "wt-agent-hooks ਇੰਸਟਾਲ ਦੀ ਕੋਸ਼ਿਸ਼ ਕੀਤੀ ਗਈ (ਆਈਡੈਮਪੋਟੈਂਟ)। ਨਤੀਜਾ ਜਾਂਚਣ ਲਈ `wta hooks status` ਚਲਾਓ। ਟ੍ਰੇਸ ਲੌਗ: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting ─────────────────────────────────────
+time.just_now: "ਹੁਣੇ ਹੀ"
+time.minutes_ago:
+  one: "%{count} ਮਿੰਟ ਪਹਿਲਾਂ"
+  other: "%{count} ਮਿੰਟ ਪਹਿਲਾਂ"
+time.hours_ago:
+  one: "%{count} ਘੰਟਾ ਪਹਿਲਾਂ"
+  other: "%{count} ਘੰਟੇ ਪਹਿਲਾਂ"
+time.days_ago:
+  one: "%{count} ਦਿਨ ਪਹਿਲਾਂ"
+  other: "%{count} ਦਿਨ ਪਹਿਲਾਂ"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "ਜਨਵਰੀ"
+  "2": "ਫ਼ਰਵਰੀ"
+  "3": "ਮਾਰਚ"
+  "4": "ਅਪ੍ਰੈਲ"
+  "5": "ਮਈ"
+  "6": "ਜੂਨ"
+  "7": "ਜੁਲਾਈ"
+  "8": "ਅਗਸਤ"
+  "9": "ਸਤੰਬਰ"
+  "10": "ਅਕਤੂਬਰ"
+  "11": "ਨਵੰਬਰ"
+  "12": "ਦਸੰਬਰ"

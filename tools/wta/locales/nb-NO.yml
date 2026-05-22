@@ -11,10 +11,10 @@ setup.title.sign_in: "Pålogging kreves"
 setup.subtitle.copilot_missing: "Agenten din \"%{agent}\" er ikke installert. Følg trinnene nedenfor for å installere den. For å bytte agent, gå til Settings."
 setup.subtitle.agent_missing: "Agenten din \"%{agent}\" er ikke installert. Installer den på nytt manuelt, og prøv deretter igjen. For å bytte agent, gå til Settings."
 setup.subtitle.copilot_auth: "Agenten din \"%{agent}\" krever autentisering. Følg trinnene nedenfor for å logge inn. For å bytte agent, gå til Settings."
-setup.subtitle.agent_auth: "Agenten din \"%{agent}\" krever autentisering. Logg inn via agentens CLI, og prøv deretter igjen. For å bytte agent, gå til Settings."
+setup.subtitle.agent_auth: "Agenten din \"%{agent}\" krever autentisering. Logg inn via agenten, og prøv deretter igjen. For å bytte agent, gå til Settings."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Velg standard agent-CLI du vil bruke i Intelligent Terminal. Du kan"
+setup.description.fre_line1: "Velg standardagenten du vil bruke i Intelligent Terminal. Du kan"
 setup.description.fre_line2: "gå til Settings for å konfigurere og sette opp arbeidsområdet ditt."
 
 setup.option.reinstall: "Installer %{agent} på nytt"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Lukk denne hjelpen"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ for å navigere • Enter for å velge • Esc for å avbryte)"
+recommendations.nav_hint: "(↑ ↓ for å navigere • ← → for å bytte knapper • Enter for å velge • Esc for å avbryte)"
 recommendations.button_run_command: "[ Kjør kommando ]"
 recommendations.button_insert_in_terminal: "Sett inn i Terminal"
 recommendations.button_open_in_new_tab: "Åpne i ny fane ↵"
@@ -158,3 +158,29 @@ hooks.installed_but_disabled: "⚠ installed but disabled"
 hooks.not_installed: "✗ not installed"
 hooks.uninstall_skipped: "skipped (CLI not on PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting (src/ui/agents_view.rs) ───────────────
+time.just_now: "akkurat nå"
+time.minutes_ago:
+  one: "%{count} minutt siden"
+  other: "%{count} minutter siden"
+time.hours_ago:
+  one: "%{count} time siden"
+  other: "%{count} timer siden"
+time.days_ago:
+  one: "%{count} dag siden"
+  other: "%{count} dager siden"
+time.date_format: "%{day}. %{month} %{year}"
+time.month:
+  "1": "januar"
+  "2": "februar"
+  "3": "mars"
+  "4": "april"
+  "5": "mai"
+  "6": "juni"
+  "7": "juli"
+  "8": "august"
+  "9": "september"
+  "10": "oktober"
+  "11": "november"
+  "12": "desember"

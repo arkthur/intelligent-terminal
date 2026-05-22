@@ -839,36 +839,36 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
     {
         if (_installingAgentHooks || IsAgentSessionHooksPolicyLocked()) return;
         _installingAgentHooks = true;
-        _agentHooksInstallSummary = winrt::hstring{ L"Installing hooks..." };
+        _agentHooksInstallSummary = RS_(L"AIAgents_HooksInstallingSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
-        _RunHooksWtaAsync(L"hooks install", L"Installing hooks...");
+        _RunHooksWtaAsync(L"hooks install", std::wstring{ RS_(L"AIAgents_HooksInstallingSummary") });
     }
 
     void AIAgentsViewModel::RemoveCopilotHooks()
     {
         if (_installingAgentHooks) return;
         _installingAgentHooks = true;
-        _agentHooksInstallSummary = winrt::hstring{ L"Removing Copilot hooks..." };
+        _agentHooksInstallSummary = RS_(L"AIAgents_HooksRemovingCopilotSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
-        _RunHooksWtaAsync(L"hooks uninstall --cli copilot", L"Removing Copilot hooks...");
+        _RunHooksWtaAsync(L"hooks uninstall --cli copilot", std::wstring{ RS_(L"AIAgents_HooksRemovingCopilotSummary") });
     }
 
     void AIAgentsViewModel::RemoveClaudeHooks()
     {
         if (_installingAgentHooks) return;
         _installingAgentHooks = true;
-        _agentHooksInstallSummary = winrt::hstring{ L"Removing Claude hooks..." };
+        _agentHooksInstallSummary = RS_(L"AIAgents_HooksRemovingClaudeSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
-        _RunHooksWtaAsync(L"hooks uninstall --cli claude", L"Removing Claude hooks...");
+        _RunHooksWtaAsync(L"hooks uninstall --cli claude", std::wstring{ RS_(L"AIAgents_HooksRemovingClaudeSummary") });
     }
 
     void AIAgentsViewModel::RemoveGeminiHooks()
     {
         if (_installingAgentHooks) return;
         _installingAgentHooks = true;
-        _agentHooksInstallSummary = winrt::hstring{ L"Removing Gemini hooks..." };
+        _agentHooksInstallSummary = RS_(L"AIAgents_HooksRemovingGeminiSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
-        _RunHooksWtaAsync(L"hooks uninstall --cli gemini", L"Removing Gemini hooks...");
+        _RunHooksWtaAsync(L"hooks uninstall --cli gemini", std::wstring{ RS_(L"AIAgents_HooksRemovingGeminiSummary") });
     }
 
     winrt::fire_and_forget AIAgentsViewModel::_RunHooksWtaAsync(std::wstring wtaArgs, std::wstring /*inProgressMessage*/)
@@ -882,6 +882,11 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // `hooks install...` or `hooks uninstall...` and we surface a
         // matching success/failure line in the expander.
         const bool isUninstall = wtaArgs.find(L"uninstall") != std::wstring::npos;
+        const std::wstring locateWtaFailedSummary{ RS_(L"AIAgents_HooksLocateWtaFailedSummary") };
+        const std::wstring hooksRemovedSummary{ RS_(L"AIAgents_HooksRemovedSummary") };
+        const std::wstring hooksInstalledSummary{ RS_(L"AIAgents_HooksInstalledSummary") };
+        const std::wstring hooksRemovalFailedSummary{ RS_(L"AIAgents_HooksRemovalFailedSummary") };
+        const std::wstring hooksInstallationFailedSummary{ RS_(L"AIAgents_HooksInstallationFailedSummary") };
         std::wstring summary;
         bool ok = false;
 
@@ -890,22 +895,18 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         const auto wtaPath = ::Microsoft::Terminal::WtaProcess::ResolveWtaExePath();
         if (wtaPath.empty())
         {
-            summary = L"Failed: could not locate wta.exe";
+            summary = locateWtaFailedSummary;
         }
         else
         {
             ok = ::Microsoft::Terminal::WtaProcess::RunWtaAndWait(wtaPath, wtaArgs, 60'000);
             if (ok)
             {
-                summary = isUninstall
-                              ? L"Hooks removed. Restart any open agent CLIs to drop the previous hooks."
-                              : L"Hooks installed. Restart any open agent CLIs to pick up the new hooks.";
+                summary = isUninstall ? hooksRemovedSummary : hooksInstalledSummary;
             }
             else
             {
-                summary = isUninstall
-                              ? L"Hook removal failed. Check %LOCALAPPDATA%\\IntelligentTerminal\\logs\\ for details."
-                              : L"Hooks installation failed. Check %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log for details.";
+                summary = isUninstall ? hooksRemovalFailedSummary : hooksInstallationFailedSummary;
             }
         }
 

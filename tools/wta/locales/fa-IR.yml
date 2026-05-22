@@ -11,10 +11,10 @@ setup.title.sign_in: "ورود به سیستم لازم است"
 setup.subtitle.copilot_missing: "عامل هوش مصنوعی \"%{agent}\" نصب نشده است. مراحل زیر را برای نصب آن دنبال کنید. برای تغییر عامل‌های هوش مصنوعی، به Settings بروید."
 setup.subtitle.agent_missing: "عامل هوش مصنوعی \"%{agent}\" نصب نشده است. لطفاً آن را به صورت دستی دوباره نصب کنید، سپس دوباره تلاش کنید. برای تغییر عامل‌های هوش مصنوعی، به Settings بروید."
 setup.subtitle.copilot_auth: "عامل هوش مصنوعی \"%{agent}\" نیاز به احراز هویت دارد. مراحل زیر را برای ورود دنبال کنید. برای تغییر عامل‌های هوش مصنوعی، به Settings بروید."
-setup.subtitle.agent_auth: "عامل هوش مصنوعی \"%{agent}\" نیاز به احراز هویت دارد. لطفاً از طریق CLI عامل هوش مصنوعی وارد شوید، سپس دوباره تلاش کنید. برای تغییر عامل‌های هوش مصنوعی، به Settings بروید."
+setup.subtitle.agent_auth: "عامل هوش مصنوعی \"%{agent}\" نیاز به احراز هویت دارد. لطفاً از طریق عامل هوش مصنوعی وارد شوید، سپس دوباره تلاش کنید. برای تغییر عامل‌های هوش مصنوعی، به Settings بروید."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "CLI عامل هوش مصنوعی پیش‌فرضی را که می‌خواهید در Intelligent Terminal استفاده کنید انتخاب نمایید. می‌توانید"
+setup.description.fre_line1: "عامل هوش مصنوعی پیش‌فرضی را که می‌خواهید در Intelligent Terminal استفاده کنید انتخاب نمایید. می‌توانید"
 setup.description.fre_line2: "به Settings بروید تا فضای کاری خود را پیکربندی و راه‌اندازی کنید."
 
 setup.option.reinstall: "نصب مجدد %{agent}"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        بستن این راهنما"  # {Locked
 
 # ── پنل پیشنهادات (src/ui/recommendations.rs) ───────────────────────────────
 # {Locked="Enter","Esc","↵"} - نام کلیدها و نماد کلید بازگشت، ترجمه نکنید
-recommendations.nav_hint: "(↑ ↓ ناوبری • Enter انتخاب • Esc لغو)"
+recommendations.nav_hint: "(↑ ↓ برای پیمایش • ← → برای جابه‌جایی بین دکمه‌ها • Enter برای انتخاب • Esc برای لغو)"
 recommendations.button_run_command: "[ اجرای دستور ]"
 recommendations.button_insert_in_terminal: "درج در ترمینال"
 recommendations.button_open_in_new_tab: "باز کردن در زبانه جدید ↵"
@@ -158,3 +158,28 @@ hooks.installed_but_disabled: "⚠ نصب شده اما غیرفعال"
 hooks.not_installed: "✗ نصب نشده"
 hooks.uninstall_skipped: "رد شد (CLI در PATH نیست)"
 hooks.install_attempted: "تلاش نصب wt-agent-hooks انجام شد (بی‌توان). برای بررسی نتیجه `wta hooks status` را اجرا کنید. گزارش ردیابی: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time and date formatting ───────────────────────────────────────
+time.just_now: "همین حالا"
+time.minutes_ago:
+  one: "%{count} دقیقه پیش"
+  other: "%{count} دقیقه پیش"
+time.hours_ago:
+  one: "%{count} ساعت پیش"
+  other: "%{count} ساعت پیش"
+time.days_ago:
+  one: "%{count} روز پیش"
+  other: "%{count} روز پیش"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "ژانویه"
+  "2": "فوریه"
+  "3": "مارس"
+  "4": "آوریل"
+  "5": "مه"
+  "6": "ژوئن"
+  "7": "ژوئیه"
+  "8": "اوت"
+  "9": "سپتامبر"
+  "10": "اکتبر"
+  "11": "نوامبر"
+  "12": "دسامبر"

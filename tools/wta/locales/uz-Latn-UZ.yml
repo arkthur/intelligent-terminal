@@ -11,10 +11,10 @@ setup.title.sign_in: "Tizimga kirish talab qilinadi"
 setup.subtitle.copilot_missing: "Agentingiz \"%{agent}\" oʻrnatilmagan. Oʻrnatish uchun quyidagi qadamlarni bajaring. Agentni almashtirish uchun Settings boʻlimiga oʻting."
 setup.subtitle.agent_missing: "Agentingiz \"%{agent}\" oʻrnatilmagan. Iltimos, qoʻlda qayta oʻrnating, keyin qayta urinib koʻring. Agentni almashtirish uchun Settings boʻlimiga oʻting."
 setup.subtitle.copilot_auth: "Agentingiz \"%{agent}\" autentifikatsiyani talab qiladi. Tizimga kirish uchun quyidagi qadamlarni bajaring. Agentni almashtirish uchun Settings boʻlimiga oʻting."
-setup.subtitle.agent_auth: "Agentingiz \"%{agent}\" autentifikatsiyani talab qiladi. Iltimos, agent CLI orqali tizimga kiring, keyin qayta urinib koʻring. Agentni almashtirish uchun Settings boʻlimiga oʻting."
+setup.subtitle.agent_auth: "Agentingiz \"%{agent}\" autentifikatsiyani talab qiladi. Iltimos, agent orqali tizimga kiring, keyin qayta urinib koʻring. Agentni almashtirish uchun Settings boʻlimiga oʻting."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Intelligent Terminal-da foydalanmoqchi boʻlgan standart agent CLI tanlang. Ish"
+setup.description.fre_line1: "Intelligent Terminal-da foydalanmoqchi boʻlgan standart agentni tanlang. Ish"
 setup.description.fre_line2: "muhitingizni sozlash va oʻrnatish uchun Settings boʻlimiga oʻtishingiz mumkin."
 
 setup.option.reinstall: "%{agent} qayta oʻrnatish"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Bu yordamni yopish"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ navigatsiya uchun • Enter tanlash uchun • Esc bekor qilish uchun)"
+recommendations.nav_hint: "(↑ ↓ navigatsiya uchun • ← → tugmalarni almashtirish uchun • Enter tanlash uchun • Esc bekor qilish uchun)"
 recommendations.button_run_command: "[ Buyruqni bajarish ]"
 recommendations.button_insert_in_terminal: "Terminal-ga kiritish"
 recommendations.button_open_in_new_tab: "Yangi varaqda ochish ↵"
@@ -158,3 +158,25 @@ hooks.installed_but_disabled: "⚠ oʻrnatilgan lekin oʻchirilgan"
 hooks.not_installed: "✗ oʻrnatilmagan"
 hooks.uninstall_skipped: "oʻtkazib yuborildi (CLI PATH-da emas)"
 hooks.install_attempted: "wt-agent-hooks oʻrnatish urinildi (idempotent). Natijani tekshirish uchun `wta hooks status` bajaring. Iz jurnali: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time and date formatting ───────────────────────────────────────
+time.just_now: "hozirgina"
+time.minutes_ago:
+  other: "%{count} daqiqa oldin"
+time.hours_ago:
+  other: "%{count} soat oldin"
+time.days_ago:
+  other: "%{count} kun oldin"
+time.date_format: "%{year}-yil %{day}-%{month}"
+time.month:
+  "1": "yanvar"
+  "2": "fevral"
+  "3": "mart"
+  "4": "aprel"
+  "5": "may"
+  "6": "iyun"
+  "7": "iyul"
+  "8": "avgust"
+  "9": "sentabr"
+  "10": "oktabr"
+  "11": "noyabr"
+  "12": "dekabr"

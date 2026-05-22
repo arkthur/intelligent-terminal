@@ -11,10 +11,10 @@ setup.title.sign_in: "Reikia prisijungti"
 setup.subtitle.copilot_missing: "Jūsų agentas \"%{agent}\" neįdiegtas. Norėdami jį įdiegti, atlikite toliau nurodytus veiksmus. Norėdami pakeisti agentą, eikite į Settings."
 setup.subtitle.agent_missing: "Jūsų agentas \"%{agent}\" neįdiegtas. Įdiekite jį iš naujo rankiniu būdu, tada bandykite dar kartą. Norėdami pakeisti agentą, eikite į Settings."
 setup.subtitle.copilot_auth: "Jūsų agentas \"%{agent}\" reikalauja autentifikavimo. Norėdami prisijungti, atlikite toliau nurodytus veiksmus. Norėdami pakeisti agentą, eikite į Settings."
-setup.subtitle.agent_auth: "Jūsų agentas \"%{agent}\" reikalauja autentifikavimo. Prisijunkite per agento CLI, tada bandykite dar kartą. Norėdami pakeisti agentą, eikite į Settings."
+setup.subtitle.agent_auth: "Jūsų agentas \"%{agent}\" reikalauja autentifikavimo. Prisijunkite per agentą, tada bandykite dar kartą. Norėdami pakeisti agentą, eikite į Settings."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Pasirinkite numatytąjį agento CLI, kurį norite naudoti Intelligent Terminal. Galite"
+setup.description.fre_line1: "Pasirinkite numatytąjį agentą, kurį norite naudoti Intelligent Terminal. Galite"
 setup.description.fre_line2: "eiti į Settings, kad sukonfigūruotumėte ir nustatytumėte savo darbo sritį."
 
 setup.option.reinstall: "Iš naujo įdiegti %{agent}"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Uždaryti šią pagalbą"  # {Locked="Es
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ naršyti • Enter pasirinkti • Esc atšaukti)"
+recommendations.nav_hint: "(↑ ↓ naršyti • ← → mygtukams perjungti • Enter pasirinkti • Esc atšaukti)"
 recommendations.button_run_command: "[ Vykdyti komandą ]"
 recommendations.button_insert_in_terminal: "Įterpti į Terminal"
 recommendations.button_open_in_new_tab: "Atidaryti naujame skirtuke ↵"
@@ -158,3 +158,32 @@ hooks.installed_but_disabled: "⚠ installed but disabled"
 hooks.not_installed: "✗ not installed"
 hooks.uninstall_skipped: "skipped (CLI not on PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting (src/ui/agents_view.rs) ───────────────
+time.just_now: "ką tik"
+time.minutes_ago:
+  one: "prieš %{count} minutę"
+  few: "prieš %{count} minutes"
+  other: "prieš %{count} minučių"
+time.hours_ago:
+  one: "prieš %{count} valandą"
+  few: "prieš %{count} valandas"
+  other: "prieš %{count} valandų"
+time.days_ago:
+  one: "prieš %{count} dieną"
+  few: "prieš %{count} dienas"
+  other: "prieš %{count} dienų"
+time.date_format: "%{day} %{month} %{year} m."
+time.month:
+  "1": "sausio"
+  "2": "vasario"
+  "3": "kovo"
+  "4": "balandžio"
+  "5": "gegužės"
+  "6": "birželio"
+  "7": "liepos"
+  "8": "rugpjūčio"
+  "9": "rugsėjo"
+  "10": "spalio"
+  "11": "lapkričio"
+  "12": "gruodžio"

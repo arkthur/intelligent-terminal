@@ -11,10 +11,10 @@ setup.title.sign_in: "Mae angen mewngofnodi"
 setup.subtitle.copilot_missing: "Nid yw eich asiant \"%{agent}\" wedi'i osod. Dilynwch y camau isod i'w osod. I newid asiantau, ewch i Settings."
 setup.subtitle.agent_missing: "Nid yw eich asiant \"%{agent}\" wedi'i osod. Ailosodwch ef â llaw, yna ceisiwch eto. I newid asiantau, ewch i Settings."
 setup.subtitle.copilot_auth: "Mae eich asiant \"%{agent}\" angen dilysu. Dilynwch y camau isod i fewngofnodi. I newid asiantau, ewch i Settings."
-setup.subtitle.agent_auth: "Mae eich asiant \"%{agent}\" angen dilysu. Mewngofnodwch drwy'r CLI asiant, yna ceisiwch eto. I newid asiantau, ewch i Settings."
+setup.subtitle.agent_auth: "Mae eich asiant \"%{agent}\" angen dilysu. Mewngofnodwch drwy'r asiant, yna ceisiwch eto. I newid asiantau, ewch i Settings."
 
 # {Locked="Intelligent Terminal"}, {Locked="Settings"}
-setup.description.fre_line1: "Dewiswch y CLI asiant rhagosodedig yr hoffech ei ddefnyddio yn Intelligent Terminal. Gallwch"
+setup.description.fre_line1: "Dewiswch yr asiant rhagosodedig yr hoffech ei ddefnyddio yn Intelligent Terminal. Gallwch"
 setup.description.fre_line2: "lywio i Settings i ffurfweddu a gosod eich gweithle."
 
 setup.option.reinstall: "Ailosod %{agent}"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Cau'r cymorth hwn"  # {Locked="Esc"}
 
 # ── Panel argymhellion (src/ui/recommendations.rs) ───────────────────────────────
 # {Locked="Enter","Esc","↵"} - enwau bysellau a glyff bysell Dychwelyd, peidiwch â chyfieithu
-recommendations.nav_hint: "(↑ ↓ i lywio • Enter i ddewis • Esc i ganslo)"
+recommendations.nav_hint: "(↑ ↓ i lywio • ← → i newid botymau • Enter i ddewis • Esc i ganslo)"
 recommendations.button_run_command: "[ Rhedeg gorchymyn ]"
 recommendations.button_insert_in_terminal: "Mewnosod yn y Terfynell"
 recommendations.button_open_in_new_tab: "Agor mewn Tab Newydd ↵"
@@ -158,3 +158,40 @@ hooks.installed_but_disabled: "⚠ wedi'i osod ond wedi'i analluogi"
 hooks.not_installed: "✗ heb ei osod"
 hooks.uninstall_skipped: "wedi'i hepgor (CLI ddim ar PATH)"
 hooks.install_attempted: "Ceisiwyd gosod wt-agent-hooks (idempotent). Rhedwch `wta hooks status` i archwilio'r canlyniad. Log olrhain: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+time.just_now: "newydd ddigwydd"
+time.minutes_ago:
+  zero: "%{count} munud yn ôl"
+  one: "%{count} munud yn ôl"
+  two: "%{count} funud yn ôl"
+  few: "%{count} munud yn ôl"
+  many: "%{count} munud yn ôl"
+  other: "%{count} munud yn ôl"
+time.hours_ago:
+  zero: "%{count} awr yn ôl"
+  one: "%{count} awr yn ôl"
+  two: "%{count} awr yn ôl"
+  few: "%{count} awr yn ôl"
+  many: "%{count} awr yn ôl"
+  other: "%{count} awr yn ôl"
+time.days_ago:
+  zero: "%{count} diwrnod yn ôl"
+  one: "%{count} diwrnod yn ôl"
+  two: "%{count} ddiwrnod yn ôl"
+  few: "%{count} diwrnod yn ôl"
+  many: "%{count} diwrnod yn ôl"
+  other: "%{count} diwrnod yn ôl"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "Ionawr"
+  "2": "Chwefror"
+  "3": "Mawrth"
+  "4": "Ebrill"
+  "5": "Mai"
+  "6": "Mehefin"
+  "7": "Gorffennaf"
+  "8": "Awst"
+  "9": "Medi"
+  "10": "Hydref"
+  "11": "Tachwedd"
+  "12": "Rhagfyr"

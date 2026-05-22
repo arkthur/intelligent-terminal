@@ -11,10 +11,10 @@ setup.title.sign_in: "تسجيل الدخول مطلوب"
 setup.subtitle.copilot_missing: "عامل الذكاء الاصطناعي \"%{agent}\" غير مثبّت. اتبع الخطوات أدناه لتثبيته. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Settings."
 setup.subtitle.agent_missing: "عامل الذكاء الاصطناعي \"%{agent}\" غير مثبّت. يُرجى إعادة تثبيته يدويًا، ثم أعد المحاولة. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Settings."
 setup.subtitle.copilot_auth: "يتطلب عامل الذكاء الاصطناعي \"%{agent}\" المصادقة. اتبع الخطوات أدناه لتسجيل الدخول. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Settings."
-setup.subtitle.agent_auth: "يتطلب عامل الذكاء الاصطناعي \"%{agent}\" المصادقة. يُرجى تسجيل الدخول عبر CLI الخاص بعامل الذكاء الاصطناعي، ثم أعد المحاولة. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Settings."
+setup.subtitle.agent_auth: "يتطلب عامل الذكاء الاصطناعي \"%{agent}\" المصادقة. يُرجى تسجيل الدخول عبر عامل الذكاء الاصطناعي، ثم أعد المحاولة. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Settings."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "اختر CLI عامل الذكاء الاصطناعي الافتراضي الذي تريد استخدامه في Intelligent Terminal. يمكنك"
+setup.description.fre_line1: "اختر عامل الذكاء الاصطناعي الافتراضي الذي تريد استخدامه في Intelligent Terminal. يمكنك"
 setup.description.fre_line2: "الانتقال إلى Settings لتكوين مساحة العمل وإعدادها."
 
 setup.option.reinstall: "إعادة تثبيت %{agent}"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        إغلاق هذه المساعدة"  # {
 
 # ── لوحة التوصيات (src/ui/recommendations.rs) ───────────────────────────────
 # {Locked="Enter","Esc","↵"} - أسماء المفاتيح ورمز مفتاح الإدخال، لا تترجمها
-recommendations.nav_hint: "(↑ ↓ للتنقل • Enter للتحديد • Esc للإلغاء)"
+recommendations.nav_hint: "(↑ ↓ للتنقل • ← → للتبديل بين الأزرار • Enter للتحديد • Esc للإلغاء)"
 recommendations.button_run_command: "[ تشغيل الأمر ]"
 recommendations.button_insert_in_terminal: "إدراج في الطرفية"
 recommendations.button_open_in_new_tab: "فتح في علامة تبويب جديدة ↵"
@@ -158,3 +158,40 @@ hooks.installed_but_disabled: "⚠ مثبّت ولكن معطّل"
 hooks.not_installed: "✗ غير مثبّت"
 hooks.uninstall_skipped: "تم التخطي (CLI ليس في PATH)"
 hooks.install_attempted: "تمت محاولة تثبيت wt-agent-hooks (متساوي القوة). شغّل `wta hooks status` لفحص النتيجة. سجل التتبع: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time and date formatting ───────────────────────────────────────
+time.just_now: "الآن"
+time.minutes_ago:
+  zero: "منذ %{count} دقيقة"
+  one: "منذ دقيقة واحدة"
+  two: "منذ دقيقتين"
+  few: "منذ %{count} دقائق"
+  many: "منذ %{count} دقيقة"
+  other: "منذ %{count} دقيقة"
+time.hours_ago:
+  zero: "منذ %{count} ساعة"
+  one: "منذ ساعة واحدة"
+  two: "منذ ساعتين"
+  few: "منذ %{count} ساعات"
+  many: "منذ %{count} ساعة"
+  other: "منذ %{count} ساعة"
+time.days_ago:
+  zero: "منذ %{count} يوم"
+  one: "منذ يوم واحد"
+  two: "منذ يومين"
+  few: "منذ %{count} أيام"
+  many: "منذ %{count} يومًا"
+  other: "منذ %{count} يوم"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "يناير"
+  "2": "فبراير"
+  "3": "مارس"
+  "4": "أبريل"
+  "5": "مايو"
+  "6": "يونيو"
+  "7": "يوليو"
+  "8": "أغسطس"
+  "9": "سبتمبر"
+  "10": "أكتوبر"
+  "11": "نوفمبر"
+  "12": "ديسمبر"

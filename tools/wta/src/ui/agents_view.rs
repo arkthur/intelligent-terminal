@@ -326,39 +326,47 @@ fn cli_suffix_for(s: &AgentSession, selected: bool) -> String {
 ///   < 24h   → "N hour(s) ago"
 ///   < 7d    → "N day(s) ago"
 ///   ≥ 7d    → "Month D, YYYY"   (UTC — close enough for week-old rows)
+///
+/// All strings come from rust-i18n with locale-aware plural forms.
 fn relative_age(t: SystemTime) -> String {
     let now = SystemTime::now();
     let secs = now.duration_since(t).map(|d| d.as_secs()).unwrap_or(0);
     if secs < 60 {
-        "just now".to_string()
+        rust_i18n::t!("time.just_now").into_owned()
     } else if secs < 3600 {
         let n = secs / 60;
-        format!("{} minute{} ago", n, plural(n))
+        rust_i18n::t!("time.minutes_ago", count = n).into_owned()
     } else if secs < 86_400 {
         let n = secs / 3600;
-        format!("{} hour{} ago", n, plural(n))
+        rust_i18n::t!("time.hours_ago", count = n).into_owned()
     } else if secs < 7 * 86_400 {
         let n = secs / 86_400;
-        format!("{} day{} ago", n, plural(n))
+        rust_i18n::t!("time.days_ago", count = n).into_owned()
     } else {
         format_calendar_date(t)
     }
 }
 
-fn plural(n: u64) -> &'static str {
-    if n == 1 { "" } else { "s" }
-}
-
-/// Format a SystemTime as "Month D, YYYY" in UTC. No chrono dep in wta —
-/// uses Howard Hinnant's date algorithm (public domain) for the Gregorian
-/// conversion. Returns "—" for pre-epoch / unreadable timestamps.
+/// Format a SystemTime as a locale-aware calendar date in UTC. No chrono dep
+/// in wta — uses Howard Hinnant's date algorithm (public domain) for the
+/// Gregorian conversion, then renders via rust-i18n keys so the locale can
+/// reorder day/month/year (e.g. zh-CN: 年/月/日) and localize month names.
+/// Returns "—" for pre-epoch / unreadable timestamps.
 fn format_calendar_date(t: SystemTime) -> String {
     let secs = match t.duration_since(UNIX_EPOCH) {
         Ok(d)  => d.as_secs() as i64,
         Err(_) => return "—".to_string(),
     };
     let (y, m, d) = civil_from_days(secs.div_euclid(86_400));
-    format!("{} {}, {}", month_name(m), d, y)
+    let month_key = format!("time.month.{}", m);
+    let month_name = rust_i18n::t!(&month_key).into_owned();
+    rust_i18n::t!(
+        "time.date_format",
+        month = month_name,
+        day = d.to_string(),
+        year = y.to_string()
+    )
+    .into_owned()
 }
 
 /// Civil date from days since the Unix epoch (1970-01-01).
@@ -375,15 +383,6 @@ fn civil_from_days(days: i64) -> (i32, u8, u8) {
     let m   = if mp < 10 { mp + 3 } else { mp - 9 } as u8;
     let year = (y + if m <= 2 { 1 } else { 0 }) as i32;
     (year, m, d)
-}
-
-fn month_name(m: u8) -> &'static str {
-    match m {
-        1 => "January", 2 => "February", 3 => "March", 4 => "April",
-        5 => "May", 6 => "June", 7 => "July", 8 => "August",
-        9 => "September", 10 => "October", 11 => "November", 12 => "December",
-        _ => "?",
-    }
 }
 
 fn trunc(s: &str, n: usize) -> String {

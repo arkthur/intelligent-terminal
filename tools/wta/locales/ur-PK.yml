@@ -11,10 +11,10 @@ setup.title.sign_in: "سائن ان ضروری ہے"
 setup.subtitle.copilot_missing: "آپ کا ایجنٹ \"%{agent}\" انسٹال نہیں ہے۔ اسے انسٹال کرنے کے لیے نیچے دیے گئے اقدامات پر عمل کریں۔ ایجنٹ تبدیل کرنے کے لیے Settings پر جائیں۔"
 setup.subtitle.agent_missing: "آپ کا ایجنٹ \"%{agent}\" انسٹال نہیں ہے۔ براہ کرم اسے دستی طور پر دوبارہ انسٹال کریں، پھر دوبارہ کوشش کریں۔ ایجنٹ تبدیل کرنے کے لیے Settings پر جائیں۔"
 setup.subtitle.copilot_auth: "آپ کے ایجنٹ \"%{agent}\" کو تصدیق کی ضرورت ہے۔ سائن ان کرنے کے لیے نیچے دیے گئے اقدامات پر عمل کریں۔ ایجنٹ تبدیل کرنے کے لیے Settings پر جائیں۔"
-setup.subtitle.agent_auth: "آپ کے ایجنٹ \"%{agent}\" کو تصدیق کی ضرورت ہے۔ براہ کرم ایجنٹ CLI کے ذریعے سائن ان کریں، پھر دوبارہ کوشش کریں۔ ایجنٹ تبدیل کرنے کے لیے Settings پر جائیں۔"
+setup.subtitle.agent_auth: "آپ کے ایجنٹ \"%{agent}\" کو تصدیق کی ضرورت ہے۔ براہ کرم ایجنٹ کے ذریعے سائن ان کریں، پھر دوبارہ کوشش کریں۔ ایجنٹ تبدیل کرنے کے لیے Settings پر جائیں۔"
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Intelligent Terminal میں استعمال کرنے کے لیے ڈیفالٹ ایجنٹ CLI منتخب کریں۔ آپ"
+setup.description.fre_line1: "Intelligent Terminal میں استعمال کرنے کے لیے ڈیفالٹ ایجنٹ منتخب کریں۔ آپ"
 setup.description.fre_line2: "اپنی ورک اسپیس کو ترتیب دینے اور سیٹ اپ کرنے کے لیے Settings پر جا سکتے ہیں۔"
 
 setup.option.reinstall: "%{agent} دوبارہ انسٹال کریں"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        یہ مدد بند کریں"  # {Locked=
 
 # ── سفارشات پینل (src/ui/recommendations.rs) ───────────────────────────────
 # {Locked="Enter","Esc","↵"} - کلید کے نام اور Return-کلید گلف، ترجمہ نہ کریں
-recommendations.nav_hint: "(↑ ↓ نیویگیشن • Enter منتخب کریں • Esc منسوخ کریں)"
+recommendations.nav_hint: "(↑ ↓ نیویگیٹ کرنے کے لیے • ← → بٹن تبدیل کرنے کے لیے • Enter منتخب کرنے کے لیے • Esc منسوخ کرنے کے لیے)"
 recommendations.button_run_command: "[ کمانڈ چلائیں ]"
 recommendations.button_insert_in_terminal: "ٹرمینل میں داخل کریں"
 recommendations.button_open_in_new_tab: "نئی ٹیب میں کھولیں ↵"
@@ -158,3 +158,29 @@ hooks.installed_but_disabled: "⚠ انسٹال ہے لیکن غیر فعال ہ
 hooks.not_installed: "✗ انسٹال نہیں ہے"
 hooks.uninstall_skipped: "چھوڑ دیا گیا (CLI PATH میں نہیں ہے)"
 hooks.install_attempted: "wt-agent-hooks انسٹال کی کوشش کی گئی (آئیڈمپوٹنٹ)۔ نتیجہ جانچنے کے لیے `wta hooks status` چلائیں۔ ٹریس لاگ: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting ─────────────────────────────────────
+time.just_now: "ابھی"
+time.minutes_ago:
+  one: "%{count} منٹ پہلے"
+  other: "%{count} منٹ پہلے"
+time.hours_ago:
+  one: "%{count} گھنٹہ پہلے"
+  other: "%{count} گھنٹے پہلے"
+time.days_ago:
+  one: "%{count} دن پہلے"
+  other: "%{count} دن پہلے"
+time.date_format: "%{day} %{month}، %{year}"
+time.month:
+  "1": "جنوری"
+  "2": "فروری"
+  "3": "مارچ"
+  "4": "اپریل"
+  "5": "مئی"
+  "6": "جون"
+  "7": "جولائی"
+  "8": "اگست"
+  "9": "ستمبر"
+  "10": "اکتوبر"
+  "11": "نومبر"
+  "12": "دسمبر"

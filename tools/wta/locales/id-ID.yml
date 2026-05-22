@@ -158,3 +158,26 @@ hooks.installed_but_disabled: "⚠ terinstal tetapi dinonaktifkan"
 hooks.not_installed: "✗ belum terinstal"
 hooks.uninstall_skipped: "dilewati (CLI tidak ada di PATH)"
 hooks.install_attempted: "Instalasi wt-agent-hooks dicoba (idempotent). Jalankan `wta hooks status` untuk memeriksa hasil. Log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting ─────────────────────────────────────
+time.just_now: "baru saja"
+time.minutes_ago:
+  other: "%{count} menit yang lalu"
+time.hours_ago:
+  other: "%{count} jam yang lalu"
+time.days_ago:
+  other: "%{count} hari yang lalu"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "Januari"
+  "2": "Februari"
+  "3": "Maret"
+  "4": "April"
+  "5": "Mei"
+  "6": "Juni"
+  "7": "Juli"
+  "8": "Agustus"
+  "9": "September"
+  "10": "Oktober"
+  "11": "November"
+  "12": "Desember"

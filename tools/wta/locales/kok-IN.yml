@@ -11,10 +11,10 @@ setup.title.sign_in: "साइन इन आवश्यक"
 setup.subtitle.copilot_missing: "तुमचो एजेंट \"%{agent}\" इन्स्टॉल जावंक ना. ताका इन्स्टॉल करपाक सकयल दिल्ल्या पावलांक अनुसरण करात. एजेंट बदलपाक Settings कडेन वचात."
 setup.subtitle.agent_missing: "तुमचो एजेंट \"%{agent}\" इन्स्टॉल जावंक ना. उपकार करून ताका हातान परतून इन्स्टॉल करात, मागीर परतून यत्न करात. एजेंट बदलपाक Settings कडेन वचात."
 setup.subtitle.copilot_auth: "तुमच्या एजेंट \"%{agent}\" क प्रमाणीकरण जाय. साइन इन करपाक सकयल दिल्ल्या पावलांक अनुसरण करात. एजेंट बदलपाक Settings कडेन वचात."
-setup.subtitle.agent_auth: "तुमच्या एजेंट \"%{agent}\" क प्रमाणीकरण जाय. उपकार करून एजेंट CLI वरवीं साइन इन करात, मागीर परतून यत्न करात. एजेंट बदलपाक Settings कडेन वचात."
+setup.subtitle.agent_auth: "तुमच्या एजंट \"%{agent}\" खातीर प्रमाणीकरण जाय. उपकार करून एजंट वरवीं सायन इन करात, मागीर परत यत्न करात. एजंट बदलपाक Settings कडेन वचात."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Intelligent Terminal ंत वापरपाक डिफॉल्ट एजेंट CLI वेंचात. तुमी"
+setup.description.fre_line1: "Intelligent Terminal भितर वापरपाक जाय आशिल्लो डीफॉल्ट एजंट निवडात. तुमी"
 setup.description.fre_line2: "तुमचें वर्कस्पेस कॉन्फिगर आनी सेटअप करपाक Settings कडेन वचूंक शकतात."
 
 setup.option.reinstall: "%{agent} परतून इन्स्टॉल करात"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        ही मजत बंद करात"
 
 # ── शिफारस पॅनेल (src/ui/recommendations.rs) ───────────────────────────────
 # {Locked="Enter","Esc","↵"} - की नांवां आनी Return-की ग्लिफ, अणकार करूं नाका
-recommendations.nav_hint: "(↑ ↓ नेव्हिगेट करात • Enter वेंचात • Esc रद्द करात)"
+recommendations.nav_hint: "(↑ ↓ नेव्हिगेट करपाक • ← → बटणां बदलपाक • Enter निवडपाक • Esc रद्द करपाक)"
 recommendations.button_run_command: "[ कमांड चलयात ]"
 recommendations.button_insert_in_terminal: "टर्मिनलांत घालात"
 recommendations.button_open_in_new_tab: "नव्या टॅबांत उगडात ↵"
@@ -158,3 +158,29 @@ hooks.installed_but_disabled: "⚠ इन्स्टॉल आसा पूण 
 hooks.not_installed: "✗ इन्स्टॉल ना"
 hooks.uninstall_skipped: "सोडलें (CLI PATH चेर ना)"
 hooks.install_attempted: "wt-agent-hooks इन्स्टॉल यत्न केलो (आइडेम्पोटेंट). निकाल तपासपाक `wta hooks status` चलयात. ट्रेस लॉग: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting ─────────────────────────────────────
+time.just_now: "आतांच"
+time.minutes_ago:
+  one: "%{count} मिनटा आदीं"
+  other: "%{count} मिनटां आदीं"
+time.hours_ago:
+  one: "%{count} तासा आदीं"
+  other: "%{count} तासां आदीं"
+time.days_ago:
+  one: "%{count} दिसा आदीं"
+  other: "%{count} दिसां आदीं"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "जानेवारी"
+  "2": "फेब्रुवारी"
+  "3": "मार्च"
+  "4": "एप्रिल"
+  "5": "मे"
+  "6": "जून"
+  "7": "जुलै"
+  "8": "ऑगस्ट"
+  "9": "सप्टेंबर"
+  "10": "ऑक्टोबर"
+  "11": "नोव्हेंबर"
+  "12": "डिसेंबर"

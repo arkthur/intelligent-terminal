@@ -11,10 +11,10 @@ setup.title.sign_in: "נדרשת כניסה"
 setup.subtitle.copilot_missing: "הסוכן \"%{agent}\" אינו מותקן. בצע את השלבים שלהלן כדי להתקין אותו. כדי להחליף סוכנים, עבור אל Settings."
 setup.subtitle.agent_missing: "הסוכן \"%{agent}\" אינו מותקן. התקן אותו מחדש באופן ידני ולאחר מכן נסה שוב. כדי להחליף סוכנים, עבור אל Settings."
 setup.subtitle.copilot_auth: "הסוכן \"%{agent}\" דורש אימות. בצע את השלבים שלהלן כדי להיכנס. כדי להחליף סוכנים, עבור אל Settings."
-setup.subtitle.agent_auth: "הסוכן \"%{agent}\" דורש אימות. היכנס דרך CLI של הסוכן ולאחר מכן נסה שוב. כדי להחליף סוכנים, עבור אל Settings."
+setup.subtitle.agent_auth: "הסוכן \"%{agent}\" דורש אימות. היכנס דרך הסוכן ולאחר מכן נסה שוב. כדי להחליף סוכנים, עבור אל Settings."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "בחר את CLI הסוכן שברצונך להשתמש בו כברירת מחדל ב-Intelligent Terminal. ניתן"
+setup.description.fre_line1: "בחר את הסוכן שברצונך להשתמש בו כברירת מחדל ב-Intelligent Terminal. ניתן"
 setup.description.fre_line2: "לנווט אל Settings כדי להגדיר את סביבת העבודה שלך."
 
 setup.option.reinstall: "התקן מחדש את %{agent}"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        סגור עזרה זו"  # {Locked="Esc"
 
 # ── לוח המלצות (src/ui/recommendations.rs) ───────────────────────────────
 # {Locked="Enter","Esc","↵"} - שמות מקשים וסמל מקש Enter, אין לתרגם
-recommendations.nav_hint: "(↑ ↓ לניווט • Enter לבחירה • Esc לביטול)"
+recommendations.nav_hint: "(↑ ↓ לניווט • ← → למעבר בין לחצנים • Enter לבחירה • Esc לביטול)"
 recommendations.button_run_command: "[ הפעל פקודה ]"
 recommendations.button_insert_in_terminal: "הכנס למסוף"
 recommendations.button_open_in_new_tab: "פתח בכרטיסייה חדשה ↵"
@@ -158,3 +158,34 @@ hooks.installed_but_disabled: "⚠ מותקן אך מושבת"
 hooks.not_installed: "✗ לא מותקן"
 hooks.uninstall_skipped: "דולג (CLI לא נמצא ב-PATH)"
 hooks.install_attempted: "בוצע ניסיון התקנת wt-agent-hooks (אידמפוטנטי). הפעל `wta hooks status` כדי לבדוק את התוצאה. יומן מעקב: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time and date formatting ───────────────────────────────────────
+time.just_now: "עכשיו"
+time.minutes_ago:
+  one: "לפני דקה אחת"
+  two: "לפני שתי דקות"
+  many: "לפני %{count} דקות"
+  other: "לפני %{count} דקות"
+time.hours_ago:
+  one: "לפני שעה אחת"
+  two: "לפני שעתיים"
+  many: "לפני %{count} שעות"
+  other: "לפני %{count} שעות"
+time.days_ago:
+  one: "לפני יום אחד"
+  two: "לפני יומיים"
+  many: "לפני %{count} ימים"
+  other: "לפני %{count} ימים"
+time.date_format: "%{day} ב%{month} %{year}"
+time.month:
+  "1": "ינואר"
+  "2": "פברואר"
+  "3": "מרץ"
+  "4": "אפריל"
+  "5": "מאי"
+  "6": "יוני"
+  "7": "יולי"
+  "8": "אוגוסט"
+  "9": "ספטמבר"
+  "10": "אוקטובר"
+  "11": "נובמבר"
+  "12": "דצמבר"

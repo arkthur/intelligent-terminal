@@ -112,12 +112,9 @@ namespace winrt::TerminalApp::implementation
         // initialize response.
         if (_isSessionsView)
         {
-            std::wstring text{ L"Agent sessions" };
-            if (!_agentName.empty())
-            {
-                text += L": ";
-                text += std::wstring{ _agentName };
-            }
+            const auto text = _agentName.empty() ?
+                                  std::wstring{ RS_(L"AgentPane_SessionsTitle") } :
+                                  RS_fmt(L"AgentPane_SessionsTitleFormat", std::wstring{ _agentName });
             AgentLabelText().Text(winrt::hstring{ text });
             return;
         }

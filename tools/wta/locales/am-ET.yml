@@ -11,10 +11,10 @@ setup.title.sign_in: "መግባት ያስፈልጋል"
 setup.subtitle.copilot_missing: "ኤጅንትዎ \"%{agent}\" አልተጠቀመም። ለመጠቀም ከታች ያሉትን ደረጃዎች ይተግበሩ። ኤጅንትን ለመቀየር Settings ይሂዱ።"
 setup.subtitle.agent_missing: "ኤጅንትዎ \"%{agent}\" አልተጠቀመም። እባክዎን በእጥ ይጠቅሙት እና እንደገና ይሞክሩ። ኤጅንትን ለመቀየር Settings ይሂዱ።"
 setup.subtitle.copilot_auth: "ኤጅንትዎ \"%{agent}\" ማረጋገጥ ያስፈልገወል። ለመግባት ከታች ያሉትን ደረጃዎች ይተግበሩ። ኤጅንትን ለመቀየር Settings ይሂዱ።"
-setup.subtitle.agent_auth: "ኤጅንትዎ \"%{agent}\" ማረጋገጥ ያስፈልገወል። እባክዎን በኤጅንት CLI በኩል ይግቡ እና እንደገና ይሞክሩ። ኤጅንትን ለመቀየር Settings ይሂዱ።"
+setup.subtitle.agent_auth: "ኤጅንትዎ \"%{agent}\" ማረጋገጥ ያስፈልገዋል። እባክዎን በኤጅንቱ በኩል ይግቡ እና እንደገና ይሞክሩ። ኤጅንትን ለመቀየር Settings ይሂዱ።"
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "በ Intelligent Terminal ውስጥ ላይጠቀሙት የሚፈልጉትን ነባሪ CLI ኤጅንት ይምረጡ። ወደ"
+setup.description.fre_line1: "በ Intelligent Terminal ውስጥ ሊጠቀሙት የሚፈልጉትን ነባሪ ኤጅንት ይምረጡ። ወደ"
 setup.description.fre_line2: "Settings ሂደው የስራ ቀጠርዎን ላያያዙ ይችላሉ።"
 
 setup.option.reinstall: "%{agent} እንደገና ጠቅም"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Close this help"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ to navigate • Enter to select • Esc to cancel)"
+recommendations.nav_hint: "(↑ ↓ ለማሰስ • ← → አዝራሮችን ለመቀየር • Enter ለመምረጥ • Esc ለመሰረዝ)"
 recommendations.button_run_command: "[ Run command ]"
 recommendations.button_insert_in_terminal: "Insert in Terminal"
 recommendations.button_open_in_new_tab: "Open in New Tab ↵"
@@ -158,3 +158,28 @@ hooks.installed_but_disabled: "⚠ installed but disabled"
 hooks.not_installed: "✗ not installed"
 hooks.uninstall_skipped: "skipped (CLI not on PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+time.just_now: "አሁን"
+time.minutes_ago:
+  one: "%{count} ደቂቃ በፊት"
+  other: "%{count} ደቂቃዎች በፊት"
+time.hours_ago:
+  one: "%{count} ሰዓት በፊት"
+  other: "%{count} ሰዓታት በፊት"
+time.days_ago:
+  one: "%{count} ቀን በፊት"
+  other: "%{count} ቀናት በፊት"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "ጃንዋሪ"
+  "2": "ፌብሩዋሪ"
+  "3": "ማርች"
+  "4": "ኤፕሪል"
+  "5": "ሜይ"
+  "6": "ጁን"
+  "7": "ጁላይ"
+  "8": "ኦገስት"
+  "9": "ሴፕቴምበር"
+  "10": "ኦክቶበር"
+  "11": "ኖቬምበር"
+  "12": "ዲሴምበር"

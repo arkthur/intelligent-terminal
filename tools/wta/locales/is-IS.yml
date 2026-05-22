@@ -11,10 +11,10 @@ setup.title.sign_in: "Innskráning nauðsynleg"
 setup.subtitle.copilot_missing: "Agentinn þinn \"%{agent}\" er ekki uppsettur. Fylgdu skrefunum hér að neðan til að setja hann upp. Til að skipta um agent, farðu í Settings."
 setup.subtitle.agent_missing: "Agentinn þinn \"%{agent}\" er ekki uppsettur. Settu hann upp aftur handvirkt og reyndu svo aftur. Til að skipta um agent, farðu í Settings."
 setup.subtitle.copilot_auth: "Agentinn þinn \"%{agent}\" krefst auðkenningar. Fylgdu skrefunum hér að neðan til að skrá þig inn. Til að skipta um agent, farðu í Settings."
-setup.subtitle.agent_auth: "Agentinn þinn \"%{agent}\" krefst auðkenningar. Skráðu þig inn í gegnum CLI agentsins og reyndu svo aftur. Til að skipta um agent, farðu í Settings."
+setup.subtitle.agent_auth: "Agentinn þinn \"%{agent}\" krefst auðkenningar. Skráðu þig inn í gegnum agentinn og reyndu svo aftur. Til að skipta um agent, farðu í Settings."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Veldu sjálfgefna agent CLI sem þú vilt nota í Intelligent Terminal. Þú getur"
+setup.description.fre_line1: "Veldu sjálfgefna agentinn sem þú vilt nota í Intelligent Terminal. Þú getur"
 setup.description.fre_line2: "farið í Settings til að stilla og setja upp vinnusvæðið þitt."
 
 setup.option.reinstall: "Setja upp %{agent} aftur"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Loka þessari hjálp"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ til að fletta • Enter til að velja • Esc til að hætta við)"
+recommendations.nav_hint: "(↑ ↓ til að fletta • ← → til að skipta um hnappa • Enter til að velja • Esc til að hætta við)"
 recommendations.button_run_command: "[ Keyra skipun ]"
 recommendations.button_insert_in_terminal: "Setja inn í Terminal"
 recommendations.button_open_in_new_tab: "Opna í nýjum flipa ↵"
@@ -158,3 +158,29 @@ hooks.installed_but_disabled: "⚠ installed but disabled"
 hooks.not_installed: "✗ not installed"
 hooks.uninstall_skipped: "skipped (CLI not on PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time and date formatting (src/ui/agents_view.rs) ───────────────
+time.just_now: "rétt í þessu"
+time.minutes_ago:
+  one: "fyrir %{count} mínútu síðan"
+  other: "fyrir %{count} mínútum síðan"
+time.hours_ago:
+  one: "fyrir %{count} klukkustund síðan"
+  other: "fyrir %{count} klukkustundum síðan"
+time.days_ago:
+  one: "fyrir %{count} degi síðan"
+  other: "fyrir %{count} dögum síðan"
+time.date_format: "%{day}. %{month} %{year}"
+time.month:
+  "1": "janúar"
+  "2": "febrúar"
+  "3": "mars"
+  "4": "apríl"
+  "5": "maí"
+  "6": "júní"
+  "7": "júlí"
+  "8": "ágúst"
+  "9": "september"
+  "10": "október"
+  "11": "nóvember"
+  "12": "desember"

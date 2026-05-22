@@ -158,3 +158,29 @@ hooks.installed_but_disabled: "⚠ Instalado pero deshabilitado"
 hooks.not_installed: "✗ No instalado"
 hooks.uninstall_skipped: "Omitido (CLI no está en el PATH)"
 hooks.install_attempted: "Instalación de wt-agent-hooks intentada (idempotente). Ejecuta `wta hooks status` para inspeccionar el resultado. Registro de seguimiento: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+time.just_now: "ahora mismo"
+time.minutes_ago:
+  one: "hace %{count} minuto"
+  other: "hace %{count} minutos"
+time.hours_ago:
+  one: "hace %{count} hora"
+  other: "hace %{count} horas"
+time.days_ago:
+  one: "hace %{count} día"
+  other: "hace %{count} días"
+time.date_format: "%{day} %{month} %{year}"
+time.month:
+  "1": "enero"
+  "2": "febrero"
+  "3": "marzo"
+  "4": "abril"
+  "5": "mayo"
+  "6": "junio"
+  "7": "julio"
+  "8": "agosto"
+  "9": "septiembre"
+  "10": "octubre"
+  "11": "noviembre"
+  "12": "diciembre"

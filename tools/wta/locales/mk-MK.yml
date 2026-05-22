@@ -11,10 +11,10 @@ setup.title.sign_in: "Потребно е најавување"
 setup.subtitle.copilot_missing: "Вашиот агент \"%{agent}\" не е инсталиран. Следете ги чекорите подолу за да го инсталирате. За промена на агентот, одете во Settings."
 setup.subtitle.agent_missing: "Вашиот агент \"%{agent}\" не е инсталиран. Реинсталирајте го рачно и обидете се повторно. За промена на агентот, одете во Settings."
 setup.subtitle.copilot_auth: "Вашиот агент \"%{agent}\" бара автентикација. Следете ги чекорите подолу за да се најавите. За промена на агентот, одете во Settings."
-setup.subtitle.agent_auth: "Вашиот агент \"%{agent}\" бара автентикација. Најавете се преку CLI на агентот и обидете се повторно. За промена на агентот, одете во Settings."
+setup.subtitle.agent_auth: "Вашиот агент \"%{agent}\" бара автентикација. Најавете се преку агентот и обидете се повторно. За промена на агентот, одете во Settings."
 
 # {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Изберете го стандардниот CLI на агентот што сакате да го користите во Intelligent Terminal. Можете"
+setup.description.fre_line1: "Изберете го стандардниот агент што сакате да го користите во Intelligent Terminal. Можете"
 setup.description.fre_line2: "да одите во Settings за да го конфигурирате работниот простор."
 
 setup.option.reinstall: "Реинсталирај %{agent}"
@@ -65,7 +65,7 @@ commands.help_close_hint: "  Esc        Затвори ја оваа помош"
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
 # {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
-recommendations.nav_hint: "(↑ ↓ за навигација • Enter за избор • Esc за откажување)"
+recommendations.nav_hint: "(↑ ↓ за навигација • ← → за префрлување копчиња • Enter за избор • Esc за откажување)"
 recommendations.button_run_command: "[ Изврши команда ]"
 recommendations.button_insert_in_terminal: "Вметни во Terminal"
 recommendations.button_open_in_new_tab: "Отвори во ново јазиче ↵"
@@ -158,3 +158,30 @@ hooks.installed_but_disabled: "⚠ installed but disabled"
 hooks.not_installed: "✗ not installed"
 hooks.uninstall_skipped: "skipped (CLI not on PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
+
+# ── Relative time + date formatting (src/ui/agents_view.rs) ─────────────────
+# CLDR plural categories for this locale; %{count} = numeric count.
+time.just_now: "штотуку"
+time.minutes_ago:
+  one: "пред %{count} минута"
+  other: "пред %{count} минути"
+time.hours_ago:
+  one: "пред %{count} час"
+  other: "пред %{count} часа"
+time.days_ago:
+  one: "пред %{count} ден"
+  other: "пред %{count} дена"
+time.date_format: "%{day} %{month} %{year} г."
+time.month:
+  "1": "јануари"
+  "2": "февруари"
+  "3": "март"
+  "4": "април"
+  "5": "мај"
+  "6": "јуни"
+  "7": "јули"
+  "8": "август"
+  "9": "септември"
+  "10": "октомври"
+  "11": "ноември"
+  "12": "декември"
