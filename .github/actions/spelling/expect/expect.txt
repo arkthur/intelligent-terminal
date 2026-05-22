@@ -725,7 +725,6 @@ hhx
 HIBYTE
 hicon
 HIDEWINDOW
-Hijri
 Hinnant
 hinst
 HISTORYBUFS
@@ -896,7 +895,6 @@ LINKERROR
 listptr
 listptrsize
 lld
-LLMs
 llx
 LMENU
 lnkd
@@ -969,7 +967,6 @@ LVT
 LWA
 LWIN
 lwkmvj
-mai
 majorly
 makeappx
 MAKEINTRESOURCE
@@ -1014,11 +1011,9 @@ mincore
 mindbogglingly
 minkernel
 MINMAXINFO
-minuto
 minwin
 minwindef
 misprediction
-Mittwoch
 MMBB
 mmcc
 MMCPL
