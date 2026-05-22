@@ -8,8 +8,8 @@ use ratatui::widgets::Paragraph;
 use crate::app::App;
 use crate::theme;
 
-/// Height in rows the queued-hint occupies for `tab`. Zero when there's
-/// nothing to show — the layout collapses to the existing geometry.
+/// Height in rows the queued-hint occupies for the current tab. Zero when
+/// there's nothing to show — the layout collapses to the existing geometry.
 pub(crate) fn queue_hint_height(app: &App) -> u16 {
     if app.current_tab().pending_prompts.is_empty() {
         0
@@ -70,10 +70,13 @@ fn truncate_to_width(text: &str, max_cells: usize) -> String {
     if max_cells == 0 {
         return String::new();
     }
-    // Fast path: fits as-is. Use the same width semantics for the check
-    // that we use during the truncation loop (zero-width → 1 cell), so a
-    // string with combining marks doesn't slip past this guard only to
-    // get clipped below.
+    // Fast path: fits as-is. `UnicodeWidthStr::width` counts zero-width
+    // chars as 0 cells (combining marks layered onto a base char don't add
+    // visible columns), so a string of `a\u{0301}b` reports width 2 here.
+    // That matches the actual rendered width, so the fast path is sound —
+    // we only need the "zero-width → 1 cell" guard inside the truncation
+    // loop to budget room for a per-char break decision once we know we
+    // must clip.
     if UnicodeWidthStr::width(text) <= max_cells {
         return text.to_string();
     }
@@ -110,9 +113,12 @@ mod tests {
     #[test]
     fn truncate_over_width_inserts_ellipsis() {
         let out = truncate_to_width("abcdefghij", 5);
-        // We push 5 chars then the next overflow triggers ellipsis swap.
+        // `truncate_to_width` reserves 1 cell for the ellipsis, so at most
+        // 4 chars are emitted before `…` is appended.
         assert!(out.ends_with('…'), "got: {out}");
         assert!(out.chars().count() <= 5);
+        assert_eq!(unicode_width::UnicodeWidthStr::width(out.as_str()), 5,
+            "result must fill exactly the requested width when content overflows");
     }
 
     #[test]
