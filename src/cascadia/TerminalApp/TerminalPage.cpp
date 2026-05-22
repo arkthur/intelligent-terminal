@@ -1068,11 +1068,12 @@ namespace winrt::TerminalApp::implementation
         const auto& globals = _settings.GlobalSettings();
         const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
 
-        // If no agent resolved and policy blocks all agents, show a policy message and bail.
-        // Only show this when the filtered agent list is genuinely empty (policy blocks
-        // ALL agents), not when agents are allowed but simply not installed.
-        namespace Reg = ::Microsoft::Terminal::Settings::Model::AgentRegistry;
-        if (agentCliPath.empty() && AgentPolicy::IsAllowedAgentsPolicyConfigured() && Reg::FilteredAcpAgents().empty())
+        // If no agent resolved and an AllowedAgents policy is active, bail out.
+        // This covers both "policy blocks ALL agents" and "policy allows some
+        // agents but none are installed" — in either case we must not launch
+        // WTA without --agent, because WTA's own fallback detection would
+        // bypass GPO and pick an unauthorized agent (e.g. copilot).
+        if (agentCliPath.empty() && AgentPolicy::IsAllowedAgentsPolicyConfigured())
         {
             _agentPaneLog("ABORT: delegation blocked by GPO — no agents allowed");
             if (auto tip{ FindName(L"WindowIdToast").try_as<MUX::Controls::TeachingTip>() })
@@ -1812,8 +1813,7 @@ namespace winrt::TerminalApp::implementation
         }
 
         const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
-        namespace Reg3 = ::Microsoft::Terminal::Settings::Model::AgentRegistry;
-        if (agentCliPath.empty() && AgentPolicy::IsAllowedAgentsPolicyConfigured() && Reg3::FilteredAcpAgents().empty())
+        if (agentCliPath.empty() && AgentPolicy::IsAllowedAgentsPolicyConfigured())
         {
             _agentPaneLog("_AutoCreateHiddenAgentPane: ABORT — all agents blocked by GPO policy");
             return;
@@ -2219,9 +2219,9 @@ namespace winrt::TerminalApp::implementation
             const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
             if (agentCliPath.empty())
             {
-                // No agent resolved. If GPO blocks all agents, show a policy-specific message.
-                namespace Reg2 = ::Microsoft::Terminal::Settings::Model::AgentRegistry;
-                if (AgentPolicy::IsAllowedAgentsPolicyConfigured() && Reg2::FilteredAcpAgents().empty())
+                // No agent resolved and an AllowedAgents policy is active — bail.
+                // See the delegation abort comment for full rationale.
+                if (AgentPolicy::IsAllowedAgentsPolicyConfigured())
                 {
                     _agentPaneLog("EARLY RETURN: all agents blocked by GPO policy");
                     if (auto tip{ FindName(L"WindowIdToast").try_as<MUX::Controls::TeachingTip>() })
