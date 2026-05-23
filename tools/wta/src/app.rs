@@ -4066,12 +4066,16 @@ impl App {
             KeyCode::Esc if self.show_notification_banner => {
                 self.dismiss_notifications();
             }
+            // Recommendation card visible → dismiss card (priority over the
+            // queue because the card blocks `drain_pending_prompts` anyway:
+            // once dismissed, drain auto-promotes the next queued prompt).
+            // We intentionally do NOT lump in-flight autofix into this
+            // branch — that case is handled by the generic in-flight
+            // cancel below, which yields to queue-pop first so the user can
+            // peel queued prompts they typed during autofix.
             KeyCode::Esc
-                if self.current_tab().turn.recommendations().is_some()
-                    || (self.autofix_pane_id.is_some()
-                        && !self.current_tab().turn.is_idle()) =>
+                if self.current_tab().turn.recommendations().is_some() =>
             {
-                // Dismiss armed fix card or cancel in-flight autofix request.
                 // `turn_cancel` bumps generation, emits autofix_state_cleared,
                 // and resets the state machine to Idle.
                 let session_id = self.current_tab().session_id.clone();
@@ -4100,28 +4104,11 @@ impl App {
                 let pane = self.suggested_pane_id.take().unwrap();
                 self.emit_autofix_state_cleared(&pane);
             }
-            // Esc on an in-flight turn acts like `/stop`: cancel the
-            // current "Thinking..." (the head of the dispatch queue). Any
-            // queued prompts behind it stay put and the auto-drain hook
-            // promotes the next one to in-flight on the following tick, so
-            // pressing Esc repeatedly peels prompts off the head one by
-            // one. Only fires when the input box is empty so users
-            // editing a draft don't lose their work.
-            KeyCode::Esc
-                if self.current_tab().input.is_empty()
-                    && !self.current_tab().turn.is_idle()
-                    && !matches!(
-                        self.current_tab().turn,
-                        TurnState::Surfaced { end_pending: false, .. }
-                    ) =>
-            {
-                self.cancel_in_flight_turn();
-            }
-            // Pop the most-recently queued prompt (LIFO undo) before falling
-            // through to "clear input". Only when the input box is empty
-            // and no turn is in flight — otherwise the user is most likely
-            // trying to cancel the current Thinking… (handled above) or
-            // clear the draft they're editing right now.
+            // Pop the most-recently queued prompt (LIFO undo) — runs BEFORE
+            // the in-flight cancel below so users can rescind a prompt they
+            // queued by mistake while the agent (or autofix) is still
+            // working on the head. Only when the input box is empty;
+            // otherwise the user is most likely clearing a draft.
             KeyCode::Esc
                 if self.current_tab().input.is_empty()
                     && !self.current_tab().pending_prompts.is_empty() =>
@@ -4135,6 +4122,23 @@ impl App {
                         now + QUEUE_HINT_DURATION,
                     ));
                 }
+            }
+            // Esc with an empty queue + an in-flight turn acts like `/stop`:
+            // cancel the current Thinking… (the head). Handles both
+            // autofix-initiated turns and user-typed prompts. After cancel
+            // the state machine is Idle and the next event tick's drain
+            // hook will pick up any prompts queued while the cancel was
+            // in flight (though typically the queue is empty by the time
+            // this branch fires — see the queue-pop branch above).
+            KeyCode::Esc
+                if self.current_tab().input.is_empty()
+                    && !self.current_tab().turn.is_idle()
+                    && !matches!(
+                        self.current_tab().turn,
+                        TurnState::Surfaced { end_pending: false, .. }
+                    ) =>
+            {
+                self.cancel_in_flight_turn();
             }
             KeyCode::Esc => {
                 self.current_tab_mut().clear_input();
@@ -7875,11 +7879,11 @@ mod tests {
     }
 
     #[test]
-    fn esc_cancels_in_flight_turn_when_input_empty() {
-        // Esc on a busy state acts like `/stop` — cancel the current
-        // Thinking… (head of dispatch queue). With queued items behind it
-        // the auto-drain hook promotes the next one on the following tick,
-        // so repeated Esc presses peel work off the head one-by-one.
+    fn esc_pops_queue_before_cancelling_in_flight() {
+        // User flow from the autofix scenario report: an autofix turn is in
+        // flight, the user types a follow-up question, presses Esc once. The
+        // queued question should be popped (LIFO); the in-flight head keeps
+        // running. Esc only cancels the head once the queue is empty.
         let mut app = connected_app_with_text("first");
         press_enter(&mut app);
         type_text(&mut app, "queued");
@@ -7889,17 +7893,73 @@ mod tests {
 
         press_esc(&mut app);
 
-        // In-flight was cancelled → state Idle. Queue is preserved (next
-        // tick's drain will promote it).
+        assert_eq!(app.current_tab().pending_prompts.len(), 0,
+            "Esc must pop the queued prompt first, leaving the in-flight head alone");
+        assert!(matches!(app.current_tab().turn, TurnState::Submitted(_)),
+            "in-flight head must keep running while queued items exist");
+    }
+
+    #[test]
+    fn esc_cancels_in_flight_turn_when_input_empty() {
+        // With no queue, Esc cancels the in-flight head like /stop.
+        let mut app = connected_app_with_text("first");
+        press_enter(&mut app);
+        assert!(matches!(app.current_tab().turn, TurnState::Submitted(_)));
+        assert_eq!(app.current_tab().pending_prompts.len(), 0);
+
+        press_esc(&mut app);
+
         assert!(app.current_tab().turn.is_idle(),
-            "Esc on in-flight must reset turn to Idle (got {:?})",
+            "Esc with empty queue cancels in-flight turn (got {:?})",
             app.current_tab().turn);
-        assert_eq!(app.current_tab().pending_prompts.len(), 1,
-            "Esc cancels the head only — queued items survive for drain");
-        // System "Cancelled." bubble appended.
         let last = app.current_tab().messages.last().expect("messages non-empty");
         assert!(matches!(last, ChatMessage::System(s) if s.contains("Cancel")),
             "expected Cancelled system message, got {last:?}");
+    }
+
+    #[test]
+    fn esc_cancels_autofix_only_when_queue_is_empty() {
+        // Autofix in-flight + queued user prompt. First Esc pops the queue;
+        // autofix keeps running. Second Esc (queue empty) cancels autofix
+        // via cancel_in_flight_turn. Mirrors the autofix-with-queue
+        // scenario reported by the user.
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+        // Stage an autofix in-flight turn directly so we don't depend on
+        // OSC-133/event wiring.
+        let sid = DEFAULT_TAB_ID.to_string();
+        app.autofix_generation = app.autofix_generation.wrapping_add(1);
+        app.autofix_pane_id = Some("pane-x".into());
+        let autofix_prompt = SubmittedPrompt {
+            id: 7,
+            text: "diagnose error".into(),
+            submitted_at_unix_s: 0.0,
+            autofix: Some(AutofixContext {
+                target_pane_id: "pane-x".into(),
+                generation: app.autofix_generation,
+            }),
+        };
+        app.turn_submit_prompt(&sid, autofix_prompt);
+        // User types a question while autofix is running.
+        type_text(&mut app, "what about this?");
+        press_enter(&mut app);
+        assert_eq!(app.current_tab().pending_prompts.len(), 1);
+        assert!(app.current_tab().turn.is_autofix(),
+            "autofix turn must still be in flight");
+
+        // First Esc: pops queue, autofix continues.
+        press_esc(&mut app);
+        assert_eq!(app.current_tab().pending_prompts.len(), 0,
+            "queued user prompt popped first");
+        assert!(app.current_tab().turn.is_autofix(),
+            "autofix must keep running after first Esc — user only wanted to undo their queue");
+
+        // Second Esc: queue now empty, cancels autofix.
+        press_esc(&mut app);
+        assert!(app.current_tab().turn.is_idle(),
+            "second Esc cancels the autofix head");
+        assert!(app.autofix_pane_id.is_none(),
+            "autofix_pane_id cleared by turn_cancel");
     }
 
     #[test]
@@ -7914,10 +7974,9 @@ mod tests {
             type_text(&mut app, q);
             press_enter(&mut app);
         }
-        // Cancel the in-flight so subsequent Esc presses target the queue,
-        // not the head. (Mirrors what happens after `/stop` if the user
-        // doesn't want any further drains either — they Esc through the
-        // backlog.)
+        // Cancel the in-flight so the first Esc below isn't intercepted by
+        // the in-flight-cancel branch — we want to verify the LIFO pop
+        // path specifically.
         let sid = app
             .current_tab()
             .session_id
