@@ -70,7 +70,7 @@ commands.restart.summary: "Повторно поврзи: прекини го п
 commands.stop.summary: "Откажи го тековното барање"
 commands.sessions.summary: "Отвори избирач на претходни сесии (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ за навигација • ← → за префрлување копчиња • Enter за избор • Esc за откажување)"
 recommendations.button_run_command: "[ Изврши команда ]"
 recommendations.button_insert_in_terminal: "Вметни во Terminal"

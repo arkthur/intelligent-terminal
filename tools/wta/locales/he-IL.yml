@@ -74,7 +74,7 @@ commands.stop.summary: "בטל את הבקשה שמתבצעת"
 commands.sessions.summary: "פתח את בורר ההפעלות ההיסטוריות (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── לוח המלצות (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - שמות מקשים וסמל מקש Enter, אין לתרגם
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - שמות מקשים וסמל מקש Enter, אין לתרגם
 recommendations.nav_hint: "(↑ ↓ לניווט • ← → למעבר בין לחצנים • Enter לבחירה • Esc לביטול)"
 recommendations.button_run_command: "[ הפעל פקודה ]"
 recommendations.button_insert_in_terminal: "הכנס למסוף"

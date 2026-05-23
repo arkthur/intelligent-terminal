@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Szó szerinti '/' küldése (megkerüli
 commands.help_close_hint: "  Esc        Súgó bezárása"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ navigáláshoz • ← → gombok közötti váltáshoz • Enter kiválasztáshoz • Esc megszakításhoz)"
 recommendations.button_run_command: "[ Parancs futtatása ]"
 recommendations.button_insert_in_terminal: "Beszúrás a terminálba"

@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Trimite un '/' literal (evită analizor
 commands.help_close_hint: "  Esc        Închide acest ajutor"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ pentru navigare • ← → pentru comutarea butoanelor • Enter pentru selectare • Esc pentru anulare)"
 recommendations.button_run_command: "[ Rulează comanda ]"
 recommendations.button_insert_in_terminal: "Inserare în Terminal"

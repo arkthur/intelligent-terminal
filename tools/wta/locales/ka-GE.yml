@@ -74,7 +74,7 @@ commands.stop.summary: "მიმდინარე მოთხოვნის 
 commands.sessions.summary: "ისტორიული სესიების ამრჩევის გახსნა (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── რეკომენდაციების პანელი (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - ღილაკების სახელები და Return ღილაკის გლიფი, არ ითარგმნება
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - ღილაკების სახელები და Return ღილაკის გლიფი, არ ითარგმნება
 recommendations.nav_hint: "(↑ ↓ ნავიგაციისთვის • ← → ღილაკებს შორის გადასართავად • Enter არჩევისთვის • Esc გაუქმებისთვის)"
 recommendations.button_run_command: "[ ბრძანების გაშვება ]"
 recommendations.button_insert_in_terminal: "ჩასმა ტერმინალში"

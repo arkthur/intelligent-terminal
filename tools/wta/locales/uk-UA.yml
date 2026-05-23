@@ -70,7 +70,7 @@ commands.restart.summary: "Повторно підключитися: завер
 commands.stop.summary: "Скасувати поточний запит"
 commands.sessions.summary: "Відкрити вибір історичних сеансів (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Панель рекомендацій (src/ui/recommendations.rs) ───────────────────────────────────
-# {Locked="Enter","Esc","↵"} - назви клавіш і символ клавіші Enter, не перекладати
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - назви клавіш і символ клавіші Enter, не перекладати
 recommendations.nav_hint: "(↑ ↓ навігація • ← → перемикання кнопок • Enter вибрати • Esc скасувати)"
 recommendations.button_run_command: "[ Виконати команду ]"
 recommendations.button_insert_in_terminal: "Вставити в термінал"

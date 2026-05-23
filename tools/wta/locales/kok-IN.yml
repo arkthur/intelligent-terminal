@@ -74,7 +74,7 @@ commands.stop.summary: "चालू आशिल्लो प्रॉम्प
 commands.sessions.summary: "इतिहासीक सत्र पिकर उगडात (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── शिफारस पॅनेल (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - की नांवां आनी Return-की ग्लिफ, अणकार करूं नाका
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - की नांवां आनी Return-की ग्लिफ, अणकार करूं नाका
 recommendations.nav_hint: "(↑ ↓ नेव्हिगेट करपाक • ← → बटणां बदलपाक • Enter निवडपाक • Esc रद्द करपाक)"
 recommendations.button_run_command: "[ कमांड चलयात ]"
 recommendations.button_insert_in_terminal: "टर्मिनलांत घालात"

@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Nosūtīt burtisku '/' (apiet komandu p
 commands.help_close_hint: "  Esc        Aizvērt šo palīdzību"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ lai pārvietotos • ← → lai pārslēgtu pogas • Enter lai izvēlētos • Esc lai atceltu)"
 recommendations.button_run_command: "[ Izpildīt komandu ]"
 recommendations.button_insert_in_terminal: "Ievietot terminālī"

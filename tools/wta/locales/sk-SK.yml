@@ -70,7 +70,7 @@ commands.restart.summary: "Znova sa pripojiť: ukončiť proces agenta a znova h
 commands.stop.summary: "Zrušiť prebiehajúcu výzvu"
 commands.sessions.summary: "Otvoriť výber historických relácií (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ na navigáciu • ← → na prepínanie tlačidiel • Enter na výber • Esc na zrušenie)"
 recommendations.button_run_command: "[ Spustiť príkaz ]"
 recommendations.button_insert_in_terminal: "Vložiť do terminálu"

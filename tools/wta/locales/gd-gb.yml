@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Cuir '/' litireil (teich bhon pharsair 
 commands.help_close_hint: "  Esc        Dùin an cuideachadh seo"  # {Locked="Esc"}
 
 # ── Panail mholaidhean (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - ainmean iuchraichean agus samhla iuchair Tilleadh, na eadar-theangaich
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - ainmean iuchraichean agus samhla iuchair Tilleadh, na eadar-theangaich
 recommendations.nav_hint: "(↑ ↓ gus seòladh • ← → gus putanan atharrachadh • Enter gus taghadh • Esc gus sgur dheth)"
 recommendations.button_run_command: "[ Ruith òrdugh ]"
 recommendations.button_insert_in_terminal: "Cuir a-steach san Teirmineal"

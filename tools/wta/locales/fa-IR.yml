@@ -74,7 +74,7 @@ commands.stop.summary: "لغو درخواست در حال اجرا"
 commands.sessions.summary: "باز کردن انتخابگر نشست‌های تاریخی (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── پنل پیشنهادات (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - نام کلیدها و نماد کلید بازگشت، ترجمه نکنید
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - نام کلیدها و نماد کلید بازگشت، ترجمه نکنید
 recommendations.nav_hint: "(↑ ↓ برای پیمایش • ← → برای جابه‌جایی بین دکمه‌ها • Enter برای انتخاب • Esc برای لغو)"
 recommendations.button_run_command: "[ اجرای دستور ]"
 recommendations.button_insert_in_terminal: "درج در ترمینال"

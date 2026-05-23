@@ -71,7 +71,7 @@ commands.help_escape_hint: "  //text     ផ្ញើ '/' ជាអក្សរ 
 commands.help_close_hint: "  Esc        បិទជំនួយនេះ"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────────────────────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ ដើម្បីរុករក • Enter ដើម្បីជ្រើសរើស • Esc ដើម្បីបោះបង់)"
 recommendations.button_run_command: "[ ដំណើរការពាក្យបញ្ជា ]"
 recommendations.button_insert_in_terminal: "បញ្ចូលក្នុង Terminal"

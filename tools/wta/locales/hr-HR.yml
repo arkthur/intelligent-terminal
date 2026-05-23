@@ -70,7 +70,7 @@ commands.restart.summary: "Ponovno se poveži: zaustavi proces agenta i ponovno 
 commands.stop.summary: "Otkaži upit u tijeku"
 commands.sessions.summary: "Otvori birač prethodnih sesija (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ za navigaciju • ← → za prebacivanje gumba • Enter za odabir • Esc za odustajanje)"
 recommendations.button_run_command: "[ Pokreni naredbu ]"
 recommendations.button_insert_in_terminal: "Umetni u terminal"

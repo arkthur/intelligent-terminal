@@ -60,7 +60,7 @@ commands.help_escape_hint: "  //text     리터럴 '/' 전송(명령 파서 이�
 commands.help_close_hint: "  Esc        이 도움말 닫기"  # {Locked="Esc"}
 
 # ── 추천 패널 (src/ui/recommendations.rs) ───────────────────────────────────
-# {Locked="Enter","Esc","↵"} - 키 이름과 Return 키 문자, 번역하지 마세요
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - 키 이름과 Return 키 문자, 번역하지 마세요
 recommendations.nav_hint: "(↑ ↓ 탐색 • ← → 버튼 전환 • Enter 선택 • Esc 취소)"
 recommendations.button_run_command: "[ 명령 실행 ]"
 recommendations.button_insert_in_terminal: "터미널에 삽입"

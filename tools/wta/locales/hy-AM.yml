@@ -81,7 +81,7 @@ commands.stop.summary: "Չեղարկել ընթացիկ հարցումը"
 commands.sessions.summary: "Բացել պատմական նիստերի ընտրիչը (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ─────────────────────────────────────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ նավարկելու համար • ← → կոճակների միջև անցնելու համար • Enter ընտրելու համար • Esc չեղարկելու համար)"
 recommendations.button_run_command: "[ Գործարկել հրամանը ]"
 recommendations.button_insert_in_terminal: "Տեղադրել տերմինալում"

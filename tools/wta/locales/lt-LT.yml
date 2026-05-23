@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Siųsti tiesioginį '/' (apeina komand�
 commands.help_close_hint: "  Esc        Uždaryti šią pagalbą"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ naršyti • ← → mygtukams perjungti • Enter pasirinkti • Esc atšaukti)"
 recommendations.button_run_command: "[ Vykdyti komandą ]"
 recommendations.button_insert_in_terminal: "Įterpti į Terminal"

@@ -74,7 +74,7 @@ commands.stop.summary: "جاری پرامپٹ منسوخ کریں"
 commands.sessions.summary: "تاریخی سیشنز کا انتخاب کار کھولیں (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── سفارشات پینل (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - کلید کے نام اور Return-کلید گلف، ترجمہ نہ کریں
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - کلید کے نام اور Return-کلید گلف، ترجمہ نہ کریں
 recommendations.nav_hint: "(↑ ↓ نیویگیٹ کرنے کے لیے • ← → بٹن تبدیل کرنے کے لیے • Enter منتخب کرنے کے لیے • Esc منسوخ کرنے کے لیے)"
 recommendations.button_run_command: "[ کمانڈ چلائیں ]"
 recommendations.button_insert_in_terminal: "ٹرمینل میں داخل کریں"

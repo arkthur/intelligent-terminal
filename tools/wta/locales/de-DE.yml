@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Literales '/' senden (Befehlsparser umg
 commands.help_close_hint: "  Esc        Diese Hilfe schließen"  # {Locked="Esc"}
 
 # ── Empfehlungsbereich (src/ui/recommendations.rs) ───────────────────────────────────
-# {Locked="Enter","Esc","↵"} - Tastennamen und Eingabetaste-Symbol, nicht übersetzen
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - Tastennamen und Eingabetaste-Symbol, nicht übersetzen
 recommendations.nav_hint: "(↑ ↓ navigieren • Enter auswählen • Esc abbrechen)"
 recommendations.button_run_command: "[ Befehl ausführen ]"
 recommendations.button_insert_in_terminal: "In Terminal einfügen"

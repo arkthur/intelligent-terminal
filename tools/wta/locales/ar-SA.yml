@@ -74,7 +74,7 @@ commands.stop.summary: "إلغاء الأمر قيد التنفيذ"
 commands.sessions.summary: "فتح منتقي الجلسات التاريخية (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── لوحة التوصيات (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - أسماء المفاتيح ورمز مفتاح الإدخال، لا تترجمها
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - أسماء المفاتيح ورمز مفتاح الإدخال، لا تترجمها
 recommendations.nav_hint: "(↑ ↓ للتنقل • ← → للتبديل بين الأزرار • Enter للتحديد • Esc للإلغاء)"
 recommendations.button_run_command: "[ تشغيل الأمر ]"
 recommendations.button_insert_in_terminal: "إدراج في الطرفية"

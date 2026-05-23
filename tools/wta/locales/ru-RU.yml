@@ -70,7 +70,7 @@ commands.restart.summary: "Переподключиться: завершить 
 commands.stop.summary: "Отменить выполняющийся запрос"
 commands.sessions.summary: "Открыть выбор прошлых сеансов (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Панель рекомендаций (src/ui/recommendations.rs) ───────────────────────────────────
-# {Locked="Enter","Esc","↵"} - названия клавиш и символ клавиши Enter, не переводить
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - названия клавиш и символ клавиши Enter, не переводить
 recommendations.nav_hint: "(↑ ↓ навигация • ← → переключение кнопок • Enter выбрать • Esc отменить)"
 recommendations.button_run_command: "[ Выполнить команду ]"
 recommendations.button_insert_in_terminal: "Вставить в терминал"

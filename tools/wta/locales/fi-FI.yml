@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Lähetä kirjaimellinen '/' (ohittaa ko
 commands.help_close_hint: "  Esc        Sulje tämä ohje"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ navigoidaksesi • ← → vaihtaaksesi painikkeita • Enter valitaksesi • Esc peruuttaaksesi)"
 recommendations.button_run_command: "[ Suorita komento ]"
 recommendations.button_insert_in_terminal: "Lisää Terminaliin"

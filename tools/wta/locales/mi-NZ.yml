@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Tukua he '/' tuturu (whakaorangia te ka
 commands.help_close_hint: "  Esc        Katia tenei awhina"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ ki te whakatere • ← → ki te whakawhiti pātene • Enter ki te whiriwhiri • Esc ki te whakakore)"
 recommendations.button_run_command: "[ Whakahautia te whakahau ]"
 recommendations.button_insert_in_terminal: "Whakauruhia ki te Teirminara"

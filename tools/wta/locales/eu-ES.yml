@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Bidali '/' literala (ihes komando-anali
 commands.help_close_hint: "  Esc        Itxi laguntza hau"  # {Locked="Esc"}
 
 # ── Gomendio-panela (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - tekla-izenak eta Itzuli-tekla glifoa, ez itzuli
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - tekla-izenak eta Itzuli-tekla glifoa, ez itzuli
 recommendations.nav_hint: "(↑ ↓ nabigatzeko • Enter hautatzeko • Esc bertan behera uzteko)"
 recommendations.button_run_command: "[ Exekutatu komandoa ]"
 recommendations.button_insert_in_terminal: "Txertatu Terminalean"

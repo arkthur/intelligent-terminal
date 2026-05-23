@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Letterlijke '/' verzenden (omzeilt de o
 commands.help_close_hint: "  Esc        Deze help sluiten"  # {Locked="Esc"}
 
 # ── Aanbevelingenpaneel (src/ui/recommendations.rs) ───────────────────────────────────
-# {Locked="Enter","Esc","↵"} - toetsnamen en Enter-toetssymbool, niet vertalen
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - toetsnamen en Enter-toetssymbool, niet vertalen
 recommendations.nav_hint: "(↑ ↓ navigeren • Enter selecteren • Esc annuleren)"
 recommendations.button_run_command: "[ Opdracht uitvoeren ]"
 recommendations.button_insert_in_terminal: "Invoegen in terminal"

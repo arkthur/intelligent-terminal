@@ -70,7 +70,7 @@ commands.restart.summary: "Połącz ponownie: zakończ proces agenta i uruchom g
 commands.stop.summary: "Anuluj trwający monit"
 commands.sessions.summary: "Otwórz wybór historycznych sesji (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ do nawigacji • ← → do przełączania przycisków • Enter aby wybrać • Esc aby anulować)"
 recommendations.button_run_command: "[ Uruchom polecenie ]"
 recommendations.button_insert_in_terminal: "Wstaw w terminalu"

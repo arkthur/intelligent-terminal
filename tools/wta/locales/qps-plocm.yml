@@ -64,7 +64,7 @@ commands.help_escape_hint: "[!!   //text     Se_nd a literal '/' (escapes the co
 commands.help_close_hint: "[!!   Esc        Cl_ose this help !!]"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "[!! (↑_ ↓ to navigate suggestions • ← → to switch actions • Enter to select • Esc to cancel) !!]"
 recommendations.button_run_command: "[!! [ R_un command ] !!]"
 recommendations.button_insert_in_terminal: "[!! Ins_ert in Terminal !!]"

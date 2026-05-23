@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Dërgo një '/' fjalëpërfjalshëm (an
 commands.help_close_hint: "  Esc        Mbyll këtë ndihmë"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ për të naviguar • ← → për të ndërruar butonat • Enter për të zgjedhur • Esc për të anuluar)"
 recommendations.button_run_command: "[ Ekzekuto komandën ]"
 recommendations.button_insert_in_terminal: "Fut në Terminal"

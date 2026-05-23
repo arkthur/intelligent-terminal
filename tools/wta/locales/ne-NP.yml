@@ -74,7 +74,7 @@ commands.stop.summary: "चलिरहेको प्रम्प्ट रद
 commands.sessions.summary: "ऐतिहासिक सत्र पिकर खोल्नुहोस् (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── सिफारिस प्यानल (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - कुञ्जी नामहरू र Return-कुञ्जी ग्लिफ, अनुवाद नगर्नुहोस्
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - कुञ्जी नामहरू र Return-कुञ्जी ग्लिफ, अनुवाद नगर्नुहोस्
 recommendations.nav_hint: "(↑ ↓ नेभिगेट गर्न • ← → बटनहरू स्विच गर्न • Enter चयन गर्न • Esc रद्द गर्न)"
 recommendations.button_run_command: "[ कमाण्ड चलाउनुहोस् ]"
 recommendations.button_insert_in_terminal: "टर्मिनलमा सम्मिलित गर्नुहोस्"

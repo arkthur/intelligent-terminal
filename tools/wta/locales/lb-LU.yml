@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Schéckt e literale '/' (escapéiert de
 commands.help_close_hint: "  Esc        Dës Hëllef zoumaachen"  # {Locked="Esc"}
 
 # ── Recommandatiounen-Panell (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - Schlësselnimm an Enter-Tast-Glyph, net iwwersetzen
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - Schlësselnimm an Enter-Tast-Glyph, net iwwersetzen
 recommendations.nav_hint: "(↑ ↓ fir ze navigéieren • ← → fir Knäppercher ze wiesselen • Enter fir auszewielen • Esc fir ofzebriechen)"
 recommendations.button_run_command: "[ Kommando ausféieren ]"
 recommendations.button_insert_in_terminal: "An den Terminal asetzen"

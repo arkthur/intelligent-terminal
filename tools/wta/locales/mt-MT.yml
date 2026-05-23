@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Ibgħat '/' litterali (eskejpja l-parse
 commands.help_close_hint: "  Esc        Agħlaq din l-għajnuna"  # {Locked="Esc"}
 
 # ── Pannell tar-rakkomandazzjonijiet (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - ismijiet taċ-ċwievet u glyph taċ-ċavetta Return, tittradux
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - ismijiet taċ-ċwievet u glyph taċ-ċavetta Return, tittradux
 recommendations.nav_hint: "(↑ ↓ biex tinnaviga • ← → biex taqleb il-buttuni • Enter biex tagħżel • Esc biex tikkanċella)"
 recommendations.button_run_command: "[ Ħaddem il-kmand ]"
 recommendations.button_insert_in_terminal: "Daħħal fit-Terminal"

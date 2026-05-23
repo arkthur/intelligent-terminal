@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Skicka ett bokstavligt '/' (undviker ko
 commands.help_close_hint: "  Esc        Stäng denna hjälp"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ för att navigera • ← → för att växla knappar • Enter för att välja • Esc för att avbryta)"
 recommendations.button_run_command: "[ Kör kommando ]"
 recommendations.button_insert_in_terminal: "Infoga i Terminal"

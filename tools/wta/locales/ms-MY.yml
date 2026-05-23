@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Hantar '/' literal (elakkan penghurai a
 commands.help_close_hint: "  Esc        Tutup bantuan ini"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ untuk navigasi • Enter untuk memilih • Esc untuk membatalkan)"
 recommendations.button_run_command: "[ Jalankan arahan ]"
 recommendations.button_insert_in_terminal: "Sisipkan dalam Terminal"

@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Envia un '/' literal (escapa l'analitza
 commands.help_close_hint: "  Esc        Tanca esta ajuda"  # {Locked="Esc"}
 
 # ── Panell de recomanacions (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - noms de tecles i glif de tecla Retorn, no traduïu
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - noms de tecles i glif de tecla Retorn, no traduïu
 recommendations.nav_hint: "(↑ ↓ per a navegar • Enter per a seleccionar • Esc per a cancel·lar)"
 recommendations.button_run_command: "[ Executa l'orde ]"
 recommendations.button_insert_in_terminal: "Inserix al Terminal"

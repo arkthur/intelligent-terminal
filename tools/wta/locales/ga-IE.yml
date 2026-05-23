@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Seol '/' litriúil (éalú ón bparsál
 commands.help_close_hint: "  Esc        Dún an chabhair seo"  # {Locked="Esc"}
 
 # ── Painéal moltaí (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - ainmneacha eochracha agus gliof eochair Fillte, ná haistrigh
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - ainmneacha eochracha agus gliof eochair Fillte, ná haistrigh
 recommendations.nav_hint: "(↑ ↓ chun nascleanúint a dhéanamh • ← → chun cnaipí a athrú • Enter chun roghnú • Esc chun cealú)"
 recommendations.button_run_command: "[ Rith ordú ]"
 recommendations.button_insert_in_terminal: "Ionsáigh i dTeirminéal"

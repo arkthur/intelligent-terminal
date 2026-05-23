@@ -74,7 +74,7 @@ commands.stop.summary: "ଚାଲୁଥିବା ପ୍ରମ୍ପ୍ଟକୁ 
 commands.sessions.summary: "ଇତିହାସିକ ସେସନ୍ ପିକର୍ ଖୋଲନ୍ତୁ (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── ସୁପାରିଶ ପ୍ୟାନେଲ (src/ui/recommendations.rs) ───────────────────────────────
-# {Locked="Enter","Esc","↵"} - କୀ ନାମ ଏବଂ Return-କୀ ଗ୍ଲିଫ୍, ଅନୁବାଦ କରନ୍ତୁ ନାହିଁ
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - କୀ ନାମ ଏବଂ Return-କୀ ଗ୍ଲିଫ୍, ଅନୁବାଦ କରନ୍ତୁ ନାହିଁ
 recommendations.nav_hint: "(↑ ↓ ନେଭିଗେଟ୍ କରିବାକୁ • ← → ବଟନ୍ ବଦଳାଇବାକୁ • Enter ବାଛିବାକୁ • Esc ବାତିଲ୍ କରିବାକୁ)"
 recommendations.button_run_command: "[ କମାଣ୍ଡ ଚଳାନ୍ତୁ ]"
 recommendations.button_insert_in_terminal: "ଟର୍ମିନାଲରେ ସନ୍ନିବେଶ କରନ୍ତୁ"

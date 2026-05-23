@@ -64,7 +64,7 @@ commands.help_escape_hint: "  //text     Invia un '/' letterale (esce dal parser
 commands.help_close_hint: "  Esc        Chiudi questa guida"  # {Locked="Esc"}
 
 # ── Pannello dei suggerimenti (src/ui/recommendations.rs) ───────────────────────────────────
-# {Locked="Enter","Esc","↵"} - nomi dei tasti e glifo del tasto Invio, non tradurre
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - nomi dei tasti e glifo del tasto Invio, non tradurre
 recommendations.nav_hint: "(↑ ↓ per navigare • Enter per selezionare • Esc per annullare)"
 recommendations.button_run_command: "[ Esegui comando ]"
 recommendations.button_insert_in_terminal: "Inserisci nel terminale"

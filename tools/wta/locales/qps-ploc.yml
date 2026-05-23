@@ -65,7 +65,7 @@ commands.help_escape_hint: "[  //text     Ŝéñď å ĺïţéŕåĺ '/' (éśç
 commands.help_close_hint: "[  Esc        Çĺöśé ţĥïś ĥéĺṗ!!!! !!!!]"  # {Locked="Esc"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "[(↑ ↓ ţö ñåṽïğåţé • ← → ţö śŵïţçĥ ɓûţţöñś • Enter ţö śéĺéçţ • Esc ţö çåñçéĺ)!!!! !!!! !!!! !!!!]"
 recommendations.button_run_command: "[[ Ŕûñ çöḿḿåñď ]!!]"
 recommendations.button_insert_in_terminal: "[Îñśéŕţ ïñ Ţéŕḿïñåĺ!!!! !!!!]"

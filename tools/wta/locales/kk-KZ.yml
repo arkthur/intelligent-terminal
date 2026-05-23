@@ -74,7 +74,7 @@ commands.stop.summary: "Орындалып жатқан сұраудан бас 
 commands.sessions.summary: "Тарихи сеанстар таңдағышын ашу (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
-# {Locked="Enter","Esc","↵"} - key names and Return-key glyph, do not translate
+# {Locked="Enter","Esc","↵","↑","↓","←","→"} - key names and Return-key glyph, do not translate
 recommendations.nav_hint: "(↑ ↓ шарлау үшін • ← → түймелер арасында ауысу үшін • Enter таңдау үшін • Esc бас тарту үшін)"
 recommendations.button_run_command: "[ Команданы іске қосу ]"
 recommendations.button_insert_in_terminal: "Terminal-ға кірістіру"
