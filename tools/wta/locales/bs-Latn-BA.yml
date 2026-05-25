@@ -63,6 +63,7 @@ commands.help_header: "Naredbe s kosom crtom — otkucajte / u polju za unos."
 commands.help_escape_hint: "  //text     Pošalji doslovno '/' (zaobilazi parser naredbi)"  # {Locked="//text","/"}
 commands.help_close_hint: "  Esc        Zatvori ovu pomoć"  # {Locked="Esc"}
 # Slash command summaries. Command names stay in English.
+# {Locked="ACP","Ctrl+Shift+/"} - protocol name and shortcut, do not translate
 commands.help.summary: "Prikaži ovu listu naredbi"
 commands.clear.summary: "Obriši historiju ćaskanja (zadržava sesiju)"
 commands.new.summary: "Pokreni novu sesiju ACP (odbacuje historiju)"  # {Locked="ACP"}
@@ -108,7 +109,7 @@ agent.custom.auth_hint: "Provjerite da je %{name} instaliran i da se nalazi u PA
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Učitavanje..."
-# {Locked="Enter","Shift+enter","Esc"} - key combinations, do not translate
+# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
 agents.footer_hint: "(↑ ↓ za navigaciju • Enter za otvaranje sesije u novoj kartici • Shift+enter za otvaranje sesije u panelu agenta • Esc za izlaz)"
 agents.status.active: "Aktivan"
 agents.status.waiting_for_input: "Čeka na unos"

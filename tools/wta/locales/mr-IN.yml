@@ -66,6 +66,7 @@ commands.help_close_hint: "  Esc        ही मदत बंद करा"  #
 # Slash-command summaries shown in the popup and /help overlay.
 # Command names (/help, /clear, /new, /restart, /stop, /sessions) stay in
 # English. Only the descriptions are localized.
+# {Locked="ACP","Ctrl+Shift+/"} - protocol name and shortcut, do not translate
 commands.help.summary: "ही कमांड सूची दाखवा"
 commands.clear.summary: "चॅट स्क्रोलबॅक साफ करा (सत्र कायम ठेवते)"
 commands.new.summary: "नवे ACP सत्र सुरू करा (इतिहास काढून टाकते)"  # {Locked="ACP"}
@@ -112,7 +113,7 @@ agent.custom.auth_hint: "%{name} इंस्टॉल आहे आणि त�
 
 # ── एजंट दृश्य (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "लोड होत आहे..."
-# {Locked="Enter","Shift+enter","Esc"} - की संयोजन, भाषांतर करू नका
+# {Locked="Enter","Shift+enter","Esc","↑","↓"} - की संयोजन, भाषांतर करू नका
 agents.footer_hint: "(↑ ↓ नेव्हिगेट करा • Enter नवीन टॅबमध्ये सत्र सुरू करा • Shift+enter एजंट पेनमध्ये सत्र सुरू करा • Esc बाहेर पडा)"
 agents.status.active: "सक्रिय"
 agents.status.waiting_for_input: "इनपुटची प्रतीक्षा"

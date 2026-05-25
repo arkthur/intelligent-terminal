@@ -102,7 +102,7 @@ agent.custom.auth_hint: "Assurez-vous que %{name} est installé et se trouve dan
 
 # ── Vue des agents (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Chargement..."
-# {Locked="Enter","Shift+enter","Esc"} - combinaisons de touches, ne pas traduire
+# {Locked="Enter","Shift+enter","Esc","↑","↓"} - combinaisons de touches, ne pas traduire
 agents.footer_hint: "(↑ ↓ naviguer • Enter lancer la session dans un nouvel onglet • Shift+enter lancer la session dans le volet de l'agent • Esc quitter)"
 agents.status.active: "Actif"
 agents.status.waiting_for_input: "En attente de saisie"
@@ -170,6 +170,7 @@ time.days_other: "il y a %{count} jours"
 
 # ── Slash-command summaries (src/commands.rs) ─────────────────────────────
 # Command names (/help, /clear, etc.) stay English; descriptions translate.
+# {Locked="ACP","Ctrl+Shift+/"} - protocol name and shortcut, do not translate
 commands.help.summary: "Afficher cette liste de commandes"
 commands.clear.summary: "Effacer le contenu du chat (conserve la session)"
 commands.new.summary: "Démarrer une nouvelle session ACP (efface l’historique)"

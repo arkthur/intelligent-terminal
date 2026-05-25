@@ -66,6 +66,7 @@ commands.help_close_hint: "  Esc        إغلاق هذه المساعدة"  # {
 # Slash-command summaries shown in the popup and /help overlay.
 # Command names (/help, /clear, /new, /restart, /stop, /sessions) stay in
 # English. Only the descriptions are localized.
+# {Locked="ACP","Ctrl+Shift+/"} - protocol name and shortcut, do not translate
 commands.help.summary: "إظهار قائمة الأوامر هذه"
 commands.clear.summary: "مسح سجل تمرير الدردشة (مع الاحتفاظ بالجلسة)"
 commands.new.summary: "بدء جلسة ACP جديدة (حذف السجل)"  # {Locked="ACP"}
@@ -112,7 +113,7 @@ agent.custom.auth_hint: "تأكد من أن %{name} مثبّت وموجود في
 
 # ── عرض عوامل الذكاء الاصطناعي (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "جارٍ التحميل..."
-# {Locked="Enter","Shift+enter","Esc"} - مجموعات المفاتيح، لا تترجمها
+# {Locked="Enter","Shift+enter","Esc","↑","↓"} - مجموعات المفاتيح، لا تترجمها
 agents.footer_hint: "(↑ ↓ للتنقل • Enter لبدء جلسة في علامة تبويب جديدة • Shift+enter لبدء جلسة في لوحة عامل الذكاء الاصطناعي • Esc للخروج)"
 agents.status.active: "نشط"
 agents.status.waiting_for_input: "في انتظار الإدخال"

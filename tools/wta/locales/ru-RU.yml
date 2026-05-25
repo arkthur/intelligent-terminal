@@ -63,6 +63,7 @@ commands.help_header: "Слеш-команды — введите / в поле 
 commands.help_escape_hint: "  //text     Отправить буквальный '/' (экранирует синтаксический анализатор команд)"  # {Locked="//text","/"}
 commands.help_close_hint: "  Esc        Закрыть эту справку"  # {Locked="Esc"}
 # Slash command summaries. Command names stay in English.
+# {Locked="ACP","Ctrl+Shift+/"} - protocol name and shortcut, do not translate
 commands.help.summary: "Показать этот список команд"
 commands.clear.summary: "Очистить историю чата (сеанс сохраняется)"
 commands.new.summary: "Начать новый сеанс ACP (история будет удалена)"  # {Locked="ACP"}
@@ -108,7 +109,7 @@ agent.custom.auth_hint: "Убедитесь, что %{name} установлен
 
 # ── Представление агентов (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Загрузка..."
-# {Locked="Enter","Shift+enter","Esc"} - комбинации клавиш, не переводить
+# {Locked="Enter","Shift+enter","Esc","↑","↓"} - комбинации клавиш, не переводить
 agents.footer_hint: "(↑ ↓ навигация • Enter запустить сеанс в новой вкладке • Shift+enter запустить сеанс в панели агента • Esc выход)"
 agents.status.active: "Активен"
 agents.status.waiting_for_input: "Ожидание ввода"

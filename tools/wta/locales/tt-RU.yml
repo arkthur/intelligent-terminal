@@ -66,6 +66,7 @@ commands.help_close_hint: "  Esc        Бу ярдәмне ябу"  # {Locked="
 # Slash-command summaries shown in the popup and /help overlay.
 # Command names (/help, /clear, /new, /restart, /stop, /sessions) stay in
 # English. Only the descriptions are localized.
+# {Locked="ACP","Ctrl+Shift+/"} - protocol name and shortcut, do not translate
 commands.help.summary: "Бу боерыклар исемлеген күрсәтү"
 commands.clear.summary: "Чат әйләндерү тарихын чистарту (сеансны саклый)"
 commands.new.summary: "Яңа ACP сеансын башлау (тарихны ташлый)"  # {Locked="ACP"}
@@ -112,7 +113,7 @@ agent.custom.auth_hint: "%{name} урнатылуына һәм PATH-та бул�
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Йөкләнә..."
-# {Locked="Enter","Shift+enter","Esc"} - key combinations, do not translate
+# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
 agents.footer_hint: "(↑ ↓ навигация өчен • Enter яңа табда сеансны ачу өчен • Shift+enter агент панелендә сеансны ачу өчен • Esc чыгу өчен)"
 agents.status.active: "Актив"
 agents.status.waiting_for_input: "Кертү көтелә"

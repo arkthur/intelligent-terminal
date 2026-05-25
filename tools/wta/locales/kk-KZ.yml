@@ -66,6 +66,7 @@ commands.help_close_hint: "  Esc        Бұл көмекті жабу"  # {Lock
 # Slash-command summaries shown in the popup and /help overlay.
 # Command names (/help, /clear, /new, /restart, /stop, /sessions) stay in
 # English. Only the descriptions are localized.
+# {Locked="ACP","Ctrl+Shift+/"} - protocol name and shortcut, do not translate
 commands.help.summary: "Осы командалар тізімін көрсету"
 commands.clear.summary: "Чаттың айналдыру журналын тазалау (сеансты сақтайды)"
 commands.new.summary: "Жаңа ACP сеансын бастау (тарихты жояды)"  # {Locked="ACP"}
@@ -112,7 +113,7 @@ agent.custom.auth_hint: "%{name} орнатылғанына және PATH-те �
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Жүктелуде..."
-# {Locked="Enter","Shift+enter","Esc"} - key combinations, do not translate
+# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
 agents.footer_hint: "(↑ ↓ шарлау үшін • Enter жаңа қойындыда сеанс ашу үшін • Shift+enter агент панелінде сеанс ашу үшін • Esc шығу үшін)"
 agents.status.active: "Белсенді"
 agents.status.waiting_for_input: "Енгізу күтілуде"

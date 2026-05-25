@@ -98,7 +98,7 @@ agent.custom.auth_hint: "请确保 %{name} 已安装并位于 PATH 上。"  # {L
 
 # ── 智能体视图 (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "加载中..."
-# {Locked="Enter","Shift+enter","Esc"} - 组合键，不翻译
+# {Locked="Enter","Shift+enter","Esc","↑","↓"} - 组合键，不翻译
 agents.footer_hint: "(↑ ↓ 导航 • Enter 在新标签页中启动会话 • Shift+enter 在智能体窗格中启动会话 • Esc 退出)"
 agents.status.active: "活动"
 agents.status.waiting_for_input: "等待输入"
@@ -165,6 +165,7 @@ time.days_other: "%{count} 天前"
 
 # ── Slash-command summaries (src/commands.rs) ─────────────────────────────
 # Command names (/help, /clear, etc.) stay English; descriptions translate.
+# {Locked="ACP","Ctrl+Shift+/"} - protocol name and shortcut, do not translate
 commands.help.summary: "显示此命令列表"
 commands.clear.summary: "清除聊天记录（保留会话）"
 commands.new.summary: "启动新的 ACP 会话（清空历史记录）"
