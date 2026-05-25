@@ -236,7 +236,7 @@ jobs:
       replace-with = "WindowsTerminalCargo"
       "@
       Add-Content -Path $configPath -Value $registry -Encoding utf8NoBOM
-      Write-Host "Updated $configPath:"
+      Write-Host "Updated ${configPath}:"
       Get-Content $configPath
     displayName: Append Cargo registry config (CI only)
 
