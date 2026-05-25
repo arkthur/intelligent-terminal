@@ -5609,16 +5609,17 @@ impl App {
                 self.session_tab_mut(session_id).autofix.pane_id = None;
                 let tab = self.session_tab_mut(session_id);
                 let prompt = tab.turn.prompt().cloned().expect("prompt set");
-                // Preserve any streamed tokens as chat history so the user
-                // can review what the model said before deciding to ignore.
-                if !buf.trim().is_empty() {
+                // Preserve only what the user actually saw streaming (prose
+                // or extracted `explanation`) — not the raw JSON wrapper.
+                let visible = ui::chat::user_visible_stream_text(buf).map(|c| c.into_owned());
+                if let Some(visible) = visible {
                     let pane_label = prompt
                         .autofix
                         .as_ref()
                         .map(|a| a.target_pane_id.clone())
-                        .unwrap_or_default();
+                        .expect("autofix finalize requires autofix prompt");
                     let mut details = tab.current_turn_details();
-                    details.push(ChatMessage::Agent(buf.to_string()));
+                    details.push(ChatMessage::Agent(visible));
                     tab.completed_turns.push(CompletedTurn {
                         prompt: format!("Auto-diagnosed error in pane {pane_label}"),
                         details,
@@ -5792,26 +5793,25 @@ impl App {
             self.emit_autofix_state_cleared(&target_tab);
         }
         let tab = self.session_tab_mut(session_id);
-        // Preserve any streamed tokens before discarding the in-flight turn,
-        // so a mid-stream Esc doesn't erase agent output the user already saw.
+        // Preserve the user-visible prose before discarding the in-flight
+        // turn, so a mid-stream Esc doesn't erase output the user just saw.
+        // Match `pending_render_text` so we never commit JSON the UI hid.
         let streamed = if let TurnState::Streaming { prompt, buf } = &tab.turn {
-            if buf.trim().is_empty() {
-                None
-            } else {
+            ui::chat::user_visible_stream_text(buf).map(|visible| {
                 let label = match prompt.autofix.as_ref() {
                     Some(autofix) => {
                         format!("Auto-diagnosed error in pane {}", autofix.target_pane_id)
                     }
                     None => prompt.text.clone(),
                 };
-                Some((label, buf.clone()))
-            }
+                (label, visible.into_owned())
+            })
         } else {
             None
         };
-        if let Some((prompt_label, buf)) = streamed {
+        if let Some((prompt_label, visible)) = streamed {
             let mut details = tab.current_turn_details();
-            details.push(ChatMessage::Agent(buf));
+            details.push(ChatMessage::Agent(visible));
             tab.completed_turns.push(CompletedTurn {
                 prompt: prompt_label,
                 details,

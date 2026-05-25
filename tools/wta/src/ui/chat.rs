@@ -248,7 +248,7 @@ fn build_activity_line(app: &App) -> Option<Line<'static>> {
 /// Incrementally extracts a JSON string field's decoded value from a
 /// possibly-truncated text. Handles `\"`, `\\`, `\n`, `\t`, `\u{XXXX}` etc.
 /// Returns the partial value if the closing quote hasn't arrived yet.
-fn extract_json_string_field(text: &str, field: &str) -> Option<String> {
+pub(crate) fn extract_json_string_field(text: &str, field: &str) -> Option<String> {
     let key = format!("\"{field}\"");
     let start = text.find(&key)?;
     let rest = text[start + key.len()..].trim_start();
@@ -290,7 +290,7 @@ fn extract_json_string_field(text: &str, field: &str) -> Option<String> {
     Some(out)
 }
 
-/// Resolves what (if anything) the pending stream should render.
+/// Resolves the user-visible portion of a streaming buffer:
 ///
 /// - Buffer starts with a JSON wrapper (autofix): extract the `explanation`
 ///   field so the user sees flowing markdown rather than raw JSON syntax.
@@ -300,9 +300,11 @@ fn extract_json_string_field(text: &str, field: &str) -> Option<String> {
 ///   terminal-task mode): render only the prose prefix; the recommendation
 ///   card replaces it on eager/end-of-turn finalize.
 /// - Pure prose: stream as-is.
-fn pending_render_text(tab: &crate::app::TabSession) -> Option<Cow<'_, str>> {
-    // Pending text is only meaningful while the turn is actively streaming.
-    let text = tab.turn.buffer()?;
+///
+/// Callers outside the render path (e.g. turn-cancel / ignore commits) use
+/// this to record exactly what the user saw during streaming, instead of the
+/// raw buffer (which may contain JSON the UI deliberately hid).
+pub(crate) fn user_visible_stream_text(text: &str) -> Option<Cow<'_, str>> {
     let trimmed = text.trim_start();
     if trimmed.is_empty() {
         return None;
@@ -321,6 +323,11 @@ fn pending_render_text(tab: &crate::app::TabSession) -> Option<Cow<'_, str>> {
         };
     }
     Some(Cow::Borrowed(text))
+}
+
+fn pending_render_text(tab: &crate::app::TabSession) -> Option<Cow<'_, str>> {
+    // Pending text is only meaningful while the turn is actively streaming.
+    user_visible_stream_text(tab.turn.buffer()?)
 }
 
 fn build_pending_stream_lines<'a>(app: &App, wrap_width: usize) -> Vec<Line<'a>> {
