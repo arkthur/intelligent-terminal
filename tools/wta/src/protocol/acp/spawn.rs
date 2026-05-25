@@ -142,7 +142,7 @@ pub(crate) fn spawn_agent_process(agent_cmd: &str, cwd: Option<&Path>) -> Result
 /// Rules:
 /// - Split on `-`. First segment is always the language, lowercased.
 /// - Two-letter segments after the first are treated as ISO 3166-1
-///   region codes and forced to upper case.
+///   region codes and converted to uppercase.
 /// - Four-letter segments are treated as ISO 15924 script codes and
 ///   title-cased (e.g. `Latn`, `Cyrl`).
 /// - Anything else (numeric region, variant) is left as-is.
