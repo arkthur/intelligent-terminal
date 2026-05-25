@@ -226,7 +226,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // Args are passed verbatim to wta.exe (e.g. L"hooks install" or
         // L"hooks uninstall --cli claude"). `inProgressMessage` is shown
         // beneath the expander while the wta process is running.
-        winrt::fire_and_forget _RunHooksWtaAsync(std::wstring wtaArgs, std::wstring inProgressMessage);
+        winrt::fire_and_forget _RunHooksWtaAsync(std::wstring wtaArgs);
     };
 };
 

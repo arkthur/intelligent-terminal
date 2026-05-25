@@ -107,9 +107,10 @@ namespace winrt::TerminalApp::implementation
         // that title lives. The session list is filtered by the current
         // agent's CLI source (see App::current_cli_filter), so we suffix
         // the bar with the agent's display name to make the scope explicit
-        // (e.g. "Agent sessions · GitHub Copilot"). We use _agentName verbatim
-        // — it already carries the canonical product casing from the ACP
-        // initialize response.
+        // (e.g. "Agent sessions: GitHub Copilot" — colon separator per the
+        // localized `AgentPane_SessionsTitleFormat` resource). We use
+        // _agentName verbatim — it already carries the canonical product
+        // casing from the ACP initialize response.
         if (_isSessionsView)
         {
             const auto text = _agentName.empty() ?

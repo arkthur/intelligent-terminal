@@ -841,7 +841,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _installingAgentHooks = true;
         _agentHooksInstallSummary = RS_(L"AIAgents_HooksInstallingSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
-        _RunHooksWtaAsync(L"hooks install", std::wstring{ RS_(L"AIAgents_HooksInstallingSummary") });
+        _RunHooksWtaAsync(L"hooks install");
     }
 
     void AIAgentsViewModel::RemoveCopilotHooks()
@@ -850,7 +850,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _installingAgentHooks = true;
         _agentHooksInstallSummary = RS_(L"AIAgents_HooksRemovingCopilotSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
-        _RunHooksWtaAsync(L"hooks uninstall --cli copilot", std::wstring{ RS_(L"AIAgents_HooksRemovingCopilotSummary") });
+        _RunHooksWtaAsync(L"hooks uninstall --cli copilot");
     }
 
     void AIAgentsViewModel::RemoveClaudeHooks()
@@ -859,7 +859,7 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _installingAgentHooks = true;
         _agentHooksInstallSummary = RS_(L"AIAgents_HooksRemovingClaudeSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
-        _RunHooksWtaAsync(L"hooks uninstall --cli claude", std::wstring{ RS_(L"AIAgents_HooksRemovingClaudeSummary") });
+        _RunHooksWtaAsync(L"hooks uninstall --cli claude");
     }
 
     void AIAgentsViewModel::RemoveGeminiHooks()
@@ -868,10 +868,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _installingAgentHooks = true;
         _agentHooksInstallSummary = RS_(L"AIAgents_HooksRemovingGeminiSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
-        _RunHooksWtaAsync(L"hooks uninstall --cli gemini", std::wstring{ RS_(L"AIAgents_HooksRemovingGeminiSummary") });
+        _RunHooksWtaAsync(L"hooks uninstall --cli gemini");
     }
 
-    winrt::fire_and_forget AIAgentsViewModel::_RunHooksWtaAsync(std::wstring wtaArgs, std::wstring /*inProgressMessage*/)
+    winrt::fire_and_forget AIAgentsViewModel::_RunHooksWtaAsync(std::wstring wtaArgs)
     {
         auto strongThis = get_strong();
         // Capture dispatcher synchronously while we're still on the calling
