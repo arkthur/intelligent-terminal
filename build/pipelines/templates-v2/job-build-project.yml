@@ -205,7 +205,7 @@ jobs:
       # config-file resolution picks it up.
       additionalTargets: 'x86_64-pc-windows-msvc i686-pc-windows-msvc aarch64-pc-windows-msvc'
 
-  # Append Azure Artifacts source replacement to .cargo/config.toml.
+  # Inject the Azure Artifacts source replacement into .cargo/config.toml.
   # The repo's .cargo/config.toml is checked in and carries the
   # `+crt-static` rustflags that wta.exe needs to start without
   # VCRUNTIME140.dll on customer machines (the package ships no VC
@@ -215,10 +215,13 @@ jobs:
   # VCRUNTIME140.dll and failed to launch in clean environments
   # (e.g. Windows Sandbox).
   #
-  # The grep guard makes the step idempotent: if `WindowsTerminalCargo`
-  # is already present (re-run on a dirty workspace, or the repo grows
-  # its own registry entry later), skip the append so we don't produce
-  # a config file with duplicate TOML keys that Cargo refuses to parse.
+  # The strategy: read the file, locate any previously CI-injected
+  # block via a sentinel marker line, truncate the file at that
+  # marker, then append a fresh canonical CI block. Idempotent by
+  # construction — regardless of starting state, the final file is
+  # always the repo's checked-in content followed by exactly one
+  # canonical CI block. Safe under retries, dirty workspaces, future
+  # URL changes, or hand-edits.
   #
   # Cargo discovers .cargo/config.toml by walking from the current
   # working directory (repo root) up — NOT from the manifest directory.
@@ -227,22 +230,29 @@ jobs:
       $configDir = '.cargo'
       $configPath = Join-Path $configDir 'config.toml'
       New-Item -ItemType Directory -Path $configDir -Force | Out-Null
-      if ((Test-Path $configPath) -and (Select-String -Path $configPath -Pattern 'WindowsTerminalCargo' -SimpleMatch -Quiet)) {
-        Write-Host "Registry replacement already present in $configPath, skipping append."
-      } else {
-        $registry = @"
 
+      $marker = '# === BEGIN: Azure Artifacts source replacement (CI-injected) ==='
+      $existing = if (Test-Path $configPath) { Get-Content $configPath -Raw } else { '' }
+      $markerIdx = $existing.IndexOf($marker)
+      if ($markerIdx -ge 0) {
+        $existing = $existing.Substring(0, $markerIdx)
+      }
+      $existing = $existing.TrimEnd()
+
+      $injection = @"
+      $marker
       [registries]
       WindowsTerminalCargo = { index = "sparse+https://pkgs.dev.azure.com/microsoft/Dart/_packaging/IntelligentTerminal_Cargo/Cargo/index/" }
 
       [source.crates-io]
       replace-with = "WindowsTerminalCargo"
       "@
-        Add-Content -Path $configPath -Value $registry -Encoding utf8NoBOM
-        Write-Host "Appended registry replacement to $configPath."
-      }
+
+      $final = if ($existing) { "$existing`n`n$injection`n" } else { "$injection`n" }
+      Set-Content -Path $configPath -Value $final -Encoding utf8NoBOM -NoNewline
+      Write-Host "Wrote $configPath:"
       Get-Content $configPath
-    displayName: Append Cargo registry config (CI only)
+    displayName: Inject Cargo registry config (CI only)
 
   # CargoAuthenticate issues a Bearer token (using System.AccessToken) for
   # every Azure Artifacts Cargo feed referenced in the config file.
