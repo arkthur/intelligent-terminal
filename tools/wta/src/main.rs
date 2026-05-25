@@ -4,6 +4,7 @@ extern crate rust_i18n;
 mod agent_check;
 mod agent_registry;
 mod agent_sessions;
+mod agent_pane_origin;
 mod agent_hooks_installer;
 mod app;
 mod commands;
@@ -1572,19 +1573,23 @@ async fn run_acp_app(
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
-                        let pane_id = event_json
-                            .get("params")
-                            .and_then(|p| p.get("session_id"))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string();
                         let params = event_json
                             .get("params")
                             .cloned()
                             .unwrap_or(serde_json::Value::Null);
+                        let pane_id = params
+                            .get("pane_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let tab_id = params
+                            .get("tab_id")
+                            .and_then(|v| v.as_str())
+                            .map(str::to_string);
                         let _ = wt_event_tx.send(app::AppEvent::WtEvent {
                             method,
                             pane_id,
+                            tab_id,
                             params,
                         });
                     }
