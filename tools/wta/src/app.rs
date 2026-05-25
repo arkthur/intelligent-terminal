@@ -5609,6 +5609,25 @@ impl App {
                 self.session_tab_mut(session_id).autofix.pane_id = None;
                 let tab = self.session_tab_mut(session_id);
                 let prompt = tab.turn.prompt().cloned().expect("prompt set");
+                // Preserve any streamed tokens as chat history so the user
+                // can review what the model said before deciding to ignore.
+                if !buf.trim().is_empty() {
+                    let pane_label = prompt
+                        .autofix
+                        .as_ref()
+                        .map(|a| a.target_pane_id.clone())
+                        .unwrap_or_default();
+                    let mut details = tab.current_turn_details();
+                    details.push(ChatMessage::Agent(buf.to_string()));
+                    tab.completed_turns.push(CompletedTurn {
+                        prompt: format!("Auto-diagnosed error in pane {pane_label}"),
+                        details,
+                        expanded: true,
+                    });
+                    tab.messages.clear();
+                    tab.tool_calls.clear();
+                    tab.scroll_to_bottom();
+                }
                 tab.turn = TurnState::Surfaced {
                     prompt,
                     outcome: TurnOutcome::Empty,
@@ -5773,6 +5792,35 @@ impl App {
             self.emit_autofix_state_cleared(&target_tab);
         }
         let tab = self.session_tab_mut(session_id);
+        // Preserve any streamed tokens before discarding the in-flight turn,
+        // so a mid-stream Esc doesn't erase agent output the user already saw.
+        let streamed = if let TurnState::Streaming { prompt, buf } = &tab.turn {
+            if buf.trim().is_empty() {
+                None
+            } else {
+                let label = match prompt.autofix.as_ref() {
+                    Some(autofix) => {
+                        format!("Auto-diagnosed error in pane {}", autofix.target_pane_id)
+                    }
+                    None => prompt.text.clone(),
+                };
+                Some((label, buf.clone()))
+            }
+        } else {
+            None
+        };
+        if let Some((prompt_label, buf)) = streamed {
+            let mut details = tab.current_turn_details();
+            details.push(ChatMessage::Agent(buf));
+            tab.completed_turns.push(CompletedTurn {
+                prompt: prompt_label,
+                details,
+                expanded: true,
+            });
+            tab.messages.clear();
+            tab.tool_calls.clear();
+            tab.scroll_to_bottom();
+        }
         tab.autofix.pane_id = None;
         tab.selected_recommendation = 0;
         tab.selected_button = 0;
@@ -5810,7 +5858,7 @@ impl App {
         tab.completed_turns.push(CompletedTurn {
             prompt: prompt.text.clone(),
             details,
-            expanded: false,
+            expanded: true,
         });
         tab.messages.clear();
         tab.tool_calls.clear();
@@ -5857,8 +5905,20 @@ impl App {
         let target_tab = self.tab_for_session(session_id);
         self.emit_autofix_state_armed(&target_tab, &pane_id, &preview);
         let rec_idx = recommended_choice_index(&recommendations);
+        let summary = format_recommendations_for_chat(&recommendations);
+        let turn_prompt_label = format!("Auto-diagnosed error in pane {pane_id}");
         let tab = self.session_tab_mut(session_id);
         let prompt = tab.turn.prompt().cloned().expect("prompt set");
+        let mut details = tab.current_turn_details();
+        details.push(ChatMessage::Agent(summary));
+        tab.completed_turns.push(CompletedTurn {
+            prompt: turn_prompt_label,
+            details,
+            expanded: true,
+        });
+        tab.messages.clear();
+        tab.tool_calls.clear();
+        tab.scroll_to_bottom();
         tab.selected_recommendation = rec_idx;
         tab.selection_visible_pending = true;
         tab.progress_status = None;
