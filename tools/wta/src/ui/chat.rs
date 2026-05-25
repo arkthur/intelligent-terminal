@@ -249,8 +249,7 @@ fn build_completed_turn_lines<'a>(
     if let (Some(marker), Some(idx)) = (turn.trailing_marker.as_deref(), marker_target_idx) {
         if let Some(line) = lines.get_mut(idx) {
             line.spans.push(Span::raw("  "));
-            line.spans
-                .push(Span::styled(marker.to_string(), theme::DIM));
+            line.spans.push(Span::styled(marker, theme::DIM));
         }
     }
 
