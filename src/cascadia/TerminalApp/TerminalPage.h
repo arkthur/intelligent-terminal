@@ -48,10 +48,6 @@ namespace winrt::TerminalApp::implementation
         Initialized = 2
     };
 
-    // Forward decls for the per-wta protocol pipe transport (Phase 1 — used by
-    // the delegation flow at present; will be extended to the agent pane).
-    struct AgentDelegationEntry;
-
     enum ScrollDirection : int
     {
         ScrollUp = 0,
@@ -210,7 +206,7 @@ namespace winrt::TerminalApp::implementation
         void OnAutofixStateChanged(hstring eventJson);
         void OnAgentStatusChanged(hstring eventJson);
         void OnCloseAgentPaneRequested(hstring eventJson);
-        void OnAgentViewChanged(hstring eventJson);
+        void OnAgentStateChanged(hstring eventJson);
         void OnResumeInNewAgentTabRequested(hstring eventJson);
 
         til::property_changed_event PropertyChanged;
@@ -330,17 +326,23 @@ namespace winrt::TerminalApp::implementation
         enum class AutofixState
         {
             Idle,      // no error pending
+            Detected,  // suggest-mode: error detected, awaiting user activation
             Pending,   // error detected, WTA is generating a fix
-            Armed,     // fix ready — click or Ctrl+. executes it
+            Armed,     // fix ready — click or Ctrl+Alt+. executes it
             Suggested, // analysis ready but no auto-fix — click opens agent pane
         };
         struct DiagnosticState
         {
-            std::wstring lastErrorSessionId;
+            // Pane GUID of the most recent error (matches the wire-level
+            // `pane_id` rename in this PR). The historical name
+            // `lastErrorSessionId` was a misnomer — this never held an
+            // ACP session id, only a WT pane GUID.
+            std::wstring lastErrorPaneId;
             AutofixState autofixState{ AutofixState::Idle };
-            std::wstring fixPreview;        // Armed
-            std::wstring hotkeyHint;        // Armed
-            std::wstring suggestionTitle;   // Suggested
+            std::wstring fixPreview;          // Armed
+            std::wstring hotkeyHint;          // Armed / Detected
+            std::wstring suggestionTitle;     // Suggested
+            std::wstring detectedSummary;     // Detected
         };
         DiagnosticState _diagnostics;
         bool _agentPaneVisible{ false };
@@ -365,6 +367,12 @@ namespace winrt::TerminalApp::implementation
         };
         AgentSettingsSnapshot _lastAgentSettings{};
         bool _agentSettingsSnapshotInitialized{ false };
+        // Snapshot of AutoFixEnabled at last SetSettings call. When the
+        // user toggles "Auto-suggest fixes" we send the new value to WTA
+        // over the protocol so it can update its in-memory gate without
+        // requiring the agent pane to be torn down and restarted.
+        bool _lastAutoFixEnabled{ false };
+        bool _autoFixEnabledSnapshotInitialized{ false };
         bool _agentRebuilding{ false };
         // Set when a settings change wants a rebuild but the active
         // tab can't host an agent pane (e.g. the Settings tab itself).
@@ -502,6 +510,7 @@ namespace winrt::TerminalApp::implementation
         void _InitializeTab(winrt::com_ptr<Tab> newTabImpl, uint32_t insertPosition = -1, bool openInBackground = false);
         void _RegisterTerminalEvents(Microsoft::Terminal::Control::TermControl term);
         std::string _FindSessionIdForControl(const Microsoft::Terminal::Control::TermControl& control);
+        std::string _FindTabIdForControl(const Microsoft::Terminal::Control::TermControl& control);
         void _RegisterTabEvents(Tab& hostingTab);
 
         void _DismissTabContextMenus();
@@ -661,9 +670,52 @@ namespace winrt::TerminalApp::implementation
         // received the handles).
         void _AttachAgentPanePipeServer(wil::unique_handle wtRead,
                                         wil::unique_handle wtWrite);
+
+        // Agent-pane wta lifetime management. Solves two problems at once:
+        //
+        // (1) Detect wta death (crash / external taskkill / clean exit) so we
+        //     tear the pane down. Conpty StateChanged can't be used because
+        //     wta spawns long-lived children (npx → npm → node → ACP adapter)
+        //     that inherit the conpty client handles, so the pipe never EOFs
+        //     even when wta itself is gone.
+        // (2) Reclaim those orphaned children. Without explicit job
+        //     containment, killing wta leaves node.exe / npx running.
+        //
+        // _agentPaneJob: KILL_ON_JOB_CLOSE Job Object containing wta and (by
+        // inheritance) all its descendants. Resetting the handle terminates
+        // every member — used during teardown to sweep orphans, and (via OS)
+        // when WT itself exits abnormally. Only the agent pane uses a job;
+        // ordinary shell panes keep their existing free-running lifetime.
+        //
+        // _agentPaneWtaHandle: duplicated SYNCHRONIZE handle to wta. Owned
+        // independently of ConptyConnection's _piClient so the wait stays
+        // valid across teardown ordering.
+        //
+        // _agentPaneWtaWait + _agentPaneWtaWaitContext: RegisterWaitForSingleObject
+        // registration. Context is heap-allocated (so the threadpool callback
+        // has stable storage even if TerminalPage tears down before the wait
+        // unregisters); it carries a weak_ref + cancelled flag so we can race
+        // safely with deliberate teardown.
+        struct AgentPaneWtaWaitContext;
+        wil::unique_handle _agentPaneJob;
+        wil::unique_handle _agentPaneWtaHandle;
+        HANDLE _agentPaneWtaWait{ nullptr };
+        std::unique_ptr<AgentPaneWtaWaitContext> _agentPaneWtaWaitContext;
+        // Generation counter bumped on every _SetupAgentPaneWtaWatch and
+        // _TearDownAgentPaneWtaWatch. The dispatched UI-thread continuation
+        // captures the generation it was scheduled under and compares
+        // against the live value before tearing the pane down. Without
+        // this, a callback that posts to the UI thread can land after a
+        // teardown-then-rebuild and tear down the freshly-armed
+        // replacement pane. UI-thread only — no atomic needed.
+        uint64_t _agentPaneWtaGen{ 0 };
+        void _SetupAgentPaneWtaWatch(HANDLE wtaProcessHandle) noexcept;
+        void _TearDownAgentPaneWtaWatch() noexcept;
+        static void NTAPI _OnAgentPaneWtaExit(PVOID context, BOOLEAN timedOut) noexcept;
         void _OpenOrReuseAgentPane(const winrt::hstring& prompt, bool intoSessionsView, const wchar_t* triggerSource);
         void _FocusAgentPane();
-        void _BroadcastAgentSetView(std::string_view view);
+        void _RequestAgentState(std::optional<std::string_view> view,
+                                std::optional<bool> paneOpen);
         void _RepositionAgentPanes();
         static winrt::Microsoft::Terminal::Settings::Model::SplitDirection _AgentPanePositionToSplitDirection(const winrt::hstring& position);
 

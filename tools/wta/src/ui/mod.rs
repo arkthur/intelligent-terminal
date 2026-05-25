@@ -1,4 +1,5 @@
 mod auth;
+pub(crate) mod card;
 mod chat;
 mod command_popup;
 mod debug_panel;

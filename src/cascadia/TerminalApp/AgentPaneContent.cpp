@@ -32,6 +32,7 @@ namespace winrt::TerminalApp::implementation
             if (lower.find(L"gemini") != std::wstring::npos) return L"gemini.svg";
             return L"copilot.svg";
         }
+
     }
 
     AgentPaneContent::AgentPaneContent(const winrt::TerminalApp::TerminalPaneContent& inner) :
@@ -103,10 +104,19 @@ namespace winrt::TerminalApp::implementation
     {
         // Session-management view takes over the bar — the wta TUI below no
         // longer renders its own "Agent sessions" header, so this is where
-        // that title lives.
+        // that title lives. The session list is filtered by the current
+        // agent's CLI source (see App::current_cli_filter), so we suffix
+        // the bar with the agent's display name to make the scope explicit
+        // (e.g. "Agent sessions: GitHub Copilot" — colon separator per the
+        // localized `AgentPane_SessionsTitleFormat` resource). We use
+        // _agentName verbatim — it already carries the canonical product
+        // casing from the ACP initialize response.
         if (_isSessionsView)
         {
-            AgentLabelText().Text(L"Agent sessions");
+            const auto text = _agentName.empty() ?
+                                  std::wstring{ RS_(L"AgentPane_SessionsTitle") } :
+                                  RS_fmt(L"AgentPane_SessionsTitleFormat", std::wstring{ _agentName });
+            AgentLabelText().Text(winrt::hstring{ text });
             return;
         }
 
@@ -141,9 +151,13 @@ namespace winrt::TerminalApp::implementation
     {
         // Sessions view: the bar shows only the "Agent sessions" title
         // (Figma node 912:70364 — no per-agent logo on the session list).
+        // Collapse the logo so the title shifts left to where the logo
+        // would have been, but keep the bar's 10px left padding so the
+        // text doesn't butt against the edge.
         if (_isSessionsView)
         {
             AgentLogo().Source(nullptr);
+            AgentLogo().Visibility(Visibility::Collapsed);
             return;
         }
 
@@ -151,6 +165,7 @@ namespace winrt::TerminalApp::implementation
         if (_agentName.empty())
         {
             AgentLogo().Source(nullptr);
+            AgentLogo().Visibility(Visibility::Collapsed);
             return;
         }
 
@@ -164,6 +179,7 @@ namespace winrt::TerminalApp::implementation
         source.RasterizePixelWidth(28.0);
         source.RasterizePixelHeight(28.0);
         AgentLogo().Source(source);
+        AgentLogo().Visibility(Visibility::Visible);
     }
 
 #pragma region IPaneContent forwarding

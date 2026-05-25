@@ -283,10 +283,8 @@ Protocol::AuthResult TerminalProtocolComServer::Authenticate(winrt::hstring cons
 
     Protocol::AuthResult result{};
     result.Authenticated = _authenticated;
-    // 2.1 — IProtocolServer no longer exposes SendInput. Keystroke injection
-    // is restricted to per-wta secure pipes (TerminalProtocolPipeServer).
-    // Pane identifiers are GUIDs (WT_SESSION) instead of UInt32 pane ids.
-    result.ProtocolVersion = L"2.1";
+    // 2.2 — SendInput restored on the COM surface; pane identifiers remain GUIDs.
+    result.ProtocolVersion = L"2.2";
     return result;
 }
 
@@ -306,6 +304,7 @@ winrt::hstring TerminalProtocolComServer::GetCapabilities()
         "create_tab",
         "split_pane",
         "close_pane",
+        "send_input",
         "set_session_variable",
         "subscribe",
         "unsubscribe",
@@ -576,6 +575,31 @@ void TerminalProtocolComServer::ClosePane(winrt::guid sessionId)
     winrt::throw_hresult(E_FAIL);
 }
 
+void TerminalProtocolComServer::SendInput(winrt::guid sessionId, winrt::hstring const& text)
+{
+    THROW_HR_IF(E_NOT_VALID_STATE, !s_emperor);
+    THROW_HR_IF(E_INVALIDARG, sessionId == winrt::guid{});
+
+    // Empty input is a no-op, matching ControlCore::SendInput semantics so
+    // COM clients that send "" don't see surprising E_INVALIDARG failures.
+    if (text.empty())
+    {
+        return;
+    }
+
+    for (const auto& host : s_emperor->GetWindows())
+    {
+        const auto page = _getPage(host.get());
+        if (!page)
+            continue;
+
+        if (page.SendProtocolInput(sessionId, text).get())
+            return;
+    }
+
+    winrt::throw_hresult(E_FAIL);
+}
+
 void TerminalProtocolComServer::FocusPane(winrt::guid sessionId)
 {
     THROW_HR_IF(E_NOT_VALID_STATE, !s_emperor);
@@ -662,11 +686,13 @@ void TerminalProtocolComServer::SendEvent(winrt::hstring const& eventJson)
         // thread and tell TerminalPage to tear down the shared agent pane.
         _dispatchCloseAgentPaneToPage(eventJson);
         return;
-    case ProtocolParsing::SendEventRoute::ViewChanged:
-        // wta TUI flipped its internal view (Esc out of session view,
-        // `/sessions` slash command). C++ mirrors the new view onto the
-        // agent bar title + the bottom bar's sessions/chat highlight.
-        _dispatchViewChangedToPage(eventJson);
+    case ProtocolParsing::SendEventRoute::AgentState:
+        // Unified per-tab agent-pane UI snapshot from wta. Drives
+        // `_agentSessionsViewActive` (bar title + bottom-bar highlight)
+        // and `Tab.AgentPaneOpen` (which tab wants the shared pane
+        // visible). One handler, one event, future per-tab state plugs
+        // in as another field on the same payload.
+        _dispatchAgentStateChangedToPage(eventJson);
         return;
     case ProtocolParsing::SendEventRoute::ResumeInNewAgentTab:
         // Session view's Shift+Enter handler in the wta TUI. Carries
@@ -798,7 +824,7 @@ void TerminalProtocolComServer::_dispatchCloseAgentPaneToPage(const winrt::hstri
     }
 }
 
-void TerminalProtocolComServer::_dispatchViewChangedToPage(const winrt::hstring& eventJson)
+void TerminalProtocolComServer::_dispatchAgentStateChangedToPage(const winrt::hstring& eventJson)
 {
     if (!s_emperor)
     {
@@ -806,7 +832,7 @@ void TerminalProtocolComServer::_dispatchViewChangedToPage(const winrt::hstring&
     }
     // Same fan-out shape as the other dispatchers: the agent pane lives in
     // exactly one window, but we don't know which from here, and pages with
-    // no agent pane no-op the call (see OnAgentViewChanged).
+    // no agent pane no-op the call (see OnAgentStateChanged).
     for (const auto& host : s_emperor->GetWindows())
     {
         auto page = _getPage(host.get());
@@ -824,7 +850,7 @@ void TerminalProtocolComServer::_dispatchViewChangedToPage(const winrt::hstring&
             [page, eventJson]() {
                 try
                 {
-                    page.OnAgentViewChanged(eventJson);
+                    page.OnAgentStateChanged(eventJson);
                 }
                 catch (...)
                 {
