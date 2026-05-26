@@ -20,6 +20,7 @@
 #include <regex>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <ShlObj.h>
 
 namespace Microsoft::Terminal::ShellIntegration
@@ -145,35 +146,22 @@ if (-not $Global:__ShellInteg_Installed) {
         };
     }
 
-    // Result of locating an existing `. "...shell-integration*.ps1"` dot-source
-    // line. When `found()`, [start, end) is the byte range of the matched line
-    // (CR/LF excluded) and `referencedPath` is the quoted path (without the
-    // surrounding quotes) — useful for path-equivalence checks even when the
-    // line has trailing comments or extra whitespace.
-    struct DotSourceMatch
-    {
-        size_t start = std::string::npos;
-        size_t end = std::string::npos;
-        std::string referencedPath;
-
-        bool found() const noexcept { return start != std::string::npos; }
-    };
-
     // Locates an existing `. "...shell-integration*.ps1"` dot-source line in `contents`.
-    // Matches any version of our script — current (shell-integration_vN.ps1) AND
-    // legacy (shell-integration.ps1) — so upgrades can rewrite the line in place.
+    // Returns the [start, end) byte range of the line (CR/LF excluded), or
+    // { npos, npos } when no such line is present. Matches any version of our
+    // script — current (shell-integration_vN.ps1) AND legacy (shell-integration.ps1)
+    // — so upgrades can rewrite the line in place.
     //
     // Pattern (multiline): line begins with `.` + whitespace + a quoted path
     // whose FINAL filename component is `shell-integration*.ps1`. The path
     // component check (preceded by `/`, `\`, or the opening quote; followed
     // only by non-separator chars before `.ps1`) avoids false matches on
     // directories that happen to contain "shell-integration" or on trailing
-    // comments after an unrelated dot-source line. Capture group 1 yields the
-    // quoted path itself (without the surrounding quotes).
-    inline DotSourceMatch FindShellIntegrationDotSourceLine(std::string_view contents)
+    // comments after an unrelated dot-source line.
+    inline std::pair<size_t, size_t> FindShellIntegrationDotSourceLine(std::string_view contents)
     {
         static const std::regex pattern{
-            R"(^[ \t]*\.[ \t]+"((?:[^"]*[\\/])?shell-integration[^"\\/]*\.ps1)".*)",
+            R"(^[ \t]*\.[ \t]+"(?:[^"]*[\\/])?shell-integration[^"\\/]*\.ps1".*)",
             std::regex_constants::ECMAScript | std::regex_constants::multiline
         };
         std::cmatch m;
@@ -187,9 +175,9 @@ if (-not $Global:__ShellInteg_Installed) {
             {
                 --end;
             }
-            return { start, end, m[1].str() };
+            return { start, end };
         }
-        return {};
+        return { std::string::npos, std::string::npos };
     }
 
     // Install shell integration for a given PowerShell profile path.
@@ -255,17 +243,14 @@ if (-not $Global:__ShellInteg_Installed) {
             : std::string_view{ "\n" };
 
         // 3. Find any existing dot-source line (current or legacy version).
-        const auto desiredPath = til::u16u8(scriptPath.wstring());
         const auto desiredLine = til::u16u8(
             fmt::format(FMT_COMPILE(L". \"{}\""), scriptPath.wstring()));
-        const auto match = FindShellIntegrationDotSourceLine(contents);
+        const auto [lineStart, lineEnd] = FindShellIntegrationDotSourceLine(contents);
+        const bool found = lineStart != std::string::npos;
 
-        // 4. No-op when the existing line already references the current script
-        //    AND the script is on disk. Compare the captured path (not the entire
-        //    line) so that trailing user comments or extra whitespace on a
-        //    correct line don't trigger a needless rewrite.
-        if (match.found() &&
-            match.referencedPath == desiredPath &&
+        // 4. No-op when the existing line already matches AND the script is on disk.
+        if (found &&
+            std::string_view(contents.data() + lineStart, lineEnd - lineStart) == desiredLine &&
             std::filesystem::exists(scriptPath))
         {
             return { true, true, {} };
@@ -306,9 +291,9 @@ if (-not $Global:__ShellInteg_Installed) {
         }
 
         // 6. Update existing line in place, or append a new line at the bottom.
-        if (match.found())
+        if (found)
         {
-            contents.replace(match.start, match.end - match.start, desiredLine);
+            contents.replace(lineStart, lineEnd - lineStart, desiredLine);
         }
         else
         {
