@@ -19,6 +19,7 @@ mod protocol;
 mod runtime_paths;
 mod rtl;
 mod pane_context;
+mod session_mgmt;
 mod session_registry;
 mod shell;
 #[cfg(test)]
