@@ -769,8 +769,6 @@ pub struct DispatchedCommand {
 
 pub enum AppEvent {
     Key(KeyEvent),
-    /// Mouse wheel scroll: delta<0 = scroll up, delta>0 = scroll down, row = terminal row of event
-    MouseScroll { delta: i32, row: u16 },
     Tick,
     Resize(u16, u16), // terminal resize (handled by ratatui)
     ConnectionStage(String),
@@ -2861,7 +2859,6 @@ impl App {
     fn event_name(event: &AppEvent) -> &'static str {
         match event {
             AppEvent::Key(_) => "key",
-            AppEvent::MouseScroll { .. } => "mouse_scroll",
             AppEvent::Tick => "tick",
             AppEvent::Resize(_, _) => "resize",
             AppEvent::ConnectionStage(_) => "connection_stage",
@@ -2916,27 +2913,6 @@ impl App {
     fn handle_event(&mut self, event: AppEvent) {
         match event {
             AppEvent::Key(key) => self.handle_key(key),
-            AppEvent::MouseScroll { delta, row } => {
-                // Recs panel sits just above the input. When the cursor is
-                // over it, the wheel drives `rec_scroll` (top-anchored:
-                // positive delta = scroll down = increase offset). Otherwise
-                // it drives `chat_scroll` (bottom-anchored: wheel up shows
-                // higher content = increase offset, so we negate delta).
-                let in_recs = self.current_tab().turn.recommendations().is_some() && {
-                    // 3 input + 1 nav hint row above the input.
-                    let recs_top = self
-                        .terminal_rows
-                        .saturating_sub(4 + self.rec_panel_height(self.main_area_width()));
-                    row >= recs_top
-                };
-                let d = delta as isize;
-                let tab = self.current_tab_mut();
-                if in_recs {
-                    tab.rec_scroll.by(d);
-                } else {
-                    tab.chat_scroll.by(-d);
-                }
-            }
             AppEvent::Tick => {
                 // Fan out across all tabs: a background tab with an in-flight
                 // prompt should keep its shimmer phase advancing so when the
@@ -4443,6 +4419,22 @@ impl App {
                     self.current_tab_mut().selected_button = default_btn;
                     self.scroll_rec_to_selected(self.main_area_width());
                 }
+            }
+            // Wheel-as-arrow scroll fallback: when the input is empty and no
+            // recommendation card is active, ↑/↓ scroll the chat transcript.
+            // The host terminal (WT, xterm, kitty, …) translates a mouse-wheel
+            // notch into ~3 arrow keystrokes when mouse capture is OFF and the
+            // app is in the alt-screen buffer, so by(1)/by(-1) per key matches
+            // one wheel notch ≈ 3 lines, in line with the previous explicit
+            // MouseScroll handler. Convention here mirrors PgUp/PgDn below:
+            // positive delta = scroll up (toward older content).
+            KeyCode::Up if self.current_tab().input.is_empty()
+                        && self.current_tab().turn.recommendations().is_none() => {
+                self.current_tab_mut().chat_scroll.by(1);
+            }
+            KeyCode::Down if self.current_tab().input.is_empty()
+                          && self.current_tab().turn.recommendations().is_none() => {
+                self.current_tab_mut().chat_scroll.by(-1);
             }
             KeyCode::Right | KeyCode::Tab
                 if self.current_tab().input.is_empty() && self.current_tab().turn.recommendations().is_some() =>
