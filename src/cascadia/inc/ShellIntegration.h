@@ -62,12 +62,11 @@ namespace Microsoft::Terminal::ShellIntegration
 
     // ───────────────────────────────────────────────────────────────────
     // SINGLE SOURCE OF TRUTH for shell-integration script versioning.
-    // To roll out a new version, bump this integer — the filename
-    // (`shell-integration_vN.ps1`) and the embedded
-    // `$Global:__ShellInteg_Version = N` literal are derived from it.
-    // Install() looks for any prior version of this script (or the
-    // legacy unversioned name) in $PROFILE and rewrites the line in
-    // place; older script files left on disk are inert.
+    // The version is carried by the filename (`shell-integration_vN.ps1`)
+    // — Install() detects any prior `shell-integration*.ps1` dot-source
+    // line in $PROFILE and rewrites it to point at the current version.
+    // Older script files left on disk are inert (never referenced).
+    // To roll out a new version, bump this integer.
     // ───────────────────────────────────────────────────────────────────
     inline constexpr int kShellIntegrationVersion = 1;
 
@@ -77,26 +76,19 @@ namespace Microsoft::Terminal::ShellIntegration
         return L"shell-integration_v" + std::to_wstring(kShellIntegrationVersion) + L".ps1";
     }
 
-    // The shell integration script content. The literal `__VERSION__` token
-    // is substituted with kShellIntegrationVersion at runtime so the version
-    // appears in exactly one place in source.
+    // The shell integration script content. The version is carried by the
+    // filename, not embedded inside the script body.
     inline std::wstring ShellIntegrationScriptContent()
     {
-        constexpr std::wstring_view kTemplate{
+        return std::wstring{
             LR"(# Shell Integration — non-invasive prompt wrapper
 # Emits OSC 133 (command marks / exit code) and OSC 9;9 (CWD) escape
 # sequences WITHOUT altering the visual appearance of the user's prompt.
-#
-# USAGE: dot-source this AFTER the user's profile has loaded:
-#   . "path\to\shell-integration_v__VERSION__.ps1"
 #
 # Compatible with Windows PowerShell 5.1+ and PowerShell 7+.
 # Safe to source multiple times (idempotent guard).
 
 if (-not $Global:__ShellInteg_Installed) {
-
-    # Version sentinel — derived from kShellIntegrationVersion in C++ source.
-    $Global:__ShellInteg_Version = __VERSION__
 
     # ── Escape characters (PS 5.1 doesn't support `e / `a literals) ──
     $Global:__ShellInteg_ESC = [char]0x1B   # ESC
@@ -153,14 +145,6 @@ if (-not $Global:__ShellInteg_Installed) {
 }
 )"
         };
-        std::wstring result{ kTemplate };
-        const auto versionStr = std::to_wstring(kShellIntegrationVersion);
-        for (size_t pos = 0; (pos = result.find(L"__VERSION__", pos)) != std::wstring::npos;)
-        {
-            result.replace(pos, 11, versionStr);
-            pos += versionStr.size();
-        }
-        return result;
     }
 
     // Locates an existing `. "...shell-integration*.ps1"` dot-source line in `contents`.
