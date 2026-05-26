@@ -120,6 +120,119 @@ pub fn to_acp_session_info(info: &SessionInfo) -> acp::SessionInfo {
     out
 }
 
+// =============================================================
+// ACP ExtNotification protocol — master ⇄ helper live-set sync.
+// =============================================================
+//
+// We send live-set deltas as standard ACP `ExtNotification`s under our
+// own `intellterm.wta/...` method namespace. Wire shape is JSON-RPC
+// `{ method: "_intellterm.wta/...", params: { ... } }` (the crate
+// prepends the `_` itself; see `AgentSideConnection::ext_notification`
+// — we pass the bare method here).
+//
+// The param payload is `to_acp_session_info(info)` serialized — the
+// helper just deserializes it back into an `acp::SessionInfo`, lifts
+// the `_meta.wta.pane_session_id` out via `extract_wta_meta`, and
+// upserts into its mirror. Using `acp::SessionInfo` (not our own
+// `SessionInfo`) gives the helper a free `cwd`/`title`/`updated_at`
+// schema in exchange for the round-trip through wire types.
+
+/// ExtNotification method for "a new session was just bound to a
+/// helper inside this master".
+pub const INTELLTERM_METHOD_SESSION_ADDED: &str = "intellterm.wta/session_added";
+
+/// ExtNotification method for "a session previously announced via
+/// `session_added` is gone" (helper disconnect, load_session rollback,
+/// future explicit close).
+pub const INTELLTERM_METHOD_SESSION_REMOVED: &str = "intellterm.wta/session_removed";
+
+/// Wire payload for [`INTELLTERM_METHOD_SESSION_REMOVED`].
+///
+/// We only need the session id — helpers look the row up locally to
+/// retrieve cwd / pane_session_id before dropping it.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct SessionRemovedParams {
+    pub session_id: acp::SessionId,
+}
+
+/// Build a `session_added` ExtNotification from a registry row.
+///
+/// Panics only if the serializer fails on `acp::SessionInfo`, which
+/// would itself be a bug in the schema crate.
+pub fn build_session_added_notification(info: &SessionInfo) -> acp::ExtNotification {
+    let wire = to_acp_session_info(info);
+    let json = serde_json::to_string(&wire)
+        .expect("acp::SessionInfo serialization is infallible for owned data");
+    let raw = serde_json::value::RawValue::from_string(json)
+        .expect("serde_json::to_string always produces valid JSON");
+    acp::ExtNotification::new(INTELLTERM_METHOD_SESSION_ADDED, Arc::from(raw))
+}
+
+/// Build a `session_removed` ExtNotification.
+pub fn build_session_removed_notification(sid: &acp::SessionId) -> acp::ExtNotification {
+    let params = SessionRemovedParams {
+        session_id: sid.clone(),
+    };
+    let json = serde_json::to_string(&params).expect("SessionRemovedParams is trivially serializable");
+    let raw = serde_json::value::RawValue::from_string(json)
+        .expect("serde_json::to_string always produces valid JSON");
+    acp::ExtNotification::new(INTELLTERM_METHOD_SESSION_REMOVED, Arc::from(raw))
+}
+
+/// Parsed view of an inbound ACP `ExtNotification` from master, as
+/// recognized by the helper's live-set mirror.
+///
+/// We deliberately don't fail-loud on unknown methods: extension
+/// notifications from a future master version (or a different vendor
+/// sharing the channel) must be ignored, not crashed on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WtaExtNotification {
+    SessionAdded(SessionInfo),
+    SessionRemoved(acp::SessionId),
+    /// Not one of ours. Caller should silently ignore.
+    Unknown,
+    /// Method matched but params failed to parse. Caller should log
+    /// and skip rather than tear down the connection — a malformed
+    /// notification is a master-side bug, but the helper must remain
+    /// usable.
+    MalformedParams { method: String, error: String },
+}
+
+/// Identify whether an `ExtNotification` is one of ours and, if so,
+/// extract the typed payload.
+pub fn parse_ext_notification(n: &acp::ExtNotification) -> WtaExtNotification {
+    let method: &str = &n.method;
+    let raw: &serde_json::value::RawValue = &n.params;
+    match method {
+        INTELLTERM_METHOD_SESSION_ADDED => match serde_json::from_str::<acp::SessionInfo>(raw.get()) {
+            Ok(mut wire) => {
+                let wta = extract_wta_meta(&mut wire.meta);
+                WtaExtNotification::SessionAdded(SessionInfo {
+                    session_id: wire.session_id,
+                    cwd: wire.cwd,
+                    title: wire.title,
+                    updated_at: wire.updated_at,
+                    pane_session_id: wta.pane_session_id,
+                })
+            }
+            Err(err) => WtaExtNotification::MalformedParams {
+                method: method.to_string(),
+                error: err.to_string(),
+            },
+        },
+        INTELLTERM_METHOD_SESSION_REMOVED => {
+            match serde_json::from_str::<SessionRemovedParams>(raw.get()) {
+                Ok(p) => WtaExtNotification::SessionRemoved(p.session_id),
+                Err(err) => WtaExtNotification::MalformedParams {
+                    method: method.to_string(),
+                    error: err.to_string(),
+                },
+            }
+        }
+        _ => WtaExtNotification::Unknown,
+    }
+}
+
 /// One row in the registry. Mirrors the fields the F2 view needs:
 ///
 /// * `session_id` — the ACP session GUID (truth-source key).
@@ -535,6 +648,72 @@ mod tests {
             acp.meta.is_none(),
             "no _meta when there's nothing to communicate"
         );
+    }
+
+    // ---------------- ExtNotification round-trips ----------------
+
+    #[test]
+    fn build_then_parse_session_added_is_round_trip() {
+        let row = SessionInfo {
+            session_id: acp::SessionId::new("sess-77".to_string()),
+            cwd: PathBuf::from("/repo/x"),
+            title: Some("hello".into()),
+            updated_at: Some("2025-01-02T03:04:05Z".into()),
+            pane_session_id: Some("pane-ZZ".into()),
+        };
+        let ext = build_session_added_notification(&row);
+        assert_eq!(&*ext.method, INTELLTERM_METHOD_SESSION_ADDED);
+        match parse_ext_notification(&ext) {
+            WtaExtNotification::SessionAdded(parsed) => assert_eq!(parsed, row),
+            other => panic!("expected SessionAdded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn build_session_added_with_no_pane_session_id_still_round_trips() {
+        let row = SessionInfo::new(
+            acp::SessionId::new("sess-99".to_string()),
+            PathBuf::from("/repo/y"),
+        );
+        let ext = build_session_added_notification(&row);
+        match parse_ext_notification(&ext) {
+            WtaExtNotification::SessionAdded(parsed) => {
+                assert_eq!(parsed, row);
+                assert!(parsed.pane_session_id.is_none());
+            }
+            other => panic!("expected SessionAdded, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn build_then_parse_session_removed_is_round_trip() {
+        let sid = acp::SessionId::new("sess-dead".to_string());
+        let ext = build_session_removed_notification(&sid);
+        assert_eq!(&*ext.method, INTELLTERM_METHOD_SESSION_REMOVED);
+        match parse_ext_notification(&ext) {
+            WtaExtNotification::SessionRemoved(parsed) => assert_eq!(parsed, sid),
+            other => panic!("expected SessionRemoved, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_unknown_method_returns_unknown() {
+        let raw = serde_json::value::RawValue::from_string("{}".into()).unwrap();
+        let ext = acp::ExtNotification::new("somebody.else/event", Arc::from(raw));
+        assert!(matches!(
+            parse_ext_notification(&ext),
+            WtaExtNotification::Unknown
+        ));
+    }
+
+    #[test]
+    fn parse_session_added_with_garbage_params_is_malformed_not_panic() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"not":"a session"}"#.into()).unwrap();
+        let ext = acp::ExtNotification::new(INTELLTERM_METHOD_SESSION_ADDED, Arc::from(raw));
+        assert!(matches!(
+            parse_ext_notification(&ext),
+            WtaExtNotification::MalformedParams { .. }
+        ));
     }
 
     #[test]

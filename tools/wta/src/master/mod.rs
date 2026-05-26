@@ -149,6 +149,19 @@ struct MasterStateInner {
     /// lock is sub-µs sync HashMap work that does not re-enter
     /// `session_to_helper`.
     pub(crate) registry: Arc<dyn crate::session_registry::SessionRegistry>,
+    /// Per-helper subscribers for `intellterm.wta/*` ExtNotifications
+    /// fanned out from master. Populated by `serve_helper` on connect
+    /// and removed on disconnect (or whenever a send fails). Keyed by
+    /// `HelperId` rather than `SessionId` because the deltas being
+    /// broadcast are *about* SessionIds (added/removed) and every
+    /// helper learns the full live set.
+    ///
+    /// Independent lock from `session_to_helper` and `registry`: the
+    /// broadcast path (`broadcast_ext_to_helpers`) only takes this
+    /// one, so it never blocks per-session routing or per-row reads
+    /// of the registry.
+    pub(crate) helper_ext_subscribers:
+        Mutex<HashMap<HelperId, mpsc::UnboundedSender<acp::ExtNotification>>>,
     /// The agent CLI's response to the master's startup initialize.
     /// Replayed verbatim to every helper that calls `initialize` over
     /// its pipe — re-forwarding to the agent CLI returns a stale or
@@ -742,7 +755,18 @@ impl acp::Agent for HelperHandler {
             updated_at: None,
             pane_session_id: wta_meta.pane_session_id,
         };
-        self.state.registry.upsert(info).await;
+        self.state.registry.upsert(info.clone()).await;
+        // Fan a `session_added` ExtNotification out to every other
+        // helper so their mirrors learn about this new row without
+        // having to re-run `session/list`. The disconnecting-helper
+        // race is benign: if a peer disconnects between us picking it
+        // up here and the actual write, the prune path in
+        // `broadcast_ext_to_helpers` cleans up its subscriber slot.
+        crate::master::broadcast_ext_to_helpers(
+            &self.state,
+            crate::session_registry::build_session_added_notification(&info),
+        )
+        .await;
         tracing::info!(
             target: "master",
             step = "helper→agent",
@@ -783,6 +807,12 @@ impl acp::Agent for HelperHandler {
         // `MasterClient::session_notification` with an unknown sid and
         // get dropped — the user-visible symptom is "I see no scroll-
         // back when I resume". Pre-registration closes that window.
+        //
+        // We do NOT pre-upsert into the live-session registry: peer
+        // helpers shouldn't observe a row that the load could still
+        // fail on. On success we upsert + broadcast `session_added`
+        // atomically; on failure we just unregister routing without
+        // any peer-visible flicker.
         let forwarder = self.forwarder_for_route("load_session")?;
         {
             let mut map = self.state.session_to_helper.lock().await;
@@ -796,16 +826,21 @@ impl acp::Agent for HelperHandler {
                 },
             );
         }
-        let info = crate::session_registry::SessionInfo {
-            session_id: session_id.clone(),
-            cwd: cwd_for_registry,
-            title: None,
-            updated_at: None,
-            pane_session_id: wta_meta.pane_session_id,
-        };
-        self.state.registry.upsert(info).await;
         match self.agent_conn.load_session(args).await {
             Ok(resp) => {
+                let info = crate::session_registry::SessionInfo {
+                    session_id: session_id.clone(),
+                    cwd: cwd_for_registry,
+                    title: None,
+                    updated_at: None,
+                    pane_session_id: wta_meta.pane_session_id,
+                };
+                self.state.registry.upsert(info.clone()).await;
+                crate::master::broadcast_ext_to_helpers(
+                    &self.state,
+                    crate::session_registry::build_session_added_notification(&info),
+                )
+                .await;
                 tracing::info!(
                     target: "master",
                     helper_id = ?self.helper_id,
@@ -815,21 +850,20 @@ impl acp::Agent for HelperHandler {
                 Ok(resp)
             }
             Err(err) => {
-                // Roll back the pre-registration: the load failed so
-                // the helper isn't actually attached to this session.
-                // Order matches teardown: drop `session_to_helper`
-                // first, then `registry`.
+                // Roll back the pre-registration. Only `session_to_helper`
+                // needs touching — we never wrote to `registry` and we
+                // never broadcast `session_added`, so peers never saw
+                // this row.
                 {
                     let mut map = self.state.session_to_helper.lock().await;
                     map.remove(&session_id);
                 }
-                self.state.registry.remove(&session_id).await;
                 tracing::warn!(
                     target: "master",
                     helper_id = ?self.helper_id,
                     session_id = ?session_id,
                     error = %err,
-                    "load_session failed; rolled back routing + registry"
+                    "load_session failed; rolled back routing entry"
                 );
                 Err(err)
             }
@@ -1103,6 +1137,7 @@ async fn run_master_loop(cli: Cli, pipe_name: String) -> Result<()> {
     let inner = Arc::new(MasterStateInner {
         session_to_helper: Mutex::new(HashMap::new()),
         registry: crate::session_registry::InMemoryRegistry::shared(),
+        helper_ext_subscribers: Mutex::new(HashMap::new()),
         cached_init_resp: OnceLock::new(),
     });
     let client = MasterClient {
@@ -1277,6 +1312,19 @@ async fn serve_helper(
     let (notif_tx, mut notif_rx) =
         mpsc::channel::<acp::SessionNotification>(NOTIF_CHANNEL_CAPACITY);
 
+    // Second channel: master-originated ExtNotifications fanned out by
+    // `broadcast_ext_to_helpers`. Kept separate from `notif_tx` so the
+    // per-session and live-set fan-out paths don't collide on the
+    // wire-write loop below; the `tokio::select!` can dispatch each to
+    // the appropriate `AgentSideConnection` method without an enum
+    // discriminator at every write site.
+    let (ext_tx, mut ext_rx) =
+        mpsc::unbounded_channel::<acp::ExtNotification>();
+    {
+        let mut subs = state.helper_ext_subscribers.lock().await;
+        subs.insert(helper_id, ext_tx);
+    }
+
     // Shared with `HelperHandler` so it can stash the helper's
     // outbound `AgentSideConnection` into `HelperRoute.forwarder` at
     // `new_session` / `load_session` time. `OnceLock` because the
@@ -1344,11 +1392,40 @@ async fn serve_helper(
                     );
                 }
             }
+            Some(ext) = ext_rx.recv() => {
+                let method = ext.method.clone();
+                tracing::debug!(
+                    target: "master",
+                    step = "master→helper",
+                    op = "ext_notification",
+                    helper_id = ?helper_id,
+                    method = %method,
+                    "writing live-set ext-notification to helper pipe"
+                );
+                if let Err(err) = agent_side_conn.ext_notification(ext).await {
+                    tracing::warn!(
+                        target: "master",
+                        helper_id = ?helper_id,
+                        method = %method,
+                        error = %err,
+                        "forwarding ext_notification to helper failed"
+                    );
+                }
+            }
             else => {
                 break Ok(());
             }
         }
     };
+
+    // Unregister BEFORE dropping sessions: prevents a race where
+    // `drop_sessions_for_helper` would broadcast `session_removed`
+    // to ourselves (harmless but pointless, and our `ext_rx` is
+    // already gone). After this point peers fan-out skips us.
+    {
+        let mut subs = state.helper_ext_subscribers.lock().await;
+        subs.remove(&helper_id);
+    }
 
     // Drop every session this helper owned so the map can't grow
     // unboundedly across the master's lifetime, and so the agent
@@ -1387,8 +1464,50 @@ async fn drop_sessions_for_helper(state: &MasterStateInner, helper_id: HelperId)
     };
     for sid in &victims {
         state.registry.remove(sid).await;
+        // Broadcast removal so every still-attached helper drops the
+        // row from its mirror. The disconnecting helper itself has
+        // (almost always) already been removed from
+        // `helper_ext_subscribers` by `serve_helper`'s cleanup path
+        // before this is called, so the broadcast only reaches the
+        // peers it should reach.
+        broadcast_ext_to_helpers(
+            state,
+            crate::session_registry::build_session_removed_notification(sid),
+        )
+        .await;
     }
     victims.len()
+}
+
+/// Fan an ACP `ExtNotification` out to every currently-attached helper.
+///
+/// Sends are non-blocking (`UnboundedSender::send` is a sync call that
+/// returns immediately); any `SendError` here means the helper's
+/// `serve_helper` loop has dropped its receiver, so we prune that
+/// helper from the subscriber map. The loop is `O(N_helpers)` under a
+/// single lock; we expect N to be tiny (one per WT window/agent pane)
+/// so a lock-while-iterate is fine.
+pub(crate) async fn broadcast_ext_to_helpers(
+    state: &MasterStateInner,
+    notification: acp::ExtNotification,
+) {
+    let mut subs = state.helper_ext_subscribers.lock().await;
+    let mut dead: Vec<HelperId> = Vec::new();
+    for (helper_id, tx) in subs.iter() {
+        if let Err(err) = tx.send(notification.clone()) {
+            tracing::warn!(
+                target: "master",
+                helper_id = ?helper_id,
+                method = %notification.method,
+                error = %err,
+                "helper ext-notification channel closed; pruning subscriber"
+            );
+            dead.push(*helper_id);
+        }
+    }
+    for helper_id in dead {
+        subs.remove(&helper_id);
+    }
 }
 
 #[cfg(test)]
@@ -1400,6 +1519,7 @@ mod tests {
         Arc::new(MasterStateInner {
             session_to_helper: Mutex::new(HashMap::new()),
             registry: crate::session_registry::InMemoryRegistry::shared(),
+            helper_ext_subscribers: Mutex::new(HashMap::new()),
             cached_init_resp: OnceLock::new(),
         })
     }
@@ -1750,6 +1870,139 @@ mod tests {
         let snapshot = state.registry.snapshot().await;
         assert_eq!(snapshot.len(), 1);
         assert_eq!(snapshot[0].session_id, sid_b);
+    }
+
+    /// `broadcast_ext_to_helpers` should reach every currently
+    /// registered helper subscriber, leaving the subscriber map
+    /// intact when channels are live.
+    #[tokio::test]
+    async fn broadcast_ext_to_helpers_fans_out_to_all_subscribers() {
+        use crate::session_registry::{self, build_session_added_notification, SessionInfo};
+        use std::path::PathBuf;
+
+        let state = make_state();
+        let (tx1, mut rx1) = mpsc::unbounded_channel::<acp::ExtNotification>();
+        let (tx2, mut rx2) = mpsc::unbounded_channel::<acp::ExtNotification>();
+        {
+            let mut subs = state.helper_ext_subscribers.lock().await;
+            subs.insert(HelperId(1), tx1);
+            subs.insert(HelperId(2), tx2);
+        }
+
+        let info = SessionInfo::new(
+            SessionId::new("alive-x"),
+            PathBuf::from("/repo/x"),
+        );
+        broadcast_ext_to_helpers(&state, build_session_added_notification(&info)).await;
+
+        let got1 = rx1.try_recv().expect("helper 1 receives broadcast");
+        let got2 = rx2.try_recv().expect("helper 2 receives broadcast");
+        assert_eq!(
+            &*got1.method,
+            session_registry::INTELLTERM_METHOD_SESSION_ADDED
+        );
+        assert_eq!(
+            &*got2.method,
+            session_registry::INTELLTERM_METHOD_SESSION_ADDED
+        );
+
+        let subs = state.helper_ext_subscribers.lock().await;
+        assert_eq!(subs.len(), 2, "live subscribers stay registered");
+    }
+
+    /// If a helper's ext-channel receiver has been dropped, the
+    /// broadcast should prune the entry so we don't keep warning on
+    /// every future fan-out.
+    #[tokio::test]
+    async fn broadcast_ext_to_helpers_prunes_dead_subscribers() {
+        use crate::session_registry::{build_session_removed_notification};
+
+        let state = make_state();
+        let (tx_dead, rx_dead) = mpsc::unbounded_channel::<acp::ExtNotification>();
+        let (tx_live, _rx_live) = mpsc::unbounded_channel::<acp::ExtNotification>();
+        {
+            let mut subs = state.helper_ext_subscribers.lock().await;
+            subs.insert(HelperId(7), tx_dead);
+            subs.insert(HelperId(8), tx_live);
+        }
+        drop(rx_dead);
+
+        broadcast_ext_to_helpers(
+            &state,
+            build_session_removed_notification(&SessionId::new("zzz")),
+        )
+        .await;
+
+        let subs = state.helper_ext_subscribers.lock().await;
+        assert!(!subs.contains_key(&HelperId(7)), "dead subscriber pruned");
+        assert!(subs.contains_key(&HelperId(8)), "live subscriber retained");
+    }
+
+    /// When a helper disconnects, `drop_sessions_for_helper` should
+    /// emit a `session_removed` for every session it owned, fanning
+    /// out to all OTHER helpers' subscribers.
+    #[tokio::test]
+    async fn drop_sessions_for_helper_broadcasts_session_removed_to_peers() {
+        use crate::session_registry::{self, SessionInfo};
+        use std::path::PathBuf;
+
+        let state = make_state();
+        // Helper 1 owns two sessions, helper 2 owns none but is
+        // subscribed (it's a peer that should learn of the removals).
+        let (notif_tx1, _notif_rx1) = mpsc::unbounded_channel();
+        let (ext_tx2, mut ext_rx2) = mpsc::unbounded_channel::<acp::ExtNotification>();
+        let sid_a = SessionId::new("removed-a");
+        let sid_b = SessionId::new("removed-b");
+        {
+            let mut map = state.session_to_helper.lock().await;
+            map.insert(
+                sid_a.clone(),
+                HelperRoute {
+                    helper_id: HelperId(1),
+                    notif_tx: notif_tx1.clone(),
+                    forwarder: None,
+                },
+            );
+            map.insert(
+                sid_b.clone(),
+                HelperRoute {
+                    helper_id: HelperId(1),
+                    notif_tx: notif_tx1,
+                    forwarder: None,
+                },
+            );
+        }
+        state
+            .registry
+            .upsert(SessionInfo::new(sid_a.clone(), PathBuf::from("/a")))
+            .await;
+        state
+            .registry
+            .upsert(SessionInfo::new(sid_b.clone(), PathBuf::from("/b")))
+            .await;
+        {
+            let mut subs = state.helper_ext_subscribers.lock().await;
+            subs.insert(HelperId(2), ext_tx2);
+        }
+
+        drop_sessions_for_helper(&state, HelperId(1)).await;
+
+        // Expect two session_removed notifications on peer 2's channel.
+        let mut got: Vec<acp::SessionId> = Vec::new();
+        while let Ok(ext) = ext_rx2.try_recv() {
+            assert_eq!(
+                &*ext.method,
+                session_registry::INTELLTERM_METHOD_SESSION_REMOVED
+            );
+            match session_registry::parse_ext_notification(&ext) {
+                session_registry::WtaExtNotification::SessionRemoved(sid) => got.push(sid),
+                other => panic!("expected SessionRemoved, got {other:?}"),
+            }
+        }
+        got.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut expected = vec![sid_a, sid_b];
+        expected.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(got, expected);
     }
 
     /// `route_for` (used by every `MasterClient::<client-method>`
