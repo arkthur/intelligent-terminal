@@ -189,6 +189,18 @@ struct Cli {
     #[arg(long, hide = true)]
     owner_tab_id: Option<String>,
 
+    /// Pre-warm mode: the helper is being spawned for a tab whose agent
+    /// pane is *already stashed* on the C++ side (see TerminalPage::
+    /// _AutoCreateHiddenAgentPaneShared autoStash path). Without this
+    /// flag, the helper's `--owner-tab-id` startup branch seeds
+    /// `tab.pane_open = true` and echoes back `agent_state_changed
+    /// { pane_open: true }`, which C++ interprets as "user opened the
+    /// pane" and unstashes it — defeating pre-warm. With this flag the
+    /// helper seeds `tab.pane_open = false`, matching the C++ stash
+    /// state. Hidden because only WT's pre-warm path should set it.
+    #[arg(long, hide = true)]
+    start_stashed: bool,
+
     // Legacy flags (hidden, backward compat)
     #[arg(long, hide = true)]
     info: bool,
@@ -1932,13 +1944,20 @@ async fn run_acp_app(
             //      stashes the just-spawned agent pane.
             // The full seed block further down (which logs + redundantly
             // sets the same fields) becomes idempotent now.
+            //
+            // `--start-stashed` inverts (2): in the pre-warm path the
+            // C++ side has *already stashed* the pane after spawning the
+            // helper, so the helper must seed `pane_open = false` to
+            // match. Without this, helper echoes `pane_open=true`, C++
+            // sees a stashed pane and a `pane_open=true` echo, and
+            // restores the pane — defeating pre-warm.
             if let Some(ref owner_tab_id) = cli.owner_tab_id {
                 if !owner_tab_id.is_empty() && app_state.tab_id.is_none() {
                     let tab = app_state
                         .tab_sessions
                         .entry(owner_tab_id.clone())
                         .or_default();
-                    tab.pane_open = true;
+                    tab.pane_open = !cli.start_stashed;
                     app_state.tab_id = Some(owner_tab_id.clone());
                     app_state.owner_tab_id = Some(owner_tab_id.clone());
                 }
@@ -2104,11 +2123,12 @@ async fn run_acp_app(
                         .or_default();
                     // wta is the source of truth for "does this tab want
                     // the pane visible". The pane is being spawned right
-                    // now for this owner tab, so the user clearly wants
-                    // it visible here. C++ will pick this up in the
-                    // initial `agent_state_changed` emit below and mirror
-                    // it onto Tab.AgentPaneOpen.
-                    tab.pane_open = true;
+                    // now for this owner tab; under the normal user-
+                    // initiated open the user wants it visible, so default
+                    // pane_open=true. The exception is `--start-stashed`
+                    // (pre-warm path) where C++ has already stashed the
+                    // pane — see comment on the earlier seed block.
+                    tab.pane_open = !cli.start_stashed;
                     app_state.tab_id = Some(owner_tab_id);
                 }
             }

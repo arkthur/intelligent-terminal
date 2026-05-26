@@ -389,8 +389,16 @@ namespace winrt::TerminalApp::implementation
         // `intoSessionsView` is passed through to the helper as
         // `--initial-view sessions`. Called from `_OpenOrReuseAgentPane`
         // user-initiated paths.
+        //
+        // `autoStash=true` is the pre-warm path called from `_InitializeTab`:
+        // the helper conpty is spawned but the pane is immediately stashed
+        // (`Tab::StashAgentPane`) so the user sees only the terminal pane.
+        // Focus stays on the original terminal; no telemetry fires (the
+        // pane wasn't *opened*, just pre-warmed). This is what makes
+        // autofix work without the user ever opening the agent pane.
         bool _AutoCreateHiddenAgentPaneShared(winrt::com_ptr<Tab> tab,
-                                              bool intoSessionsView = false);
+                                              bool intoSessionsView = false,
+                                              bool autoStash = false);
         // Wraps the raw terminal pane's TerminalPaneContent in an
         // AgentPaneContent so the leaf renders the 36px XAML agent bar
         // above the wta TermControl + the bottom-bar below.
