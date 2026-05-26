@@ -1620,13 +1620,24 @@ namespace winrt::TerminalApp::implementation
 
         // Resolve cwd. Priority matches the legacy spawn:
         //   a) VirtualWorkingDirectory (CLI-remoted commands like `wt agent`)
-        //   b) Active pane CWD (from shell integration / OSC 9;9)
+        //   b) Active pane CWD of THIS tab (from shell integration / OSC 9;9)
         //   c) Profile's configured starting directory
         //   d) User's home directory
+        //
+        // Use `tab->GetActiveTerminalControl()` rather than the page's
+        // `_GetActiveControl()`: for `openInBackground=true` new tabs the
+        // tab being pre-warmed is NOT the focused one, so reading from the
+        // page-focused control would pick up the foreground tab's cwd and
+        // the helper would start in the wrong directory (autofix and
+        // agent context would attribute to the wrong project). Reading
+        // directly from `tab` resolves to whichever pane is active on
+        // this specific tab. If shell integration hasn't reported a cwd
+        // yet (common for a just-spawned background tab) we fall through
+        // to (c)/(d) below.
         winrt::hstring startingDirectory = _WindowProperties.VirtualWorkingDirectory();
         if (startingDirectory.empty())
         {
-            if (const auto& activeControl = _GetActiveControl())
+            if (const auto activeControl = tab->GetActiveTerminalControl())
             {
                 startingDirectory = activeControl.WorkingDirectory();
             }
@@ -6592,6 +6603,28 @@ namespace winrt::TerminalApp::implementation
                     if (const auto agentContent = wrapped->GetContent().try_as<winrt::TerminalApp::AgentPaneContent>())
                     {
                         agentContent.SetAgentPanePosition(_settings.GlobalSettings().AgentPanePosition());
+
+                        // Wire `StateChanged` BEFORE emitting `tab_renamed`.
+                        // The deferred walk in `_InitializeTab` would normally
+                        // handle this, but cross-window drag-in has a timing
+                        // problem: the SplitPane that calls this re-wrap
+                        // fires ~300ms AFTER NewTab's deferred dispatcher tick
+                        // has already run; at walk time the agent pane wasn't
+                        // in the tree yet, so `_WireAgentPaneEvents` was
+                        // never invoked. We do it here instead.
+                        //
+                        // Ordering matters: `tab_renamed` (emitted a few lines
+                        // below) drives the helper to re-project state, which
+                        // ends up calling `ApplyAutofixState` → `StateChanged`
+                        // on this very `AgentPaneContent`. If the wire happens
+                        // after `tab_renamed`, that `StateChanged` raise has
+                        // nobody listening and the bottom bar stays stale —
+                        // exactly the bug this drag-in path is meant to fix.
+                        // The helper round-trip through wtcli + COM is many
+                        // ms so in practice we always win the race, but the
+                        // synchronous-correct ordering is to wire first.
+                        // (`ownerTab` arg is unused.)
+                        _WireAgentPaneEvents(agentContent, winrt::com_ptr<Tab>{ nullptr });
                     }
                     // Emit `tab_renamed` IMMEDIATELY here. The cross-window
                     // drag flow runs NewTab → SplitPane as serialized actions:
@@ -6656,27 +6689,6 @@ namespace winrt::TerminalApp::implementation
                             }
                         }
                     }
-                    // Wire `StateChanged` NOW. The deferred walk in
-                    // `_InitializeTab` would normally handle this, but
-                    // cross-window drag-in has a timing problem: the
-                    // SplitPane that calls this `_MakeTerminalPane` re-wrap
-                    // path fires ~300ms AFTER NewTab's deferred dispatcher
-                    // tick has already run. By the time the deferred tick
-                    // walked the tab tree the agent pane wasn't there yet,
-                    // so `_WireAgentPaneEvents` was never invoked. Without
-                    // the StateChanged subscriber the helper's post-
-                    // `tab_renamed` state echo (`ApplyAutofixState` writes
-                    // the cache, raises StateChanged) has nobody listening,
-                    // so the bottom bar never refreshes — the autofix
-                    // pill silently disappears across drag even though
-                    // the helper's TabSession migrated correctly and is
-                    // re-emitting the right state. The `ownerTab` arg is
-                    // unused by `_WireAgentPaneEvents`; pass nullptr.
-                    if (const auto agentContent = wrapped->GetContent().try_as<winrt::TerminalApp::AgentPaneContent>())
-                    {
-                        _WireAgentPaneEvents(agentContent, winrt::com_ptr<Tab>{ nullptr });
-                    }
-
                     _agentPaneLog("_MakeTerminalPane: re-wrapped drag-in pane as AgentPaneContent");
                     return wrapped;
                 }
