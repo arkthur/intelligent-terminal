@@ -1524,6 +1524,20 @@ pub struct App {
     /// (e.g. "Press Ctrl+C again to close pane"). Auto-clears at the
     /// recorded deadline.
     pub transient_hint: Option<(String, std::time::Instant)>,
+    /// Mirror of master's authoritative live-session set, pushed via
+    /// ACP `intellterm.wta/session_*` ext-notifications. F2 Enter
+    /// routing reads this to decide Focus vs Resume without an extra
+    /// IPC round-trip. Wired into B-6 (subscribe) and B-10 (consult);
+    /// here we just hold the mirror so the rest of the helper can
+    /// reference it through a stable handle.
+    pub alive: std::sync::Arc<dyn crate::session_registry::SessionRegistry>,
+    /// True once we've received the initial `session/list` snapshot
+    /// from master. Until then, the helper must *not* interpret an
+    /// `alive.lookup()` miss as "session is dead" — there's a window
+    /// at startup where the registry is legitimately empty because
+    /// the bootstrap RPC hasn't returned yet. Tracked as an Atomic so
+    /// the bootstrap task can flip it from a non-`&mut self` context.
+    pub alive_loaded: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// How long the "Press Ctrl+C again to close pane" arm stays live. Long
@@ -1646,6 +1660,8 @@ impl App {
             activity_frame: 0,
             close_pane_armed_at: None,
             transient_hint: None,
+            alive: crate::session_registry::InMemoryRegistry::shared(),
+            alive_loaded: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 

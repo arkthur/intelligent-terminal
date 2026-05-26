@@ -17,6 +17,7 @@
 use agent_client_protocol as acp;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -134,6 +135,47 @@ impl SessionRegistry for InMemoryRegistry {
     }
 }
 
+/// Bulk-load the result of an ACP `session/list` response into a registry
+/// and mark the helper as having seen its first authoritative snapshot.
+///
+/// Semantics: the snapshot is *authoritative* — any row not present in
+/// `items` is removed. We achieve this by issuing per-key removes against
+/// the current snapshot (so we honor the registry's existing locking
+/// surface without adding a `clear()` method just for one bootstrap call
+/// site) and then upserting each item from `items`.
+///
+/// Setting `loaded` to `true` flips the helper from "we haven't heard
+/// from master yet, fall back to legacy behavior" to "registry is
+/// authoritative". The F2 routing layer reads this flag to avoid
+/// misclassifying an actually-Live row as Ended during the startup
+/// window between helper boot and the first `session/list` response.
+///
+/// This is intentionally a free function rather than a method on
+/// `SessionRegistry`: bootstrap-vs-incremental is a *caller* concern,
+/// not a property of the storage, and keeping the trait minimal keeps
+/// the mock surface small for unit tests of higher layers.
+pub async fn apply_snapshot(
+    reg: &dyn SessionRegistry,
+    loaded: &AtomicBool,
+    items: impl IntoIterator<Item = SessionInfo>,
+) {
+    // Drop every row currently in the registry. We snapshot first and
+    // then remove by id rather than holding a write lock across the
+    // whole reload, because (a) the trait surface only offers per-key
+    // mutations, (b) bootstrap snapshots are tiny (<<100 rows) so the
+    // double-pass is cheap, and (c) the only concurrent writer at
+    // bootstrap is the ext-notification listener, which we *want* to
+    // win against this routine — see comment on `alive_loaded` for
+    // why we tolerate the small race window.
+    for old in reg.snapshot().await {
+        reg.remove(&old.session_id).await;
+    }
+    for item in items {
+        reg.upsert(item).await;
+    }
+    loaded.store(true, Ordering::Release);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,5 +263,70 @@ mod tests {
         let reg: Arc<dyn SessionRegistry> = InMemoryRegistry::shared();
         reg.upsert(info("sess-1", None)).await;
         assert_eq!(reg.snapshot().await.len(), 1);
+    }
+
+    // ── apply_snapshot ──────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn apply_snapshot_seeds_empty_registry() {
+        let reg = InMemoryRegistry::new();
+        let loaded = AtomicBool::new(false);
+        apply_snapshot(&reg, &loaded, vec![info("a", Some("pa")), info("b", None)]).await;
+        let mut snap = reg.snapshot().await;
+        snap.sort_by(|l, r| l.session_id.0.cmp(&r.session_id.0));
+        let ids: Vec<&str> = snap.iter().map(|s| &*s.session_id.0).collect();
+        assert_eq!(ids, vec!["a", "b"]);
+        assert!(loaded.load(Ordering::Acquire), "loaded flag flipped");
+    }
+
+    #[tokio::test]
+    async fn apply_snapshot_drops_rows_absent_from_new_snapshot() {
+        let reg = InMemoryRegistry::new();
+        let loaded = AtomicBool::new(false);
+        reg.upsert(info("stale", Some("pa"))).await;
+        reg.upsert(info("keep", Some("pb"))).await;
+        apply_snapshot(&reg, &loaded, vec![info("keep", Some("pb")), info("fresh", None)]).await;
+        let mut snap = reg.snapshot().await;
+        snap.sort_by(|l, r| l.session_id.0.cmp(&r.session_id.0));
+        let ids: Vec<&str> = snap.iter().map(|s| &*s.session_id.0).collect();
+        assert_eq!(ids, vec!["fresh", "keep"], "stale row evicted");
+    }
+
+    #[tokio::test]
+    async fn apply_snapshot_replaces_existing_row_contents() {
+        let reg = InMemoryRegistry::new();
+        let loaded = AtomicBool::new(false);
+        reg.upsert(info("sess-1", Some("old-pane"))).await;
+        apply_snapshot(&reg, &loaded, vec![info("sess-1", Some("new-pane"))]).await;
+        let found = reg
+            .lookup(&acp::SessionId::new("sess-1".to_string()))
+            .await
+            .unwrap();
+        assert_eq!(found.pane_session_id.as_deref(), Some("new-pane"));
+        assert_eq!(reg.snapshot().await.len(), 1, "no duplicates");
+    }
+
+    #[tokio::test]
+    async fn apply_snapshot_with_empty_iter_clears_registry() {
+        let reg = InMemoryRegistry::new();
+        let loaded = AtomicBool::new(false);
+        reg.upsert(info("a", None)).await;
+        reg.upsert(info("b", None)).await;
+        apply_snapshot(&reg, &loaded, std::iter::empty()).await;
+        assert!(reg.snapshot().await.is_empty(), "registry cleared");
+        assert!(
+            loaded.load(Ordering::Acquire),
+            "loaded still flips on empty snapshot"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_snapshot_is_idempotent() {
+        let reg = InMemoryRegistry::new();
+        let loaded = AtomicBool::new(false);
+        let items = vec![info("a", Some("pa")), info("b", None)];
+        apply_snapshot(&reg, &loaded, items.clone()).await;
+        apply_snapshot(&reg, &loaded, items).await;
+        assert_eq!(reg.snapshot().await.len(), 2, "second apply matches first");
     }
 }
