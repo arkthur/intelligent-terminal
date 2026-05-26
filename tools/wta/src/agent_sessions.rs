@@ -836,6 +836,15 @@ impl AgentSessionRegistry {
     /// (Copilot may differ), the join simply misses — the row stays
     /// Historical, which is the same behaviour as today and degrades
     /// gracefully (Enter will start a new session).
+    ///
+    /// Tombstone safety: only `Historical` rows (loaded from disk
+    /// scan) are upgraded. `Ended` rows reflect a local `PaneClosed`
+    /// observation in this WTA process; we treat that as authoritative
+    /// because the alternative (a stale `session_added` broadcast
+    /// arriving before master detects the helper disconnect) would
+    /// silently resurrect a pane that's already gone, leaving the F2
+    /// row Live forever with no demotion path. Cross-WTA-process
+    /// resume-after-disconnect is rare; preferring the safe direction.
     pub fn apply_alive_session_join<'a>(
         &mut self,
         alive: impl IntoIterator<Item = (&'a str, Option<&'a str>)>,
@@ -843,9 +852,14 @@ impl AgentSessionRegistry {
         let now = SystemTime::now();
         for (sid, pane_opt) in alive {
             let Some(entry) = self.sessions.get_mut(sid) else { continue };
-            // Only upgrade non-Live rows; never demote Live rows here.
-            let live = matches!(entry.liveness(), LivenessState::Live);
-            if live { continue; }
+            // Only upgrade Historical rows. Live rows are obviously
+            // skipped; Ended rows are skipped because they were
+            // tombstoned by a local PaneClosed event in THIS process
+            // and resurrecting them via a (potentially stale) alive
+            // broadcast would leave no demotion path back to Ended.
+            if !matches!(entry.liveness(), LivenessState::Historical) {
+                continue;
+            }
 
             entry.status            = AgentStatus::Idle;
             entry.last_activity_at  = now;
@@ -869,7 +883,7 @@ impl AgentSessionRegistry {
                 target: "agent_session_registry",
                 key = %sid,
                 pane = ?pane_opt,
-                "alive snapshot upgraded row Historical/Ended → Live",
+                "alive snapshot upgraded Historical row → Live",
             );
         }
     }
@@ -2216,11 +2230,13 @@ mod tests {
     }
 
     #[test]
-    fn apply_alive_session_join_upgrades_ended_rows_too() {
-        // An "Ended" row could be ended by a stale tombstone (e.g.
-        // an old PaneClosed event reconciled against a stale pane).
-        // If the alive mirror later says "this sid is live in pane Y",
-        // the row should come back to Live with the new pane bound.
+    fn apply_alive_session_join_does_not_resurrect_locally_ended_rows() {
+        // Local PaneClosed tombstones win over (potentially stale)
+        // alive broadcasts — see apply_alive_session_join's tombstone
+        // safety comment. Rationale: if a stale `session_added` from
+        // master arrives after PaneClosed has already ended the row,
+        // resurrecting it would leave it Live with no demotion path
+        // (the pane is genuinely gone in this process).
         let mut reg = AgentSessionRegistry::new();
         reg.apply(SessionEvent::SessionStarted {
             key: k("sid"), cli_source: CliSource::Claude,
@@ -2232,11 +2248,10 @@ mod tests {
 
         reg.apply_alive_session_join([("sid", Some("pane-new"))]);
         let s = reg.sessions.get("sid").unwrap();
-        assert_eq!(s.liveness(), LivenessState::Live);
-        assert_eq!(s.pane_session_id.as_deref(), Some("pane-new"));
-        assert_eq!(reg.active_by_pane.get("pane-new").map(|k| k.as_str()), Some("sid"));
-        assert!(reg.active_by_pane.get("pane-old").is_none(),
-                "old binding cleared by PaneClosed must stay cleared");
+        assert_eq!(s.liveness(), LivenessState::Ended, "Ended must stay Ended");
+        // Pane bindings should not be re-established for a tombstoned row.
+        assert!(reg.active_by_pane.get("pane-new").is_none());
+        assert!(reg.active_by_pane.get("pane-old").is_none());
     }
 
     #[test]

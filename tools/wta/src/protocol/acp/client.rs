@@ -1779,6 +1779,41 @@ impl acp::Client for WtaClient {
 ///
 /// See doc/specs/Multi-window-agent-pane.md for the helper+master
 /// architecture, and `tools/wta/src/master/mod.rs` for the peer.
+
+/// Inject `_meta.wta.pane_session_id = $WT_SESSION` (lowercased, no
+/// braces) into an outbound ACP `session/new` or `session/load`
+/// request, when this helper is running inside a Windows Terminal pane.
+///
+/// Used by the helper-over-master path to tell `wta-master` which WT
+/// pane owns the session it's about to create or rehydrate. Master
+/// records this in `SessionRegistry`, surfaces it via `session/list`
+/// `_meta.wta.pane_session_id`, and broadcasts it via
+/// `intellterm.wta/session_added` notifications. Other helpers
+/// listening on those broadcasts use it to populate `alive_mirror`
+/// pane bindings so cross-helper Focus actions (F2 Enter on a row
+/// owned by a sibling helper) have a real WT pane GUID to target.
+///
+/// No-op when `WT_SESSION` is unset/empty (e.g. when running outside
+/// a WT pane in tests).
+fn inject_wta_pane_meta(meta: &mut Option<acp::Meta>) {
+    let wt_session = std::env::var("WT_SESSION").unwrap_or_default();
+    if wt_session.is_empty() {
+        return;
+    }
+    let pane_session_id = wt_session
+        .trim_matches(|c| c == '{' || c == '}')
+        .to_ascii_lowercase();
+    if pane_session_id.is_empty() {
+        return;
+    }
+    crate::session_registry::inject_wta_meta(
+        meta,
+        &crate::session_registry::WtaMeta {
+            pane_session_id: Some(pane_session_id),
+        },
+    );
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn run_acp_client_over_pipe(
     pipe_name: String,
@@ -2001,7 +2036,9 @@ pub async fn run_acp_client_over_pipe(
     ));
     startup_probe.log("Creating session (over pipe)");
     let cwd = std::env::current_dir().unwrap_or_default();
-    let session_future = conn.new_session(acp::NewSessionRequest::new(cwd));
+    let mut new_session_req = acp::NewSessionRequest::new(cwd);
+    inject_wta_pane_meta(&mut new_session_req.meta);
+    let session_future = conn.new_session(new_session_req);
     let session = tokio::time::timeout(std::time::Duration::from_secs(30), session_future)
         .await
         .map_err(|_| anyhow::anyhow!("new_session over master pipe timed out after 30s"))?
@@ -3534,11 +3571,68 @@ async fn dispatch_prompt_body(
 #[cfg(test)]
 mod tests {
     use super::{
-        complete_prompt_request, requested_model_id, summarize_agent_identity, user_locale_tag,
-        PromptTimingState,
+        complete_prompt_request, inject_wta_pane_meta, requested_model_id, summarize_agent_identity,
+        user_locale_tag, PromptTimingState,
     };
     use crate::app::AppEvent;
     use tokio::sync::mpsc;
+
+    /// Helper-only: round-trip a `_meta` blob through `inject_wta_pane_meta`
+    /// and report the `pane_session_id` that the master would see in
+    /// `extract_wta_meta`. Returns `None` when the meta is empty after
+    /// injection (i.e. `WT_SESSION` was missing/empty and we correctly
+    /// emitted no namespace).
+    fn injected_pane_session_id() -> Option<String> {
+        let mut meta: Option<agent_client_protocol::Meta> = None;
+        inject_wta_pane_meta(&mut meta);
+        crate::session_registry::extract_wta_meta(&mut meta).pane_session_id
+    }
+
+    #[test]
+    fn inject_wta_pane_meta_injects_lowercased_pane_session_id_with_braces_stripped() {
+        let _g = crate::test_support::lock_env();
+        // SAFETY: env is process-global; lock_env serializes parallel tests.
+        unsafe {
+            std::env::set_var("WT_SESSION", "{A86EAF3B-1234-5678-9ABC-DEF012345678}");
+        }
+        assert_eq!(
+            injected_pane_session_id(),
+            Some("a86eaf3b-1234-5678-9abc-def012345678".to_string()),
+            "WT_SESSION should be lowercased and have braces stripped before going on the wire",
+        );
+        unsafe { std::env::remove_var("WT_SESSION") };
+    }
+
+    #[test]
+    fn inject_wta_pane_meta_is_noop_when_wt_session_is_absent() {
+        let _g = crate::test_support::lock_env();
+        unsafe { std::env::remove_var("WT_SESSION") };
+        assert_eq!(
+            injected_pane_session_id(),
+            None,
+            "no WT_SESSION → master must not record a phantom pane binding",
+        );
+    }
+
+    #[test]
+    fn inject_wta_pane_meta_is_noop_when_wt_session_is_empty() {
+        let _g = crate::test_support::lock_env();
+        unsafe { std::env::set_var("WT_SESSION", "") };
+        assert_eq!(injected_pane_session_id(), None);
+        unsafe { std::env::remove_var("WT_SESSION") };
+    }
+
+    #[test]
+    fn inject_wta_pane_meta_is_noop_when_wt_session_is_only_braces() {
+        let _g = crate::test_support::lock_env();
+        unsafe { std::env::set_var("WT_SESSION", "{}") };
+        assert_eq!(
+            injected_pane_session_id(),
+            None,
+            "stripping braces from `{{}}` leaves the empty string — must not write `pane_session_id`: \"\"",
+        );
+        unsafe { std::env::remove_var("WT_SESSION") };
+    }
 
     #[test]
     fn user_locale_tag_returns_current_locale_verbatim() {
