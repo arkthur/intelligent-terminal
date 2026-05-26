@@ -1464,7 +1464,7 @@ namespace winrt::TerminalApp::implementation
     // wta-master process that the helpers connect to over a named pipe (helper
     // ↔ master speaks ACP JSON-RPC, master owns the single agent CLI subprocess).
     // See doc/specs/Multi-window-agent-pane.md.
-    bool TerminalPage::_AutoCreateHiddenAgentPaneShared(winrt::com_ptr<Tab> tab, bool intoSessionsView)
+    bool TerminalPage::_AutoCreateHiddenAgentPaneShared(winrt::com_ptr<Tab> tab, bool intoSessionsView, bool autoStash)
     {
         if (!tab || !tab->GetActiveTerminalControl())
         {
@@ -1606,16 +1606,38 @@ namespace winrt::TerminalApp::implementation
         {
             helperCmd.append(L" --initial-view sessions");
         }
+        if (autoStash)
+        {
+            // Pre-warm path: the helper is spawned for a pane that C++
+            // will stash immediately. Tell the helper to seed its
+            // `tab.pane_open = false` so the initial `agent_state_changed`
+            // echo matches the stashed C++ state. Without this the
+            // helper defaults to `pane_open = true` (the "user just
+            // opened the pane" assumption), C++ receives the echo on a
+            // stashed pane and restores it — defeating pre-warm.
+            helperCmd.append(L" --start-stashed");
+        }
 
         // Resolve cwd. Priority matches the legacy spawn:
         //   a) VirtualWorkingDirectory (CLI-remoted commands like `wt agent`)
-        //   b) Active pane CWD (from shell integration / OSC 9;9)
+        //   b) Active pane CWD of THIS tab (from shell integration / OSC 9;9)
         //   c) Profile's configured starting directory
         //   d) User's home directory
+        //
+        // Use `tab->GetActiveTerminalControl()` rather than the page's
+        // `_GetActiveControl()`: for `openInBackground=true` new tabs the
+        // tab being pre-warmed is NOT the focused one, so reading from the
+        // page-focused control would pick up the foreground tab's cwd and
+        // the helper would start in the wrong directory (autofix and
+        // agent context would attribute to the wrong project). Reading
+        // directly from `tab` resolves to whichever pane is active on
+        // this specific tab. If shell integration hasn't reported a cwd
+        // yet (common for a just-spawned background tab) we fall through
+        // to (c)/(d) below.
         winrt::hstring startingDirectory = _WindowProperties.VirtualWorkingDirectory();
         if (startingDirectory.empty())
         {
-            if (const auto& activeControl = _GetActiveControl())
+            if (const auto activeControl = tab->GetActiveTerminalControl())
             {
                 startingDirectory = activeControl.WorkingDirectory();
             }
@@ -1679,6 +1701,45 @@ namespace winrt::TerminalApp::implementation
 
         const auto splitDirection = _AgentPanePositionToSplitDirection(globals.AgentPanePosition());
         tab->SplitPaneAtRoot(splitDirection, newPane);
+
+        if (autoStash)
+        {
+            // Pre-warm path: spawn the helper conpty child NOW, then stash
+            // the pane so the user doesn't see it.
+            //
+            // CRITICAL: `connection.Start()` (which spawns the wta-helper
+            // process) is gated on the agent pane's SwapChainPanel firing
+            // its first `LayoutUpdated` event — see
+            // `TermControl.cpp:343-352`. `LayoutUpdated` is raised by XAML
+            // during its layout pass, which runs *after* the UI thread
+            // returns. If we stash synchronously after SplitPaneAtRoot,
+            // `Pane::HidePane` strips the agent pane's border out of the
+            // visual tree *before* layout runs, so `LayoutUpdated` never
+            // fires, `_InitializeTerminal` never runs, `connection.Start()`
+            // never runs, and the helper is never spawned. Pre-warm becomes
+            // a no-op.
+            //
+            // Fix: force a synchronous layout pass via `UpdateLayout()` on
+            // the agent pane's root grid before stashing. `UpdateLayout` is
+            // XAML's official API for running measure+arrange synchronously;
+            // `LayoutUpdated` is raised inside the call, the
+            // TermControl handler runs, `connection.Start()` spawns the
+            // helper. By the time `StashAgentPane` runs on the next line
+            // the helper is already alive — `HidePane` just rewires the
+            // grid while the conpty + helper keep running in the background.
+            //
+            // Everything stays in one UI-thread tick (no awaits), so XAML
+            // never renders an intermediate frame. The user only sees the
+            // post-stash state: terminal pane filling the tab.
+            if (const auto root = newPane->GetRootElement())
+            {
+                root.UpdateLayout();
+            }
+            tab->StashAgentPane();
+            _UpdateBottomBarState();
+            _agentPaneLog("_AutoCreateHiddenAgentPaneShared: done — helper pre-warmed + stashed");
+            return true;
+        }
 
         // Focus the new agent pane so the helper receives keyboard input.
         // The bookkeeping path (FocusPane) is synchronous; the actual
@@ -2017,7 +2078,18 @@ namespace winrt::TerminalApp::implementation
         winrt::hstring hotkeyHint;
         winrt::hstring suggestionTitle;
         winrt::hstring detectedSummary;
-        if (paneOpen)
+        // Autofix-state read must NOT be gated on pane visibility. The
+        // helper keeps running and detecting command failures even when
+        // the agent pane is stashed (pre-warm path: helper is spawned
+        // and connected from the moment the tab opens, with the pane
+        // hidden). `OnAutofixStateChanged` writes the latest state into
+        // AgentPaneContent's cache regardless of stash, so the bar
+        // should reflect it regardless of stash too. (The toggle-button
+        // highlights above DO gate on `paneOpen` — that's correct, they
+        // mean "which view is currently shown.") Without this, the bar
+        // shows Idle forever until the user opens the pane, which
+        // defeats autofix-without-toggle.
+        if (activeAgent)
         {
             if (const auto impl = winrt::get_self<winrt::TerminalApp::implementation::AgentPaneContent>(activeAgent))
             {
@@ -6496,12 +6568,91 @@ namespace winrt::TerminalApp::implementation
             winrt::hstring oldTabId;
             if (winrt::TerminalApp::implementation::AgentPaneDragStash::Take(contentId, oldTabId))
             {
+                // Drag-in is targeting the focused (destination) tab. If
+                // pre-warm already created an agent pane on this tab (race:
+                // NewTab's deferred dispatcher tick fires ~300ms BEFORE this
+                // SplitPane re-wrap, sees no agent pane yet, and spawns a
+                // pre-warm one), close that pane first so the drag-in pane
+                // is the only AgentPaneContent on the tab. The preexisting
+                // pre-warm pane's `Pane::Closed` handler releases its
+                // SharedWta refcount and its helper conpty exits via EOF;
+                // the brief wasted helper spawn is the cost of letting
+                // pre-warm fire unconditionally on every new tab (vs.
+                // gating it on an unreliable / over-broad "is any drag in
+                // flight" signal).
+                //
+                // Per-tab dedup: we know the drag-in is targeting THIS
+                // focused tab specifically (NewTab focused it just before
+                // this SplitPane fires), so this only tears down panes on
+                // the right tab — no false-positives in unrelated windows
+                // / tabs.
+                if (const auto focusedTab = _GetFocusedTabImpl())
+                {
+                    if (const auto existingAgentPane = focusedTab->FindAgentPane())
+                    {
+                        _agentPaneLog(
+                            std::string{ "_MakeTerminalPane: drag-in tearing down pre-warm leftover on tab " } +
+                            winrt::to_string(focusedTab->StableId()));
+                        existingAgentPane->Close();
+                    }
+                }
+
                 if (auto wrapped = _WrapInAgentPaneContent(resultPane))
                 {
                     wrapped->IsAgentPane(true);
+
+                    // Mirror the `Pane::Closed` → `SharedWta::ReleasePane`
+                    // wiring that `_AutoCreateHiddenAgentPaneShared`
+                    // installs on the source side. The drag-in pane is a
+                    // freshly-constructed `Pane` object; without this
+                    // handler, any path that calls `pane->Close()` on it
+                    // (Ctrl+C×2 → `OnCloseAgentPaneRequested` →
+                    // `_TeardownAgentPane`, or settings-rebuild via
+                    // `_RebuildAgentStack` → `_TeardownAgentPane`) would
+                    // raise `Closed` without anyone decrementing the
+                    // SharedWta refcount that the source side's
+                    // `AcquirePane()` contributed. The tab-close walk
+                    // in `_RemoveTab` wouldn't catch it either, because
+                    // the pane is already gone from the tree by the time
+                    // the tab finally closes. Net: the master process
+                    // would be kept alive past its last live pane.
+                    //
+                    // No new `AcquirePane()` here — the source side's
+                    // existing refcount carries across the drag (source's
+                    // `_RemoveTab(movingAway=true)` deliberately skips
+                    // `ReleasePane` precisely so the dragged helper has a
+                    // refcount to live on). This `Closed` handler is the
+                    // matching `Release` for that.
+                    wrapped->Closed([](auto&&, auto&&) {
+                        _agentPaneLog("drag-in agent pane closed");
+                        winrt::TerminalApp::implementation::SharedWta::Instance().ReleasePane();
+                    });
+
                     if (const auto agentContent = wrapped->GetContent().try_as<winrt::TerminalApp::AgentPaneContent>())
                     {
                         agentContent.SetAgentPanePosition(_settings.GlobalSettings().AgentPanePosition());
+
+                        // Wire `StateChanged` BEFORE emitting `tab_renamed`.
+                        // The deferred walk in `_InitializeTab` would normally
+                        // handle this, but cross-window drag-in has a timing
+                        // problem: the SplitPane that calls this re-wrap
+                        // fires ~300ms AFTER NewTab's deferred dispatcher tick
+                        // has already run; at walk time the agent pane wasn't
+                        // in the tree yet, so `_WireAgentPaneEvents` was
+                        // never invoked. We do it here instead.
+                        //
+                        // Ordering matters: `tab_renamed` (emitted a few lines
+                        // below) drives the helper to re-project state, which
+                        // ends up calling `ApplyAutofixState` → `StateChanged`
+                        // on this very `AgentPaneContent`. If the wire happens
+                        // after `tab_renamed`, that `StateChanged` raise has
+                        // nobody listening and the bottom bar stays stale —
+                        // exactly the bug this drag-in path is meant to fix.
+                        // The helper round-trip through wtcli + COM is many
+                        // ms so in practice we always win the race, but the
+                        // synchronous-correct ordering is to wire first.
+                        // (`ownerTab` arg is unused.)
+                        _WireAgentPaneEvents(agentContent, winrt::com_ptr<Tab>{ nullptr });
                     }
                     // Emit `tab_renamed` IMMEDIATELY here. The cross-window
                     // drag flow runs NewTab → SplitPane as serialized actions:
