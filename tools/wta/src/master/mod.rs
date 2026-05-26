@@ -958,6 +958,24 @@ impl acp::Agent for HelperHandler {
         &self,
         _args: acp::ListSessionsRequest,
     ) -> acp::Result<acp::ListSessionsResponse> {
+        // Lock-order safety: this call only takes the registry mutex
+        // (sub-µs hashmap snapshot, no awaits inside the critical
+        // section). `drop_sessions_for_helper` mutates the registry
+        // by calling `registry.remove(sid)` *after* releasing
+        // `session_to_helper`'s mutex (see lock-order comment on
+        // `MasterStateInner::registry`). Both operations are
+        // serialized by the registry's own internal mutex, so any
+        // ordering between a concurrent helper-drop and this
+        // snapshot is acceptable:
+        //   - snapshot first  → caller sees the about-to-drop sid;
+        //                       the subsequent `session_removed`
+        //                       broadcast reconciles it on the
+        //                       caller's mirror.
+        //   - drop first      → snapshot omits the sid; caller never
+        //                       saw it as live, so nothing to clean up.
+        // No torn-state window because the registry holds a
+        // tokio::sync::Mutex<HashMap<...>> internally; each
+        // upsert/remove/snapshot is one full hashmap op.
         let snapshot = self.state.registry.snapshot().await;
         tracing::info!(
             target: "master",
