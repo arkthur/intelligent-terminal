@@ -1715,7 +1715,7 @@ namespace winrt::TerminalApp::implementation
             // TermControl handler runs, `connection.Start()` spawns the
             // helper. By the time `StashAgentPane` runs on the next line
             // the helper is already alive — `HidePane` just rewires the
-            // grid while the conpty + helper keep running headlessly.
+            // grid while the conpty + helper keep running in the background.
             //
             // Everything stays in one UI-thread tick (no awaits), so XAML
             // never renders an intermediate frame. The user only sees the
@@ -6562,7 +6562,7 @@ namespace winrt::TerminalApp::implementation
                 // NewTab's deferred dispatcher tick fires ~300ms BEFORE this
                 // SplitPane re-wrap, sees no agent pane yet, and spawns a
                 // pre-warm one), close that pane first so the drag-in pane
-                // is the only AgentPaneContent on the tab. The pre-existing
+                // is the only AgentPaneContent on the tab. The preexisting
                 // pre-warm pane's `Pane::Closed` handler releases its
                 // SharedWta refcount and its helper conpty exits via EOF;
                 // the brief wasted helper spawn is the cost of letting

@@ -227,11 +227,11 @@ namespace winrt::TerminalApp::implementation
         // tab. The helper conpty child is spawned but the pane is immediately
         // stashed via `Tab::StashAgentPane`, so the user only sees the
         // terminal pane. Toggling the agent pane (`Ctrl+Shift+.` /
-        // `Ctrl+Shift+/` / bottom-bar button) is just an unstash/restash.
+        // `Ctrl+Shift+/` / bottom-bar button) is just a stash/restore.
         // The point of pre-warming is autofix: autofix routes through the
         // agent helper, and gating it on "user has opened the pane at least
-        // once" was a footgun. With pre-warm, autofix works on every tab
-        // from the moment the tab opens.
+        // once" silently broke autofix on every fresh tab. With pre-warm,
+        // autofix works on every tab from the moment the tab opens.
         //
         // The actual spawn is deferred to the same low-priority dispatcher
         // tick as the cross-window drag rename walk below — that way
@@ -694,7 +694,7 @@ namespace winrt::TerminalApp::implementation
         {
             _NotifyAgentTabClosed(closedTabStableId);
 
-            // Pre-existing latent leak (made worse by pre-warm): tab close
+            // Preexisting latent leak (made worse by pre-warm): tab close
             // goes through `Tab::Shutdown` → `Pane::Shutdown`, which only
             // calls `_setPaneContent(nullptr)` on each leaf — it does NOT
             // raise `Pane::Closed`. The agent pane's `Pane::Closed` handler
