@@ -2724,6 +2724,7 @@ mod tests {
 
     #[test]
     fn user_locale_tag_maps_pseudo_locales_to_en_us() {
+        let _g = crate::test_support::lock_locale();
         // qps-* are UI-only pseudo-locales — agents won't recognize them.
         rust_i18n::set_locale("qps-ploc");
         assert_eq!(user_locale_tag(), "en-US");
@@ -2733,6 +2734,7 @@ mod tests {
 
     #[test]
     fn user_locale_tag_passes_real_locale_through() {
+        let _g = crate::test_support::lock_locale();
         rust_i18n::set_locale("zh-CN");
         assert_eq!(user_locale_tag(), "zh-CN");
         rust_i18n::set_locale("en-US");

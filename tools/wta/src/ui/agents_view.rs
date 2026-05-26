@@ -485,26 +485,23 @@ fn trunc(s: &str, n: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
     use std::time::Duration;
 
-    /// All tests that read rust_i18n strings share the global locale.
-    /// Cargo runs tests in parallel by default, so without this mutex
-    /// one test's `set_locale("zh-CN")` is observed by another test
-    /// inside its en-US assertions. Every locale-sensitive test must
-    /// acquire this lock first.
-    static LOCALE_LOCK: Mutex<()> = Mutex::new(());
+    /// All locale-sensitive tests must hold the crate-wide locale guard
+    /// from [`crate::test_support::lock_locale`]. It serializes parallel
+    /// tests on the global `rust_i18n` locale AND restores the previous
+    /// locale on drop, so the suite stays order-independent.
 
     /// Ensure tests use en-US locale so the hardcoded English assertions match
     /// (regardless of what the running shell's locale is). Must be called
-    /// while holding `LOCALE_LOCK`.
+    /// while holding the locale guard.
     fn set_test_locale() {
         rust_i18n::set_locale("en-US");
     }
 
     #[test]
     fn relative_age_just_now_under_a_minute() {
-        let _g = LOCALE_LOCK.lock().unwrap();
+        let _g = crate::test_support::lock_locale();
         set_test_locale();
         let t = SystemTime::now() - Duration::from_secs(5);
         assert_eq!(relative_age(t), "just now");
@@ -512,7 +509,7 @@ mod tests {
 
     #[test]
     fn relative_age_singular_and_plural_minutes() {
-        let _g = LOCALE_LOCK.lock().unwrap();
+        let _g = crate::test_support::lock_locale();
         set_test_locale();
         let t1 = SystemTime::now() - Duration::from_secs(60);
         assert_eq!(relative_age(t1), "1 minute ago");
@@ -522,7 +519,7 @@ mod tests {
 
     #[test]
     fn relative_age_days() {
-        let _g = LOCALE_LOCK.lock().unwrap();
+        let _g = crate::test_support::lock_locale();
         set_test_locale();
         let t = SystemTime::now() - Duration::from_secs(3 * 86_400);
         assert_eq!(relative_age(t), "3 days ago");
@@ -531,7 +528,7 @@ mod tests {
     #[test]
     fn relative_age_falls_back_to_calendar_date_after_a_week() {
         // 8 days ago — must produce a calendar date string, not "8 days ago".
-        let _g = LOCALE_LOCK.lock().unwrap();
+        let _g = crate::test_support::lock_locale();
         set_test_locale();
         let t = SystemTime::now() - Duration::from_secs(8 * 86_400);
         let s = relative_age(t);
@@ -556,7 +553,7 @@ mod tests {
     ///      one digit, and doesn't end with the English literal "ago".
     #[test]
     fn relative_age_covers_representative_locales() {
-        let _g = LOCALE_LOCK.lock().unwrap();
+        let _g = crate::test_support::lock_locale();
         let one_minute = SystemTime::now() - Duration::from_secs(60);
         let many_minutes = SystemTime::now() - Duration::from_secs(180);
         let many_hours = SystemTime::now() - Duration::from_secs(5 * 3600);
@@ -633,7 +630,7 @@ mod tests {
     /// contains digits, and is distinct across locales.
     #[test]
     fn format_calendar_date_locale_smoke() {
-        let _g = LOCALE_LOCK.lock().unwrap();
+        let _g = crate::test_support::lock_locale();
         // 2026-05-22 in UTC.
         let target = UNIX_EPOCH + Duration::from_secs(20_595 * 86_400);
 
@@ -681,7 +678,7 @@ mod tests {
 
     #[test]
     fn format_calendar_date_renders_month_name() {
-        let _g = LOCALE_LOCK.lock().unwrap();
+        let _g = crate::test_support::lock_locale();
         rust_i18n::set_locale("en-US");
         let t = UNIX_EPOCH + Duration::from_secs(20_563 * 86_400);
         let s = format_calendar_date(t);
