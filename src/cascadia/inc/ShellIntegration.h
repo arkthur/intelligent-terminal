@@ -18,10 +18,8 @@
 #include <filesystem>
 #include <fstream>
 #include <regex>
-#include <sstream>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <ShlObj.h>
 
 namespace Microsoft::Terminal::ShellIntegration
@@ -183,7 +181,8 @@ if (-not $Global:__ShellInteg_Installed) {
         {
             const size_t start = static_cast<size_t>(m.position());
             size_t end = start + static_cast<size_t>(m.length());
-            // Multiline `$` stops before `\n`; trailing `\r` from CRLF may remain — strip it.
+            // `.` doesn't match `\n`, so the match naturally stops at end-of-line.
+            // For CRLF input a trailing `\r` may remain in the captured range — strip it.
             while (end > start && contents[end - 1] == '\r')
             {
                 --end;
