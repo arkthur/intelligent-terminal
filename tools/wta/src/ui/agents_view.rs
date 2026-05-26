@@ -237,13 +237,45 @@ fn row_for(s: &AgentSession, selected: bool, row_width: usize) -> ListItem<'stat
     // marker is rendered as a prefix (between caret and title) rather than
     // a suffix so it stays visible even when a long title pushes the
     // trailing columns off the right edge.
+    //
+    // When the pane is narrower than the row's natural width, the title
+    // is adaptively truncated so the timestamp (right edge) stays
+    // visible. If the title would have to shrink below TITLE_FLOOR
+    // characters to make room, the optional trailing pieces are dropped
+    // in priority order — cli suffix first, then status badge — before
+    // squeezing the title any further. The age column is never dropped.
+    const TITLE_FLOOR: usize = 8;
+    const MIN_PAD: usize = 1;
+
     let caret_w    = 2_usize;
-    let title_w    = title_text.width();
     let badge_w    = if badge.is_empty() { 0 } else { badge.width() + 2 }; // "  badge"
     let cli_w      = if cli_suffix.is_empty() { 0 } else { cli_suffix.width() + 1 };
     let age_w      = age.width();
-    let used       = caret_w + prefix_w + title_w + badge_w + cli_w + age_w;
-    let pad        = row_width.saturating_sub(used).max(1);
+
+    let leading       = caret_w + prefix_w;
+    let reserved_tail = MIN_PAD + age_w;
+
+    let mut keep_badge = badge_w > 0;
+    let mut keep_cli   = cli_w > 0;
+    let mut title_cap  = row_width
+        .saturating_sub(leading + reserved_tail + badge_w + cli_w);
+
+    if title_cap < TITLE_FLOOR && keep_cli {
+        keep_cli  = false;
+        title_cap = row_width.saturating_sub(leading + reserved_tail + badge_w);
+    }
+    if title_cap < TITLE_FLOOR && keep_badge {
+        keep_badge = false;
+        title_cap  = row_width.saturating_sub(leading + reserved_tail);
+    }
+
+    let title_text = trunc(&title_text, title_cap.max(1));
+
+    let title_w       = title_text.width();
+    let final_badge_w = if keep_badge { badge_w } else { 0 };
+    let final_cli_w   = if keep_cli   { cli_w   } else { 0 };
+    let used          = caret_w + prefix_w + title_w + final_badge_w + final_cli_w + age_w;
+    let pad           = row_width.saturating_sub(used).max(1);
 
     let mut spans = vec![caret];
     if let Some(prefix) = origin_prefix {
@@ -253,11 +285,11 @@ fn row_for(s: &AgentSession, selected: bool, row_width: usize) -> ListItem<'stat
         spans.push(Span::styled(prefix, title_style));
     }
     spans.push(Span::styled(title_text, title_style));
-    if !badge.is_empty() {
+    if keep_badge && !badge.is_empty() {
         spans.push(Span::raw("  "));
         spans.push(Span::styled(badge, badge_style));
     }
-    if !cli_suffix.is_empty() {
+    if keep_cli && !cli_suffix.is_empty() {
         spans.push(Span::raw(" "));
         spans.push(Span::styled(
             cli_suffix,
