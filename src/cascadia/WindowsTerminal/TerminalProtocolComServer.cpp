@@ -52,7 +52,7 @@ int32_t TerminalProtocolComServer::s_GetLiveObjectCount() noexcept
 
 // Post a message to the emperor's UI thread to re-evaluate idle state.
 // Called from the COM MTA thread — PostMessage is thread-safe.
-static void s_notifyEmperorIdleCheck()
+void TerminalProtocolComServer::s_notifyEmperorIdleCheck()
 {
     const auto hwnd = TerminalProtocolComServer::s_emperorHwnd.load(std::memory_order_acquire);
     if (hwnd)

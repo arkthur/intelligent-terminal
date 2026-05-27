@@ -137,6 +137,7 @@ private:
     void _addInstance();
     void _removeInstance();
     static void _ensurePageEventsRegistered();
+    static void s_notifyEmperorIdleCheck();
 
     // Dispatch an {method:"autofix_state"} payload to every window's
     // TerminalPage on its UI thread.
