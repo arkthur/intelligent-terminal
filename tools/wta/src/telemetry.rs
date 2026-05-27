@@ -6,9 +6,17 @@
 // This module registers the SAME ETW provider as the C++ Windows Terminal
 // side (`Microsoft.Windows.Terminal.App`, GUID
 // `{24a1622f-7da7-5c77-3303-d850bd1ab2ed}`, registered by
-// `g_hTerminalAppProvider` in `src/cascadia/TerminalApp/init.cpp`).
-// Listeners therefore see a single merged event stream for the entire fork,
-// joinable by SessionId.
+// `g_hTerminalAppProvider` in `src/cascadia/TerminalApp/init.cpp`). WTA and
+// the C++ side therefore emit into a single merged ETW provider stream, so
+// listeners (xperf/wpa/UTC) see one unified view of the fork.
+//
+// Note: cross-process correlation by `SessionId` is intentionally NOT
+// provided here. The `SessionId` field on WTA events identifies the ACP
+// session (agent-pane backend connection); the C++-side events under this
+// provider (e.g. `CommandPaletteDispatchedAgentPrompt`) emit different
+// fields and do not carry a matching ACP session id. Treat the two
+// processes' events as a merged stream from one provider, but join across
+// processes only via fields explicitly shared (e.g. `PaneId`).
 //
 // Events emitted from this module:
 //   - AgentPromptSent       (WTA dispatches a prompt over ACP)
@@ -20,6 +28,8 @@
 //   - TraceLoggingDescription equivalent: passed as the event's metadata comment
 //   - Keyword: MICROSOFT_KEYWORD_MEASURES (stub = 0 in OSS; real value in MS-internal build)
 //   - PartA_PrivTags: PDT_ProductAndServiceUsage (stub = 0 in OSS)
+//   - Level: `Verbose`, matching `TraceLoggingWrite`'s C++ default (the C++
+//     events under this provider also use the implicit Verbose level).
 
 use tracelogging as tlg;
 
@@ -51,23 +61,28 @@ tlg::define_provider!(
     group_id("9aa7a361-583f-4c09-b1f1-cea1ef5863b0")
 );
 
-/// Register the ETW provider. Call once during process startup, BEFORE any
-/// log_* function below. Safe to call only once; subsequent calls are no-ops.
+/// Register the ETW provider. Safe to call multiple times — the underlying
+/// `TraceLoggingRegister`-style API is guarded by a `Once`, so only the
+/// first invocation actually performs the (unsafe) registration. Subsequent
+/// calls are no-ops, which keeps tests and re-entrant startup paths safe.
 ///
 /// # Safety
 /// `TraceLoggingRegister`-style APIs are inherently per-process. The
-/// `tracelogging` crate marks this `unsafe` for that reason. We call it from
-/// `main()` exactly once, which satisfies the contract.
+/// `tracelogging` crate marks `register()` `unsafe` for that reason. The
+/// `Once` below guarantees the unsafe call runs exactly once.
 pub fn register() {
-    // SAFETY: called once during startup.
-    unsafe {
-        AGENT_PROVIDER.register();
-    }
+    static REGISTER_ONCE: std::sync::Once = std::sync::Once::new();
+    REGISTER_ONCE.call_once(|| {
+        // SAFETY: the surrounding `Once` guarantees this runs exactly once
+        // per process; `tracelogging`'s contract is satisfied.
+        unsafe {
+            AGENT_PROVIDER.register();
+        }
+    });
 }
 
 /// Unregister the ETW provider. Optional; the OS reclaims the registration
-/// on process exit. Provided for symmetry with typical DLL_PROCESS_DETACH
-/// patterns in case future consumers want explicit teardown.
+/// on process exit. No-op if `register()` was never called.
 #[allow(dead_code)]
 pub fn unregister() {
     AGENT_PROVIDER.unregister();
