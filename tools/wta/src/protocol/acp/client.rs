@@ -2802,7 +2802,10 @@ async fn run_inner(
     });
 
     // Record the agent identity for ETW telemetry events.
-    crate::telemetry::set_agent_id(raw_program);
+    // Use the registry-sanitized id (e.g. "copilot", "claude") rather than
+    // the raw command path to avoid leaking local filesystem paths.
+    let telemetry_agent_id = crate::agent_registry::lookup_profile(raw_program).id;
+    crate::telemetry::set_agent_id(telemetry_agent_id);
 
     // Per-tab session cache, shared across all in-flight prompt tasks.
     // The startup session is bound to the owner tab GUID passed in by WT

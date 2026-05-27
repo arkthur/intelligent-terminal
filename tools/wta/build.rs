@@ -34,7 +34,13 @@ fn main() {
     };
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let dest = std::path::Path::new(&out_dir).join("telemetry_generated.rs");
-    std::fs::write(&dest, output).expect("failed to write telemetry_generated.rs");
+    // Only write when contents differ to avoid unnecessary recompiles.
+    let needs_write = std::fs::read_to_string(&dest)
+        .map(|existing| existing != output)
+        .unwrap_or(true);
+    if needs_write {
+        std::fs::write(&dest, output).expect("failed to write telemetry_generated.rs");
+    }
 
     println!("cargo:rerun-if-changed=src/telemetry_template.rs");
     println!("cargo:rerun-if-env-changed=MAGIC_TRACING_GUID");
