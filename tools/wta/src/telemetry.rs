@@ -3,11 +3,12 @@
 //
 // ETW TraceLogging provider for the WTA (Windows Terminal Agent) process.
 //
-// This module emits ETW events that are byte-identical to the C++
-// TraceLoggingWrite() calls in src/cascadia/TerminalApp/. WTA registers the
-// SAME provider GUID as the C++ side (see src/cascadia/TerminalApp/init.cpp,
-// g_hTerminalAgentProvider). Listeners therefore see a single merged event
-// stream for the entire fork, joinable by SessionId.
+// This module registers its own ETW provider (`Microsoft.Windows.Terminal.Agent`)
+// and emits TraceLogging events for the agent runtime. It is independent of
+// the Windows Terminal C++ provider (`Microsoft.Windows.Terminal.App`,
+// `g_hTerminalAppProvider` in `src/cascadia/TerminalApp/init.cpp`) — listeners
+// that want the full picture should subscribe to both providers and join by
+// SessionId.
 //
 // Events emitted from this module:
 //   - AgentPromptSent       (WTA dispatches a prompt over ACP)
@@ -15,7 +16,7 @@
 //   - ErrorDetected         (classify_wt_event positively classifies an error)
 //   - ErrorFixResolved      (next command's exit code is 0 after a fix attempt)
 //
-// All events follow the same conventions as the C++ side:
+// Conventions:
 //   - TraceLoggingDescription equivalent: passed as the event's metadata comment
 //   - Keyword: MICROSOFT_KEYWORD_MEASURES (stub = 0 in OSS; real value in MS-internal build)
 //   - PartA_PrivTags: PDT_ProductAndServiceUsage (stub = 0 in OSS)
@@ -23,8 +24,9 @@
 use tracelogging as tlg;
 
 // Compliance stubs — these mirror the values defined in
-// `dep/telemetry/ProjectTelemetry.h` on the C++ side. In the public OSS build
-// they are all zero. Microsoft-internal builds replace them with real values.
+// `dep/telemetry/ProjectTelemetry.h` used by Microsoft-internal builds. In the
+// public OSS build they are all zero; Microsoft-internal builds replace them
+// with real values.
 #[allow(dead_code)]
 pub const MICROSOFT_KEYWORD_MEASURES: u64 = 0x0;
 #[allow(dead_code)]
@@ -34,9 +36,12 @@ pub const PDT_PRODUCT_AND_SERVICE_PERFORMANCE: u64 = 0x0;
 
 // Provider definition.
 //
-// Provider name MUST match the C++ side (`Microsoft.Windows.Terminal.Agent`,
-// see src/cascadia/TerminalApp/init.cpp). The same applies to the GUID:
-// {c2cc7e3b-9d5f-4a2e-b8a4-1f3e5d7c9b6a}.
+// WTA owns its own ETW provider `Microsoft.Windows.Terminal.Agent`
+// (GUID `{c2cc7e3b-9d5f-4a2e-b8a4-1f3e5d7c9b6a}`). This is intentionally
+// distinct from the C++ Windows Terminal provider
+// (`Microsoft.Windows.Terminal.App`, registered by `g_hTerminalAppProvider`
+// in `src/cascadia/TerminalApp/init.cpp`). The two provider streams can be
+// correlated by SessionId.
 //
 // `group_id` is the Microsoft Telemetry option group, equivalent to the C++
 // TraceLoggingOptionMicrosoftTelemetry() macro
@@ -56,15 +61,15 @@ tlg::define_provider!(
 /// `tracelogging` crate marks this `unsafe` for that reason. We call it from
 /// `main()` exactly once, which satisfies the contract.
 pub fn register() {
-    // SAFETY: called once during startup; matches C++-side single-registration pattern.
+    // SAFETY: called once during startup.
     unsafe {
         AGENT_PROVIDER.register();
     }
 }
 
 /// Unregister the ETW provider. Optional; the OS reclaims the registration
-/// on process exit. We provide it for symmetry with the C++ side's
-/// DLL_PROCESS_DETACH path.
+/// on process exit. Provided for symmetry with typical DLL_PROCESS_DETACH
+/// patterns in case future consumers want explicit teardown.
 #[allow(dead_code)]
 pub fn unregister() {
     AGENT_PROVIDER.unregister();
@@ -72,9 +77,10 @@ pub fn unregister() {
 
 /// Emitted when WTA dispatches a prompt over the ACP stream to an agent.
 ///
-/// This is the WTA-side counterpart of `AgentPromptSent` on the C++ side
-/// (which fires when the `?<prompt>` command-palette delegation route enters
-/// the Terminal). Together they cover the two prompt-entry routes.
+/// Covers the agent-pane prompt-entry route. (The `?<prompt>` command-palette
+/// delegation route lives in the C++ Windows Terminal side and emits its own
+/// telemetry under the `Microsoft.Windows.Terminal.App` provider when that
+/// integration is wired up.)
 pub fn log_agent_prompt_sent(
     session_id: &str,
     prompt_byte_len: u32,

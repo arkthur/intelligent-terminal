@@ -493,16 +493,21 @@ impl PromptTimingState {
                 prompt_timing_log(turn_id, submitted_at_unix_s, "first_text", &details);
 
                 // Telemetry: agent's first text chunk arrived. Time-to-first-token
-                // is the key responsiveness metric — emit it for analysis.
-                let first_token_latency_ms = match prompt_sent_at {
-                    Some(sent) if now >= sent => (now - sent) * 1000.0,
-                    _ => 0.0,
-                };
-                crate::telemetry::log_agent_response_first_token(
-                    session_id,
-                    first_token_latency_ms,
-                    text_len as u32,
-                );
+                // is the key responsiveness metric — emit only when we can
+                // compute it reliably (i.e. we observed `prompt_sent_at` and it
+                // is not in the future). Otherwise we'd report 0ms latency,
+                // which is indistinguishable from a real fast response and
+                // would skew aggregates.
+                if let Some(sent) = prompt_sent_at {
+                    if now >= sent {
+                        let first_token_latency_ms = (now - sent) * 1000.0;
+                        crate::telemetry::log_agent_response_first_token(
+                            session_id,
+                            first_token_latency_ms,
+                            text_len as u32,
+                        );
+                    }
+                }
             }
         }
     }
@@ -700,16 +705,19 @@ impl PromptTimingState {
         );
 
         // Telemetry: emit the prompt-complete signal with aggregate metrics.
-        let total_duration_ms = match active_prompt.prompt_sent_at_unix_s {
-            Some(sent) if now >= sent => (now - sent) * 1000.0,
-            _ => 0.0,
-        };
-        crate::telemetry::log_agent_response_complete(
-            session_id,
-            total_duration_ms,
-            active_prompt.bytes_read_after_prompt as u64,
-            success,
-        );
+        // Only emit when we can compute total_duration_ms reliably; otherwise
+        // a 0ms completion would mislead aggregates.
+        if let Some(sent) = active_prompt.prompt_sent_at_unix_s {
+            if now >= sent {
+                let total_duration_ms = (now - sent) * 1000.0;
+                crate::telemetry::log_agent_response_complete(
+                    session_id,
+                    total_duration_ms,
+                    active_prompt.bytes_read_after_prompt as u64,
+                    success,
+                );
+            }
+        }
 
         Some(final_timing_note(
             active_prompt.submitted_at_unix_s,

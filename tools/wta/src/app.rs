@@ -1199,10 +1199,11 @@ pub struct App {
     pub show_notification_banner: bool,
     // Auto-fix: the pane ID where the error occurred (used to auto-fill Send parent)
     pub autofix_pane_id: Option<String>,
-    // Wall-clock instant at which the current `autofix_pane_id` was armed.
-    // Used to compute `TimeSinceFixMs` when the fix resolves (next command in
-    // the same pane exits zero). Overwritten on every new arming; the resolve
-    // path is gated by `autofix_pane_id`, so a stale value here is unreachable.
+    // Monotonic timestamp captured at the moment the current `autofix_pane_id`
+    // was armed. Used to compute `TimeSinceFixMs` (elapsed duration) when the
+    // fix resolves (next command in the same pane exits zero). Overwritten on
+    // every new arming; the resolve path is gated by `autofix_pane_id`, so a
+    // stale value here is unreachable.
     pub autofix_armed_at: Option<std::time::Instant>,
     // Auto-fix Suggested state: pane ID with a non-actionable suggestion shown on
     // the bottom bar. Cleared when the user runs a successful command in the
