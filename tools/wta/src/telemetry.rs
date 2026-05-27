@@ -75,9 +75,10 @@ pub fn unregister() {
 
 /// Emitted when WTA dispatches a prompt over the ACP stream to an agent.
 ///
-/// Covers the agent-pane prompt-entry route. The C++ side may also emit
-/// `AgentPromptSent` for the `?<prompt>` command-palette delegation route
-/// (registered under the same provider).
+/// Covers the agent-pane prompt-entry route. The C++ side emits its own
+/// related event for the `?<prompt>` command-palette delegation route
+/// (`CommandPaletteDispatchedAgentPrompt` in
+/// `src/cascadia/TerminalApp/CommandPalette.cpp`, under the same provider).
 pub fn log_agent_prompt_sent(
     session_id: &str,
     prompt_byte_len: u32,

@@ -2604,8 +2604,11 @@ async fn dispatch_prompt_body(
             });
             prompt_timing_task.mark_prompt_sent(&prompt_session_id_str);
 
-            // Telemetry: prompt dispatched over ACP. Mirrors the C++ side's
-            // AgentPromptSent event (which fires for ?<prompt> delegation).
+            // Telemetry: prompt dispatched over ACP. WTA emits
+            // `AgentPromptSent` for the agent-pane prompt-entry route; the
+            // C++ side emits `CommandPaletteDispatchedAgentPrompt` (in
+            // src/cascadia/TerminalApp/CommandPalette.cpp) for the
+            // `?<prompt>` delegation route under the same provider.
             // Together the two emissions cover both prompt-entry routes.
             crate::telemetry::log_agent_prompt_sent(
                 &prompt_session_id_str,
