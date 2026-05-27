@@ -3,12 +3,12 @@
 //
 // ETW TraceLogging provider for the WTA (Windows Terminal Agent) process.
 //
-// This module registers its own ETW provider (`Microsoft.Windows.Terminal.Agent`)
-// and emits TraceLogging events for the agent runtime. It is independent of
-// the Windows Terminal C++ provider (`Microsoft.Windows.Terminal.App`,
-// `g_hTerminalAppProvider` in `src/cascadia/TerminalApp/init.cpp`) — listeners
-// that want the full picture should subscribe to both providers and join by
-// SessionId.
+// This module registers the SAME ETW provider as the C++ Windows Terminal
+// side (`Microsoft.Windows.Terminal.App`, GUID
+// `{24a1622f-7da7-5c77-3303-d850bd1ab2ed}`, registered by
+// `g_hTerminalAppProvider` in `src/cascadia/TerminalApp/init.cpp`).
+// Listeners therefore see a single merged event stream for the entire fork,
+// joinable by SessionId.
 //
 // Events emitted from this module:
 //   - AgentPromptSent       (WTA dispatches a prompt over ACP)
@@ -36,20 +36,18 @@ pub const PDT_PRODUCT_AND_SERVICE_PERFORMANCE: u64 = 0x0;
 
 // Provider definition.
 //
-// WTA owns its own ETW provider `Microsoft.Windows.Terminal.Agent`
-// (GUID `{c2cc7e3b-9d5f-4a2e-b8a4-1f3e5d7c9b6a}`). This is intentionally
-// distinct from the C++ Windows Terminal provider
-// (`Microsoft.Windows.Terminal.App`, registered by `g_hTerminalAppProvider`
-// in `src/cascadia/TerminalApp/init.cpp`). The two provider streams can be
-// correlated by SessionId.
+// Provider name and GUID match the C++ side
+// (`Microsoft.Windows.Terminal.App`, `g_hTerminalAppProvider` in
+// `src/cascadia/TerminalApp/init.cpp`). Both processes therefore emit into
+// the same ETW provider stream and listeners get a unified view of the fork.
 //
 // `group_id` is the Microsoft Telemetry option group, equivalent to the C++
 // TraceLoggingOptionMicrosoftTelemetry() macro
 // (group GUID: 9aa7a361-583f-4c09-b1f1-cea1ef5863b0).
 tlg::define_provider!(
     AGENT_PROVIDER,
-    "Microsoft.Windows.Terminal.Agent",
-    id("c2cc7e3b-9d5f-4a2e-b8a4-1f3e5d7c9b6a"),
+    "Microsoft.Windows.Terminal.App",
+    id("24a1622f-7da7-5c77-3303-d850bd1ab2ed"),
     group_id("9aa7a361-583f-4c09-b1f1-cea1ef5863b0")
 );
 
@@ -77,10 +75,9 @@ pub fn unregister() {
 
 /// Emitted when WTA dispatches a prompt over the ACP stream to an agent.
 ///
-/// Covers the agent-pane prompt-entry route. (The `?<prompt>` command-palette
-/// delegation route lives in the C++ Windows Terminal side and emits its own
-/// telemetry under the `Microsoft.Windows.Terminal.App` provider when that
-/// integration is wired up.)
+/// Covers the agent-pane prompt-entry route. The C++ side may also emit
+/// `AgentPromptSent` for the `?<prompt>` command-palette delegation route
+/// (registered under the same provider).
 pub fn log_agent_prompt_sent(
     session_id: &str,
     prompt_byte_len: u32,

@@ -444,8 +444,9 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Register the WTA ETW TraceLogging provider once per process.
-    // (Provider: `Microsoft.Windows.Terminal.Agent`, independent from the C++
-    // Windows Terminal provider; see tools/wta/src/telemetry.rs.)
+    // WTA registers under the SAME provider GUID as the C++ side
+    // (`Microsoft.Windows.Terminal.App` / `g_hTerminalAppProvider`) so
+    // listeners see a single merged event stream. See tools/wta/src/telemetry.rs.
     telemetry::register();
 
     // Legacy flags first (backward compat)
