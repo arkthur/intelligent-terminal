@@ -1150,6 +1150,15 @@ impl TabSession {
         self.chat_scroll.offset = 0;
     }
 
+    /// Whether the input box is the arrow-key navigational focus target.
+    /// False when the user is browsing a completed turn or a recommendation
+    /// card is showing — in both cases ↑↓ navigate elsewhere. UI affordances
+    /// that should track "is the input cell live" (e.g. the placeholder
+    /// caret cell) gate on this together with the pane's XAML focus.
+    pub fn input_has_nav_focus(&self) -> bool {
+        self.selected_completed_turn_idx.is_none() && self.turn.recommendations().is_none()
+    }
+
     pub fn clear_recommendations(&mut self) {
         self.selected_recommendation = 0;
         self.selected_button = 0;

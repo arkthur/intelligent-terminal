@@ -68,15 +68,11 @@ pub fn render(frame: &mut Frame, app: &App, area: Rect) {
         // on Black = invisible) before the cursor overlay had anything to
         // reveal.
         //
-        // Only paint the white block when the input cell is the actual
-        // navigational focus target. Otherwise the bare white square is a
-        // misleading "cursor here" indicator — most keystrokes won't land
-        // in the input. The TUI gives arrow-key focus to whichever of these
-        // is showing, in this priority: turn selection > recommendations >
-        // input. Mirror that here so the visual cue tracks the focus.
-        let input_active = app.pane_focused
-            && tab.selected_completed_turn_idx.is_none()
-            && tab.turn.recommendations().is_none();
+        // Only paint the white block when the input cell is actually the
+        // live caret target: the pane has XAML focus *and* the TUI's arrow
+        // keys land in the input (not in a recommendation card or a
+        // selected completed turn). See TabSession::input_has_nav_focus.
+        let input_active = app.pane_focused && tab.input_has_nav_focus();
         let mut placeholder_spans = vec![Span::styled(INPUT_PROMPT, theme::DIM)];
         let mut chars = placeholder.chars();
         if let Some(first) = chars.next() {
