@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::agent_sessions::{AgentStatus, CliSource, SessionEvent, SessionOrigin};
+use crate::agent_sessions::{AgentSession, AgentStatus, CliSource, SessionEvent, SessionOrigin};
 use tokio::sync::Mutex;
 
 /// Top-level key under `_meta` reserved for our extension. ACP lets
@@ -701,6 +701,36 @@ impl SessionInfo {
     pub fn with_pane_session_id(mut self, pane_session_id: impl Into<String>) -> Self {
         self.pane_session_id = Some(pane_session_id.into());
         self
+    }
+}
+
+/// Convert an `AgentSession` (the helper-side representation, also used
+/// by the disk scanner `history_loader::load_all`) into a `SessionInfo`
+/// for upsert into master's registry.
+///
+/// Used by master at startup to seed the registry with historical
+/// rows scanned from `~/.copilot/`, `~/.claude/`, `~/.gemini/` so
+/// `wta sessions list` and F2 viewers see the full set, not just live
+/// sessions created via `session/new` after master booted.
+pub fn agent_session_to_session_info(s: &AgentSession) -> SessionInfo {
+    let last_activity_at_ms = s
+        .last_activity_at
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|d| d.as_millis() as u64);
+    SessionInfo {
+        session_id: acp::SessionId::new(s.key.clone()),
+        cwd: s.cwd.clone(),
+        title: if s.title.is_empty() { None } else { Some(s.title.clone()) },
+        updated_at: None,
+        pane_session_id: s.pane_session_id.clone(),
+        status: Some(s.status.clone()),
+        cli_source: Some(s.cli_source.clone()),
+        current_tool: s.current_tool.clone(),
+        attention_reason: s.attention_reason.clone(),
+        last_activity_at_ms,
+        origin: Some(s.origin.clone()),
+        last_error: s.last_error.clone(),
     }
 }
 
@@ -1740,6 +1770,64 @@ mod tests {
         let notification = build_sessions_changed_notification();
         assert_eq!(&*notification.method, INTELLTERM_METHOD_SESSIONS_CHANGED);
         assert_eq!(notification.params.get(), "{}");
+    }
+
+    // ─── agent_session_to_session_info (master history seeding) ─────────
+
+    #[test]
+    fn agent_session_to_session_info_preserves_fields_for_historical_row() {
+        use crate::agent_sessions::{AgentSession, AgentStatus, CliSource, SessionOrigin};
+        let s = AgentSession {
+            key: "hist-sid".to_string(),
+            cli_source: CliSource::Copilot,
+            pane_session_id: None,
+            window_id: None,
+            tab_id: None,
+            title: "fix build".to_string(),
+            cwd: PathBuf::from(r#"C:\repo"#),
+            started_at: std::time::UNIX_EPOCH + std::time::Duration::from_millis(1_000_000),
+            last_activity_at: std::time::UNIX_EPOCH + std::time::Duration::from_millis(2_000_000),
+            status: AgentStatus::Historical,
+            last_error: None,
+            current_tool: None,
+            attention_reason: None,
+            log_path: None,
+            origin: SessionOrigin::AgentPane,
+        };
+        let info = agent_session_to_session_info(&s);
+        assert_eq!(info.session_id.0.as_ref(), "hist-sid");
+        assert_eq!(info.cwd, PathBuf::from(r#"C:\repo"#));
+        assert_eq!(info.title.as_deref(), Some("fix build"));
+        assert_eq!(info.status, Some(AgentStatus::Historical));
+        assert_eq!(info.cli_source, Some(CliSource::Copilot));
+        assert_eq!(info.origin, Some(SessionOrigin::AgentPane));
+        assert_eq!(info.last_activity_at_ms, Some(2_000_000));
+        assert_eq!(info.pane_session_id, None);
+    }
+
+    #[test]
+    fn agent_session_to_session_info_drops_empty_title() {
+        use crate::agent_sessions::{AgentSession, AgentStatus, CliSource, SessionOrigin};
+        let s = AgentSession {
+            key: "x".to_string(),
+            cli_source: CliSource::Claude,
+            pane_session_id: Some("pane-X".to_string()),
+            window_id: None,
+            tab_id: None,
+            title: String::new(),
+            cwd: PathBuf::from("/repo"),
+            started_at: std::time::SystemTime::now(),
+            last_activity_at: std::time::SystemTime::now(),
+            status: AgentStatus::Idle,
+            last_error: None,
+            current_tool: None,
+            attention_reason: None,
+            log_path: None,
+            origin: SessionOrigin::Unknown,
+        };
+        let info = agent_session_to_session_info(&s);
+        assert_eq!(info.title, None, "empty title should map to None, not Some(\"\")");
+        assert_eq!(info.pane_session_id.as_deref(), Some("pane-X"));
     }
 
     #[test]

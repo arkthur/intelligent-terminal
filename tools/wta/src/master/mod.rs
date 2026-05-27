@@ -1314,6 +1314,53 @@ async fn run_master_loop(cli: Cli, pipe_name: String) -> Result<()> {
         wt,
         cached_init_resp: OnceLock::new(),
     });
+
+    // Seed the registry with historical sessions scanned from
+    // `~/.copilot/`, `~/.claude/`, `~/.gemini/` so `wta sessions list`
+    // and helper F2 viewers see the full set, not just live sessions
+    // created via `session/new` after master booted. Disk scan can take
+    // ~100ms-1s for users with many sessions, so we run it in
+    // spawn_blocking and broadcast `sessions/changed` once when done.
+    // Helpers that have F2 open at that moment will refetch and pick
+    // up the historicals; helpers that open F2 later will see them on
+    // the next `sessions/list` call.
+    let inner_for_history = Arc::clone(&inner);
+    tokio::task::spawn_local(async move {
+        let scan_started = std::time::Instant::now();
+        let sessions = match tokio::task::spawn_blocking(|| {
+            crate::history_loader::load_all()
+        })
+        .await
+        {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    target: "master_history",
+                    error = %e,
+                    "history scan task panicked; registry will not include historicals"
+                );
+                return;
+            }
+        };
+        let count = sessions.len();
+        for s in &sessions {
+            let info = crate::session_registry::agent_session_to_session_info(s);
+            inner_for_history.registry.upsert(info).await;
+        }
+        tracing::info!(
+            target: "master_history",
+            count,
+            elapsed_ms = scan_started.elapsed().as_millis() as u64,
+            "master-side history scan complete; broadcasting sessions/changed"
+        );
+        if count > 0 {
+            broadcast_ext_to_helpers(
+                &inner_for_history,
+                crate::session_registry::build_sessions_changed_notification(),
+            )
+            .await;
+        }
+    });
     let client = MasterClient {
         state: Arc::clone(&inner),
     };
