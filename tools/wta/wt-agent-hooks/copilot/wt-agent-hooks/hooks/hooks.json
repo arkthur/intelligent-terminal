@@ -5,7 +5,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.session.start"
+          "command": "wtcli forward-hook -c copilot -e agent.session.start"
         }]
       }
     ],
@@ -14,7 +14,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.session.end"
+          "command": "wtcli forward-hook -c copilot -e agent.session.end"
         }]
       }
     ],
@@ -23,7 +23,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.notification"
+          "command": "wtcli forward-hook -c copilot -e agent.notification"
         }]
       }
     ],
@@ -32,7 +32,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.prompt.submit"
+          "command": "wtcli forward-hook -c copilot -e agent.prompt.submit"
         }]
       }
     ],
@@ -41,7 +41,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.tool.starting"
+          "command": "wtcli forward-hook -c copilot -e agent.tool.starting"
         }]
       }
     ],
@@ -50,7 +50,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.tool.finished"
+          "command": "wtcli forward-hook -c copilot -e agent.tool.finished"
         }]
       }
     ],
@@ -59,7 +59,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.tool.failed"
+          "command": "wtcli forward-hook -c copilot -e agent.tool.failed"
         }]
       }
     ],
@@ -68,7 +68,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.error"
+          "command": "wtcli forward-hook -c copilot -e agent.error"
         }]
       }
     ],
@@ -77,7 +77,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.stop"
+          "command": "wtcli forward-hook -c copilot -e agent.stop"
         }]
       }
     ],
@@ -86,7 +86,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource copilot agent.subagent.stop"
+          "command": "wtcli forward-hook -c copilot -e agent.subagent.stop"
         }]
       }
     ]

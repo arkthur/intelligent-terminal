@@ -24,12 +24,19 @@
 //       .claude-plugin/marketplace.json
 //       wt-agent-hooks/                    <- the plugin folder Claude copies
 //         .claude-plugin/plugin.json
-//         hooks/{hooks.json,send-event.ps1}
+//         hooks/hooks.json
 //     copilot/                             <- passed to `copilot plugin marketplace add`
-//       (same shape; only hooks.json differs from claude/ — `-CliSource copilot`)
+//       (same shape; only hooks.json differs from claude/ — `-c copilot`)
 //     gemini-extension/                    <- passed to `gemini extensions install`
 //       gemini-extension.json
-//       hooks/{hooks.json,send-event.ps1}
+//       hooks/hooks.json
+//
+// `hooks.json` invokes `wtcli forward-hook` directly (a native C++ subcommand
+// in wtcli.exe). Older releases shipped a `send-event.ps1` PowerShell bridge
+// here; that file has been removed because PowerShell cold-start (~870ms) was
+// adding latency to every hook fire. See `src/tools/wtcli/main.cpp` for the
+// native implementation. Stale `send-event.ps1` references in user installs
+// are still recognised by `entry_is_wta_tagged()` for cleanup compatibility.
 //
 // The MSIX package ships this directory next to `wta.exe` (see
 // `CascadiaPackage.wapproj`'s `wt-agent-hooks` Content glob), so at runtime
@@ -624,6 +631,12 @@ fn install_for_copilot(home: &Path) {
         }
     };
 
+    // Stage the bundle to LOCALAPPDATA so we own a writable copy and can
+    // rewrite hooks.json's `wtcli` references to an absolute path. The
+    // alias-based literal `wtcli` is a fine fallback when staging fails.
+    let staged_dir = stage_bundle_for_cli(CliKind::Copilot, &bundle_dir);
+    let bundle_dir = staged_dir.as_deref().unwrap_or(&bundle_dir);
+
     // Cleanup (issue #21): pre-staging-refactor wta builds, moved/deleted
     // worktrees, renamed dev clones, or stale `WTA_HOOKS_BUNDLE_DIR` values
     // can all leave an `extraKnownMarketplaces["wt-local"]` entry whose
@@ -718,6 +731,11 @@ fn install_for_gemini(home: &Path) {
             return;
         }
     };
+
+    // Stage to LOCALAPPDATA for wtcli path substitution; see the
+    // identical block in install_for_copilot for rationale.
+    let staged_dir = stage_bundle_for_cli(CliKind::Gemini, &bundle_dir);
+    let bundle_dir = staged_dir.as_deref().unwrap_or(&bundle_dir);
 
     let bundle_path = bundle_dir.to_string_lossy().into_owned();
     // `--consent --skip-settings`: defuse Gemini 0.41.2's interactive
@@ -1894,17 +1912,16 @@ fn home_dir() -> Option<PathBuf> {
 }
 
 /// Directory name (under `%LOCALAPPDATA%\IntelligentTerminal\`) used to
-/// hold per-CLI staging copies of the wt-agent-hooks bundle. We only
-/// materialize into it when the resolved source lives under WindowsApps
-/// (see [`maybe_stage_bundle_for_claude`]); dev-tree and
-/// `WTA_HOOKS_BUNDLE_DIR` runs skip staging and hand the source path
-/// directly to the CLI.
+/// hold per-CLI staging copies of the wt-agent-hooks bundle. Every
+/// install path materializes into it so we own a writable copy in which
+/// `hooks.json` can be rewritten with the absolute `wtcli.exe` path
+/// (see [`stage_bundle_for_cli`]).
 const STAGING_SUBDIR: &str = "hook-bundle-staging";
 
 /// True when `path` is under `…\WindowsApps\…` (any segment, any case).
-/// Used to detect MSIX-deployed bundle sources that trip Node.js's
-/// recursive `fs.cpSync` with `EPERM` (see the long-form rationale at
-/// the call site in `install_for_claude`).
+/// Originally used to gate Claude's EPERM workaround; now retained as a
+/// general diagnostic helper and exercised by the test below.
+#[allow(dead_code)]
 fn is_under_windows_apps(path: &Path) -> bool {
     let s = path.to_string_lossy();
     let lower = s.to_ascii_lowercase();
@@ -1914,43 +1931,106 @@ fn is_under_windows_apps(path: &Path) -> bool {
     lower.contains(r"\windowsapps\") || lower.contains("/windowsapps/")
 }
 
-/// If `source` is under WindowsApps, stage a copy into
-/// `%LOCALAPPDATA%\IntelligentTerminal\hook-bundle-staging\claude\`
-/// and return the staged path. Returns `None` when staging is unnecessary
-/// or fails (the caller falls back to `source`).
-///
-/// Idempotent: removes any stale staging directory first so MSIX upgrades
-/// (which bump the version segment in the package path) don't leave
-/// orphaned files behind.
+/// Backwards-compatible entry point retained for `install_for_claude`
+/// callers. Delegates to the universal stager.
 fn maybe_stage_bundle_for_claude(source: &Path) -> Option<PathBuf> {
-    if !is_under_windows_apps(source) {
-        return None;
-    }
+    stage_bundle_for_cli(CliKind::Claude, source)
+}
+
+/// Stage a per-CLI bundle into LOCALAPPDATA and rewrite its `hooks.json`
+/// `wtcli` references to the absolute path resolved at startup.
+///
+/// Why staging is universal now (was Claude-only)
+/// ----------------------------------------------
+/// The bundle's `hooks.json` invokes `wtcli forward-hook ...`. Relying on
+/// PATH (via the wtcli AppExecutionAlias) works in the common case, but
+/// fails when:
+///   * The user has disabled per-app AppExecutionAlias in Windows Settings.
+///   * The agent CLI subprocess inherits a sanitised PATH that drops
+///     `%LOCALAPPDATA%\Microsoft\WindowsApps`.
+///   * The installed package isn't `IntelligentTerminal_*` (dev builds,
+///     side-loaded MSIX, etc.) and the alias isn't present.
+///
+/// Substituting the absolute `wtcli.exe` path at install time removes
+/// every one of those failure modes. A staged copy is required because we
+/// cannot safely mutate the dev-tree source.
+///
+/// Bonus benefit (was the original reason for Claude-only staging): the
+/// Node.js `fs.cpSync` recursive copy that `claude plugin install` uses
+/// fails with EPERM against subdirectories of `C:\Program Files\WindowsApps\`,
+/// so universal staging also sidesteps that bug for Claude.
+fn stage_bundle_for_cli(cli: CliKind, source: &Path) -> Option<PathBuf> {
     let root = crate::runtime_paths::intelligent_terminal_root()?;
-    let staged = root.join(STAGING_SUBDIR).join(CliKind::Claude.dir_name());
+    let staged = root.join(STAGING_SUBDIR).join(cli.dir_name());
     match restage_bundle_dir(source, &staged) {
         Ok(()) => {
+            // Best-effort path substitution. Locates `hooks/hooks.json`
+            // under either `wt-agent-hooks/` (Claude/Copilot) or directly
+            // under the bundle root (Gemini).
+            let candidates = [
+                staged.join("wt-agent-hooks/hooks/hooks.json"),
+                staged.join("hooks/hooks.json"),
+            ];
+            for path in &candidates {
+                if path.is_file() {
+                    let _ = rewrite_hooks_json_wtcli_path(path);
+                }
+            }
             tracing::info!(
                 target: "agent_hooks",
+                cli = %cli.name(),
                 source = %source.display(),
                 staged = %staged.display(),
-                "staged claude bundle out of WindowsApps to sidestep Node.js cpSync EPERM",
+                "staged bundle to LOCALAPPDATA with wtcli path substitution",
             );
             Some(staged)
         }
         Err(e) => {
             tracing::warn!(
                 target: "agent_hooks",
+                cli = %cli.name(),
                 err = %e,
                 source = %source.display(),
                 staged = %staged.display(),
-                "failed to stage claude bundle under LOCALAPPDATA; \
-                 falling back to WindowsApps source (claude plugin install \
-                 may fail with EPERM)",
+                "failed to stage bundle; falling back to source path \
+                 (literal `wtcli` will rely on AppExecutionAlias)",
             );
             None
         }
     }
+}
+
+/// Rewrite the literal `wtcli` token at the start of `forward-hook`
+/// command strings in a staged `hooks.json` to the absolute path of the
+/// `wtcli.exe` resolved at startup. Best-effort: on any error, leaves
+/// the file untouched (literal `wtcli` still works via AppExecutionAlias).
+fn rewrite_hooks_json_wtcli_path(path: &Path) -> std::io::Result<()> {
+    let original = fs::read_to_string(path)?;
+    let wtcli = crate::shell::wt_channel::resolve_wtcli_path();
+
+    // Sanity: if the resolver fell back to bare "wtcli", there is nothing
+    // to substitute. Leave the file alone so we don't quote-escape the
+    // literal needlessly.
+    if wtcli == "wtcli" || wtcli == "wtcli.exe" {
+        return Ok(());
+    }
+
+    // JSON requires `\\` for each backslash in a string literal. Quotes
+    // inside the path are forbidden by Windows, so we don't need to
+    // escape those.
+    let escaped = wtcli.replace('\\', "\\\\");
+
+    // Substitute only at the start of the `command` value. This is
+    // narrower than a global replace, which would also catch e.g. a
+    // string containing "wtcli" inside a matcher or comment.
+    let needle = "\"command\": \"wtcli forward-hook";
+    let replacement = format!("\"command\": \"{} forward-hook", escaped);
+    let rewritten = original.replace(needle, &replacement);
+
+    if rewritten == original {
+        return Ok(());
+    }
+    fs::write(path, rewritten)
 }
 
 /// Recreate `dst` as a fresh, byte-identical copy of `src`. Removes any
@@ -2070,16 +2150,22 @@ fn cleanup_legacy_claude_hooks(settings_path: &Path) -> std::io::Result<()> {
 }
 
 /// True iff the entry was inserted by us (any nested `command` string
-/// references our bridge script or carries the WTA_TAG marker). Used by
-/// `cleanup_legacy_claude_hooks` to identify our own entries during
-/// migration off the direct-settings.json path.
+/// references our bridge script, the new `wtcli forward-hook` subcommand,
+/// or carries the WTA_TAG marker). Used by `cleanup_legacy_claude_hooks`
+/// to identify our own entries during migration off the direct-settings.json
+/// path. Keeps the `send-event.ps1` substring match for back-compat —
+/// users upgrading from a pre-`forward-hook` install may still have
+/// settings.json entries pointing at the now-deleted script.
 fn entry_is_wta_tagged(entry: &Value) -> bool {
     let Some(hooks) = entry.get("hooks").and_then(|h| h.as_array()) else {
         return false;
     };
     for h in hooks {
         let Some(cmd) = h.get("command").and_then(|c| c.as_str()) else { continue; };
-        if cmd.contains(WTA_TAG) || cmd.contains("send-event.ps1") {
+        if cmd.contains(WTA_TAG)
+            || cmd.contains("send-event.ps1")
+            || cmd.contains("forward-hook")
+        {
             return true;
         }
     }
@@ -2445,38 +2531,66 @@ mod tests {
     const COPILOT_MARKETPLACE_JSON: &str =
         include_str!("../wt-agent-hooks/copilot/.claude-plugin/marketplace.json");
 
-    const CLAUDE_SEND_EVENT_PS1: &str =
-        include_str!("../wt-agent-hooks/claude/wt-agent-hooks/hooks/send-event.ps1");
-    const COPILOT_SEND_EVENT_PS1: &str =
-        include_str!("../wt-agent-hooks/copilot/wt-agent-hooks/hooks/send-event.ps1");
-    const GEMINI_SEND_EVENT_PS1: &str =
-        include_str!("../wt-agent-hooks/gemini-extension/hooks/send-event.ps1");
+    // NOTE: `send-event.ps1` was retired in favour of `wtcli forward-hook`
+    // (a native subcommand in wtcli.exe). The previous tests that pinned
+    // the PowerShell bridge to byte-equality across the three CLIs were
+    // removed at the same time; the parity invariants we still care about
+    // (hooks.json shape, plugin/marketplace JSONs) are covered below.
 
-    /// `hooks.json` files must reference `${CLAUDE_PLUGIN_ROOT}` (Claude/
-    /// Copilot) or `${extensionPath}` (Gemini), and `send-event.ps1` must
-    /// be non-empty in every per-CLI subtree.
+    /// `hooks.json` must invoke `wtcli forward-hook` directly. The bare
+    /// `wtcli` token is what gets rewritten to an absolute path by
+    /// `rewrite_hooks_json_wtcli_path()` at install time (with the literal
+    /// preserved as a fallback when path resolution fails).
     #[test]
     fn bundle_files_are_well_formed() {
-        assert!(CLAUDE_HOOKS_JSON.contains("${CLAUDE_PLUGIN_ROOT}"));
-        assert!(COPILOT_HOOKS_JSON.contains("${CLAUDE_PLUGIN_ROOT}"));
-        assert!(GEMINI_HOOKS_JSON.contains("${extensionPath}"));
-
-        assert!(!CLAUDE_SEND_EVENT_PS1.is_empty());
-        assert!(!COPILOT_SEND_EVENT_PS1.is_empty());
-        assert!(!GEMINI_SEND_EVENT_PS1.is_empty());
+        for (label, hooks) in [
+            ("claude", CLAUDE_HOOKS_JSON),
+            ("copilot", COPILOT_HOOKS_JSON),
+            ("gemini", GEMINI_HOOKS_JSON),
+        ] {
+            assert!(
+                hooks.contains("wtcli forward-hook"),
+                "{label} hooks.json missing `wtcli forward-hook` invocation"
+            );
+            // Sanity-check it parses as JSON so a stray editor doesn't
+            // ship a malformed file.
+            let _: Value = serde_json::from_str(hooks)
+                .unwrap_or_else(|e| panic!("{label} hooks.json is not valid JSON: {e}"));
+        }
     }
 
-    /// Per-CLI hooks.json files must each contain the expected `-CliSource`
-    /// argument so the bridge script tags emitted events with the right CLI.
+    /// Per-CLI hooks.json files must each invoke `wtcli forward-hook` with
+    /// the matching `-c <cli>` argument so the bridge tags emitted events
+    /// with the right CLI source.
     #[test]
     fn bundle_hooks_thread_cli_source() {
-        assert!(CLAUDE_HOOKS_JSON.contains("-CliSource claude"));
-        assert!(!CLAUDE_HOOKS_JSON.contains("-CliSource copilot"));
+        assert!(CLAUDE_HOOKS_JSON.contains("wtcli forward-hook -c claude"));
+        assert!(!CLAUDE_HOOKS_JSON.contains("-c copilot"));
 
-        assert!(COPILOT_HOOKS_JSON.contains("-CliSource copilot"));
-        assert!(!COPILOT_HOOKS_JSON.contains("-CliSource claude"));
+        assert!(COPILOT_HOOKS_JSON.contains("wtcli forward-hook -c copilot"));
+        assert!(!COPILOT_HOOKS_JSON.contains("-c claude"));
 
-        assert!(GEMINI_HOOKS_JSON.contains("-CliSource gemini"));
+        assert!(GEMINI_HOOKS_JSON.contains("wtcli forward-hook -c gemini"));
+    }
+
+    /// Hooks.json must NOT carry any reference to the retired PowerShell
+    /// bridge — otherwise an editor reverted the migration.
+    #[test]
+    fn bundle_hooks_no_longer_reference_powershell_bridge() {
+        for (label, hooks) in [
+            ("claude", CLAUDE_HOOKS_JSON),
+            ("copilot", COPILOT_HOOKS_JSON),
+            ("gemini", GEMINI_HOOKS_JSON),
+        ] {
+            assert!(
+                !hooks.contains("send-event.ps1"),
+                "{label} hooks.json still references the retired send-event.ps1 bridge"
+            );
+            assert!(
+                !hooks.contains("powershell"),
+                "{label} hooks.json still spawns powershell directly"
+            );
+        }
     }
 
     /// Claude and Copilot must ship the canonical 10-event Claude-documented
@@ -2514,21 +2628,20 @@ mod tests {
 
     /// Claude and Copilot share the same hook-event schema; their
     /// `hooks.json` files must be byte-identical except for the
-    /// `-CliSource <name>` token. Prevents future drift between the two
+    /// `-c <name>` token. Prevents future drift between the two
     /// per-CLI bundles.
     #[test]
     fn claude_and_copilot_hooks_json_are_parity_identical() {
-        let normalized_claude = CLAUDE_HOOKS_JSON.replace("-CliSource claude", "-CliSource <CLI>");
-        let normalized_copilot =
-            COPILOT_HOOKS_JSON.replace("-CliSource copilot", "-CliSource <CLI>");
+        let normalized_claude = CLAUDE_HOOKS_JSON.replace("-c claude", "-c <CLI>");
+        let normalized_copilot = COPILOT_HOOKS_JSON.replace("-c copilot", "-c <CLI>");
         assert_eq!(
             normalized_claude, normalized_copilot,
-            "claude/ and copilot/ hooks.json must match modulo -CliSource value"
+            "claude/ and copilot/ hooks.json must match modulo -c value"
         );
     }
 
-    /// Claude and Copilot share the same `plugin.json`, `marketplace.json`,
-    /// and `send-event.ps1` content; assert byte-equality so future edits
+    /// Claude and Copilot share the same `plugin.json` and
+    /// `marketplace.json` content; assert byte-equality so future edits
     /// stay in sync.
     #[test]
     fn claude_and_copilot_share_static_manifests() {
@@ -2540,18 +2653,6 @@ mod tests {
             CLAUDE_MARKETPLACE_JSON, COPILOT_MARKETPLACE_JSON,
             "claude/ and copilot/ marketplace.json must match byte-for-byte"
         );
-        assert_eq!(
-            CLAUDE_SEND_EVENT_PS1, COPILOT_SEND_EVENT_PS1,
-            "claude/ and copilot/ send-event.ps1 must match byte-for-byte"
-        );
-    }
-
-    /// `send-event.ps1` is single-source-of-truth across all three CLIs.
-    /// (Claude/Copilot byte-equality is covered above; this also pins
-    /// Gemini to the same content.)
-    #[test]
-    fn all_three_cli_send_event_scripts_are_identical() {
-        assert_eq!(CLAUDE_SEND_EVENT_PS1, GEMINI_SEND_EVENT_PS1);
     }
 
     /// `marketplace.json` must declare the `wt-local` marketplace name and

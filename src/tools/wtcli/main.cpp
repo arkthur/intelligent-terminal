@@ -12,6 +12,8 @@
 
 #include <chrono>
 #include <cstdio>
+#include <fcntl.h>
+#include <io.h>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -74,6 +76,37 @@ static Protocol::IProtocolServer ConnectToTerminal(Protocol::AuthResult* outAuth
     }
 }
 
+static Protocol::IProtocolServer ConnectToTerminalQuiet()
+{
+    // Variant of ConnectToTerminal() that NEVER writes to stderr. The
+    // forward-hook subcommand is invoked by Claude/Copilot/Gemini hook
+    // pipelines; per their contracts, stdout/stderr from the hook command
+    // are observed (stdout is fed into the model context for
+    // SessionStart/UserPromptSubmit, stderr surfaces as "<hook> hook error"
+    // in the transcript). Any noise we emit here leaks tokens or breaks UX,
+    // so we silently return nullptr on every failure path.
+    wchar_t clsid[128]{};
+    if (!GetEnvironmentVariableW(L"WT_COM_CLSID", clsid, ARRAYSIZE(clsid)))
+        return nullptr;
+
+    CLSID cls{};
+    if (FAILED(CLSIDFromString(clsid, &cls)))
+        return nullptr;
+
+    try
+    {
+        auto server = winrt::create_instance<Protocol::IProtocolServer>(cls, CLSCTX_LOCAL_SERVER);
+        auto authResult = server.Authenticate(L"");
+        if (!authResult.Authenticated)
+            return nullptr;
+        return server;
+    }
+    catch (...)
+    {
+        return nullptr;
+    }
+}
+
 static winrt::guid ResolveSessionId(const Protocol::IProtocolServer& server, const std::string& target)
 {
     if (!target.empty())
@@ -119,10 +152,210 @@ static uint32_t GetFirstTabId(const Protocol::IProtocolServer& server, uint64_t 
     return UINT32_MAX;
 }
 
+// ── Hook bridge support (forward-hook subcommand) ──
+//
+// These helpers exist *only* for `forward-hook`. They are intentionally
+// silent — no fprintf, no exceptions escaping — because hook stdout/stderr
+// is observed by the agent CLI (Claude/Copilot/Gemini) and any noise either
+// leaks tokens into the model context or surfaces as a "hook error" toast.
+
+// Read all of stdin into a string. Returns empty on any I/O failure.
+// May legitimately return empty: some hook events (SessionEnd, AfterTool)
+// carry no payload, but we still want them to reach WTA so the agent state
+// transitions out of Working back to Idle.
+static std::string ReadAllStdin()
+{
+    std::string out;
+    try
+    {
+        // Binary mode so CRLF translation doesn't corrupt JSON payloads
+        // containing literal '\r' inside strings.
+        _setmode(_fileno(stdin), _O_BINARY);
+        constexpr size_t chunk = 4096;
+        char buf[chunk];
+        while (true)
+        {
+            const auto n = fread(buf, 1, chunk, stdin);
+            if (n == 0)
+                break;
+            out.append(buf, n);
+            if (out.size() > 1 * 1024 * 1024)
+            {
+                // 1 MB hard cap — hook payloads should be tiny (a few KB
+                // of JSON metadata). Anything bigger is either runaway
+                // tool output that should have been stripped upstream or
+                // an attack vector; either way we'd rather drop than ship.
+                break;
+            }
+        }
+    }
+    catch (...)
+    {
+    }
+    return out;
+}
+
+static std::wstring GetEnvW(const wchar_t* name)
+{
+    wchar_t buf[1024]{};
+    const DWORD n = GetEnvironmentVariableW(name, buf, ARRAYSIZE(buf));
+    if (n == 0 || n >= ARRAYSIZE(buf))
+        return {};
+    return std::wstring(buf, n);
+}
+
+static std::string GetEnvUtf8(const wchar_t* name)
+{
+    const auto w = GetEnvW(name);
+    if (w.empty())
+        return {};
+    return winrt::to_string(winrt::hstring{ w });
+}
+
+// Append one line to `%LOCALAPPDATA%\IntelligentTerminal\logs\hook-trace.log`,
+// best-effort, never throws. Rotates the file when it crosses 5 MB by renaming
+// to `.1` (overwriting any prior `.1`). Rotation is racy under concurrent fire
+// — the rename may fail or interleave — and that's deliberately acceptable; a
+// missed line never blocks or fails the hook.
+static void AppendHookTrace(const std::string& line)
+{
+    try
+    {
+        const auto root = GetEnvW(L"LOCALAPPDATA");
+        if (root.empty())
+            return;
+
+        const std::wstring dir = root + L"\\IntelligentTerminal\\logs";
+        // SHCreateDirectoryExW would be ideal but pulls in shell32; build the
+        // path piecewise instead.
+        CreateDirectoryW((root + L"\\IntelligentTerminal").c_str(), nullptr);
+        CreateDirectoryW(dir.c_str(), nullptr);
+
+        const std::wstring path = dir + L"\\hook-trace.log";
+        const std::wstring rotated = path + L".1";
+
+        // Best-effort rotation. WIN32_FILE_ATTRIBUTE_DATA is enough to read
+        // the size without locking the file.
+        WIN32_FILE_ATTRIBUTE_DATA attr{};
+        if (GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &attr))
+        {
+            const uint64_t size =
+                (uint64_t{ attr.nFileSizeHigh } << 32) | uint64_t{ attr.nFileSizeLow };
+            if (size > 5 * 1024 * 1024)
+            {
+                DeleteFileW(rotated.c_str());
+                MoveFileW(path.c_str(), rotated.c_str());
+            }
+        }
+
+        // Open with FILE_SHARE_READ|FILE_SHARE_WRITE so concurrent hook
+        // fires don't lock each other out. OPEN_ALWAYS + SetFilePointer(END)
+        // appends; on Windows there is no native O_APPEND-style atomic append
+        // for plain files, so interleaving is possible — that's acceptable
+        // here, the trace is for human troubleshooting, not parsing.
+        HANDLE h = CreateFileW(
+            path.c_str(),
+            FILE_APPEND_DATA,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            nullptr,
+            OPEN_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr);
+        if (h == INVALID_HANDLE_VALUE)
+            return;
+        DWORD written = 0;
+        WriteFile(h, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
+        constexpr char newline = '\n';
+        WriteFile(h, &newline, 1, &written, nullptr);
+        CloseHandle(h);
+    }
+    catch (...)
+    {
+    }
+}
+
+static std::string CurrentTimestamp()
+{
+    SYSTEMTIME t{};
+    GetLocalTime(&t);
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04u-%02u-%02u %02u:%02u:%02u.%03u",
+                  t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+    return std::string(buf);
+}
+
+// Watchdog: forcibly terminate the process after `timeoutMs` to bound the
+// hook's wall-clock cost. Old send-event.ps1 killed its wtcli child after
+// 5s; we apply the same budget to the whole forward-hook process. Returns
+// the thread handle so callers can leave it running and let it self-destruct
+// at process exit (we never join — the whole point is "fire and forget,
+// process dies one way or another").
+static void StartHookWatchdog(DWORD timeoutMs)
+{
+    auto* arg = new DWORD{ timeoutMs };
+    HANDLE th = CreateThread(
+        nullptr, 0,
+        [](LPVOID p) -> DWORD {
+            const DWORD ms = *static_cast<DWORD*>(p);
+            delete static_cast<DWORD*>(p);
+            Sleep(ms);
+            // Best-effort: append a final trace line so debugging shows the
+            // timeout was hit. Use a tight call (no I/O retry) to keep
+            // shutdown fast.
+            AppendHookTrace(CurrentTimestamp() + " | TIMEOUT (forward-hook exceeded budget)");
+            TerminateProcess(GetCurrentProcess(), 0);
+            return 0;
+        },
+        arg, 0, nullptr);
+    if (th)
+        CloseHandle(th); // detach
+}
+
 // ── Main ──
+
+// Detect `forward-hook` / `fh` subcommand by scanning argv before CLI11
+// parsing. When present, redirect stdout AND stderr to NUL for the rest
+// of the process lifetime. This silences not only our own writes but also
+// CLI11's auto-printed help / parse-error messages, satisfying the hook
+// contract even when the caller passes garbled args. Returns true iff
+// forward-hook mode was detected.
+//
+// Uses `CommandLineToArgvW(GetCommandLineW(), ...)` rather than the CRT's
+// `__wargv` because that global is `nullptr` for programs declared with
+// `int main()` (it is only initialized for `wmain`). Dereferencing it
+// would crash the process before any breadcrumb could be written.
+static bool SilenceForwardHookIfApplicable()
+{
+    int wargc = 0;
+    LPWSTR* wargv = ::CommandLineToArgvW(::GetCommandLineW(), &wargc);
+    if (!wargv)
+        return false;
+
+    bool isHook = false;
+    for (int i = 1; i < wargc; ++i)
+    {
+        const std::wstring a = wargv[i];
+        if (a.empty() || a[0] == L'-')
+            continue;
+        if (a == L"forward-hook" || a == L"fh")
+            isHook = true;
+        break;
+    }
+    ::LocalFree(wargv);
+
+    if (isHook)
+    {
+        FILE* dummy = nullptr;
+        _wfreopen_s(&dummy, L"NUL", L"w", stdout);
+        _wfreopen_s(&dummy, L"NUL", L"w", stderr);
+    }
+    return isHook;
+}
 
 int main()
 {
+    const bool hookMode = SilenceForwardHookIfApplicable();
+
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
 
     CLI::App app{ "wtcli — Windows Terminal CLI" };
@@ -746,6 +979,134 @@ int main()
         }
     });
 
+    // ── forward-hook ───────────────────────────────────────────────────
+    //
+    // The hook bridge invoked by Claude / Copilot / Gemini hook
+    // pipelines, replacing the prior `send-event.ps1` PowerShell script.
+    // Each agent CLI fires this subcommand with `-c <cli> -e <event>`
+    // and pipes its hook JSON to stdin; we wrap it into a
+    // `{cli_source, agent_session_id, payload}` envelope and SendEvent
+    // it to the WT COM server as an `agent_event`.
+    //
+    // STRICT CONTRACT (see send-event.ps1 header comments for rationale):
+    //   * Always exit 0. Non-zero exit codes block tool calls (exit 2) or
+    //     show "<hook> hook error" toasts (other non-zero) in the agent
+    //     transcript.
+    //   * Never write to stdout. SessionStart / UserPromptSubmit stdout is
+    //     fed into the model context — leaks tokens, attack vector.
+    //   * Never write to stderr. Surfaces as a transcript error.
+    //   * Bounded runtime. A 5s watchdog terminates the process if the
+    //     COM call hangs.
+    //
+    // All failure paths are silent and exit 0.
+    std::string fwdHookEvent, fwdHookCli;
+    auto* fwdHookCmd = app.add_subcommand("forward-hook",
+        "Internal: bridge an agent-CLI hook fire into a WT agent_event")
+        ->alias("fh");
+    fwdHookCmd->add_option("-e,--event", fwdHookEvent,
+        "WTA topic name (e.g. agent.session.start)")->required();
+    fwdHookCmd->add_option("-c,--cli-source", fwdHookCli,
+        "CLI source: claude | copilot | gemini")->required();
+    fwdHookCmd->callback([&]() {
+        // Force-disable the outer exitCode bookkeeping; this subcommand
+        // must return 0 regardless of what happens inside.
+        exitCode = 0;
+
+        try
+        {
+            // Bound the process lifetime. The watchdog runs even if COM
+            // never returns. Override via WTA_HOOK_TIMEOUT_MS for testing.
+            DWORD timeoutMs = 5000;
+            if (const auto envTo = GetEnvUtf8(L"WTA_HOOK_TIMEOUT_MS"); !envTo.empty())
+            {
+                try { timeoutMs = static_cast<DWORD>(std::stoul(envTo)); }
+                catch (...) {}
+            }
+            StartHookWatchdog(timeoutMs);
+
+            // Resolve agent_session_id and cli_source from inputs + env.
+            // Order matches send-event.ps1 to preserve compatibility for
+            // older hook installs that re-trigger during a migration.
+            const auto stdinJson = ReadAllStdin();
+
+            std::string sessionId;
+            {
+                // First try parsing stdin to grab session_id; if that
+                // fails or the field is missing, fall back to env vars
+                // (Copilot CLI populates COPILOT_SESSION_ID etc).
+                Json::CharReaderBuilder rb;
+                std::string errs;
+                std::istringstream ss(stdinJson);
+                Json::Value parsed;
+                if (Json::parseFromStream(rb, ss, &parsed, &errs))
+                {
+                    sessionId = wtcli::ExtractSessionId(parsed);
+                }
+                if (sessionId.empty()) sessionId = GetEnvUtf8(L"COPILOT_SESSION_ID");
+                if (sessionId.empty()) sessionId = GetEnvUtf8(L"CLAUDE_SESSION_ID");
+                if (sessionId.empty()) sessionId = GetEnvUtf8(L"GEMINI_SESSION_ID");
+            }
+
+            std::string cliSource = fwdHookCli;
+            if (cliSource.empty()) cliSource = GetEnvUtf8(L"WTA_CLI_SOURCE");
+
+            // Pane GUID — pass through from WT_SESSION when set. Do NOT
+            // fall back to GetActivePane(): inside a multi-pane window
+            // that would route every hook to the focused pane, breaking
+            // F2 list routing.
+            const std::string paneId = GetEnvUtf8(L"WT_SESSION");
+
+            // ENTER breadcrumb written before the COM call so a hang or
+            // timeout still leaves an audit trail.
+            AppendHookTrace(CurrentTimestamp() +
+                " | ENTER cli=" + cliSource +
+                " event=" + fwdHookEvent +
+                " sid=" + (sessionId.empty() ? "<none>" : sessionId.substr(0, 8) + "...") +
+                " pane=" + (paneId.empty() ? "<no-WT_SESSION>" : paneId) +
+                " pid=" + std::to_string(GetCurrentProcessId()));
+
+            // Now connect. Silent on every failure — no stderr writes.
+            auto server = ConnectToTerminalQuiet();
+            if (!server)
+            {
+                AppendHookTrace(CurrentTimestamp() + " | SKIP no-server");
+                return;
+            }
+
+            Json::Value evt;
+            if (!wtcli::BuildHookEventEnvelope(stdinJson, fwdHookEvent, cliSource, sessionId, paneId, evt))
+            {
+                AppendHookTrace(CurrentTimestamp() + " | SKIP build-failed");
+                return;
+            }
+
+            Json::StreamWriterBuilder wb;
+            wb["indentation"] = "";
+            const auto json = Json::writeString(wb, evt);
+
+            try
+            {
+                server.SendEvent(winrt::to_hstring(json));
+                AppendHookTrace(CurrentTimestamp() + " | OK bytes=" + std::to_string(json.size()));
+            }
+            catch (const winrt::hresult_error& e)
+            {
+                char hbuf[32];
+                std::snprintf(hbuf, sizeof(hbuf), "0x%08X", static_cast<uint32_t>(e.code()));
+                AppendHookTrace(CurrentTimestamp() + " | FAIL hr=" + hbuf);
+            }
+            catch (...)
+            {
+                AppendHookTrace(CurrentTimestamp() + " | FAIL unknown");
+            }
+        }
+        catch (...)
+        {
+            // Last-resort guard. Anything escaping the inner blocks lands
+            // here. Still exit 0.
+        }
+    });
+
     // ── listen ──
     std::string listenTarget;
     std::string listenEventFilter;
@@ -807,7 +1168,20 @@ int main()
         }
     });
 
-    CLI11_PARSE(app, __argc, __argv);
+    // CLI11_PARSE expands to a `return app.exit(e)` on parse error, which
+    // returns non-zero for missing args / typos. In hook mode we MUST exit
+    // 0 regardless (any non-zero shows as "<hook> hook error" in the agent
+    // transcript). Expand the macro manually so we can swallow the error.
+    try
+    {
+        app.parse(__argc, __argv);
+    }
+    catch (const CLI::ParseError& e)
+    {
+        if (hookMode)
+            return 0;
+        return app.exit(e);
+    }
 
-    return exitCode;
+    return hookMode ? 0 : exitCode;
 }

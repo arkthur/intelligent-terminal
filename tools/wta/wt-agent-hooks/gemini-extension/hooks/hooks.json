@@ -5,7 +5,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${extensionPath}/hooks/send-event.ps1\" -CliSource gemini agent.session.start"
+          "command": "wtcli forward-hook -c gemini -e agent.session.start"
         }]
       }
     ],
@@ -14,7 +14,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${extensionPath}/hooks/send-event.ps1\" -CliSource gemini agent.session.end"
+          "command": "wtcli forward-hook -c gemini -e agent.session.end"
         }]
       }
     ],
@@ -23,7 +23,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${extensionPath}/hooks/send-event.ps1\" -CliSource gemini agent.prompt.submit"
+          "command": "wtcli forward-hook -c gemini -e agent.prompt.submit"
         }]
       }
     ],
@@ -32,7 +32,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${extensionPath}/hooks/send-event.ps1\" -CliSource gemini agent.tool.starting"
+          "command": "wtcli forward-hook -c gemini -e agent.tool.starting"
         }]
       }
     ],
@@ -41,7 +41,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${extensionPath}/hooks/send-event.ps1\" -CliSource gemini agent.tool.finished"
+          "command": "wtcli forward-hook -c gemini -e agent.tool.finished"
         }]
       }
     ],
@@ -50,7 +50,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${extensionPath}/hooks/send-event.ps1\" -CliSource gemini agent.notification"
+          "command": "wtcli forward-hook -c gemini -e agent.notification"
         }]
       }
     ],
@@ -59,7 +59,7 @@
         "matcher": ".*",
         "hooks": [{
           "type": "command",
-          "command": "powershell -ExecutionPolicy Bypass -File \"${extensionPath}/hooks/send-event.ps1\" -CliSource gemini agent.stop"
+          "command": "wtcli forward-hook -c gemini -e agent.stop"
         }]
       }
     ]

@@ -95,6 +95,108 @@ namespace wtcli
     }
 
 
+    // ── Hook bridge helpers ────────────────────────────────────────────
+    //
+    // The agent CLIs (Claude / Copilot / Gemini) fire events into this
+    // process via the `forward-hook` subcommand. Each fire wraps stdin
+    // (the agent's hook JSON) into a `{cli_source, agent_session_id,
+    // payload}` envelope and SendEvent's it as an `agent_event`. These
+    // pure helpers do the JSON manipulation so they can be unit-tested
+    // and fuzzed independently of COM.
+
+    // Drop large model-bound fields from the top level of `root` that
+    // wta never reads. Matches the original `send-event.ps1` semantics:
+    // top-level only (nested data is preserved). The 6 keys reflect the
+    // schema differences between Claude/Copilot (snake_case) and Gemini
+    // (camelCase) — each CLI uses one variant.
+    inline void StripBigPayloadFields(Json::Value& root)
+    {
+        if (!root.isObject())
+            return;
+        static const char* const kFields[] = {
+            "tool_result", "tool_response", "tool_output",
+            "toolResult", "toolResponse", "toolOutput",
+        };
+        for (const auto* key : kFields)
+        {
+            if (root.isMember(key))
+                root.removeMember(key);
+        }
+    }
+
+    // Extract `session_id` from a parsed hook payload, or return empty.
+    // Only consults the top-level field — matches send-event.ps1 which
+    // reads `$parsed.session_id` from the PSCustomObject root.
+    inline std::string ExtractSessionId(const Json::Value& payload)
+    {
+        if (!payload.isObject())
+            return {};
+        const auto& v = payload["session_id"];
+        if (v.isString())
+            return v.asString();
+        return {};
+    }
+
+    // Build the `agent_event` envelope a hook fire should publish.
+    //
+    // |stdinJson|     — raw stdin contents (may be empty or malformed)
+    // |eventType|     — WTA topic, e.g. "agent.session.start"
+    // |cliSource|     — "claude" | "copilot" | "gemini"
+    // |sessionId|     — agent session id (resolved by caller from stdin/env)
+    // |paneId|        — WT_SESSION pane GUID, empty to omit `pane_id` from envelope
+    // |outEvt|        — populated on success
+    //
+    // Returns true on success. On malformed stdin, falls back to an empty
+    // payload object so the event still goes through (matches ps1: only
+    // top-level data is dropped, the event itself is never suppressed by
+    // payload-parse failure).
+    inline bool BuildHookEventEnvelope(
+        const std::string& stdinJson,
+        const std::string& eventType,
+        const std::string& cliSource,
+        const std::string& sessionId,
+        const std::string& paneId,
+        Json::Value& outEvt)
+    {
+        Json::Value payload(Json::objectValue);
+        if (!stdinJson.empty())
+        {
+            // Tolerate leading/trailing whitespace ("\r\n" from PS pipelines).
+            const auto firstNonSpace = stdinJson.find_first_not_of(" \t\r\n");
+            if (firstNonSpace != std::string::npos)
+            {
+                Json::CharReaderBuilder rb;
+                std::string errs;
+                std::istringstream ss(stdinJson);
+                Json::Value parsed;
+                if (Json::parseFromStream(rb, ss, &parsed, &errs) && parsed.isObject())
+                {
+                    payload = parsed;
+                }
+                // If parsing fails or the root is non-object, fall through
+                // with payload = empty object — the event still fires so the
+                // agent state transitions correctly downstream.
+            }
+        }
+
+        StripBigPayloadFields(payload);
+
+        Json::Value params(Json::objectValue);
+        params["cli_source"] = cliSource;
+        params["agent_session_id"] = sessionId;
+        params["payload"] = payload;
+        params["event"] = eventType;
+        if (!paneId.empty())
+        {
+            params["pane_id"] = paneId;
+        }
+
+        outEvt["type"] = "event";
+        outEvt["method"] = "agent_event";
+        outEvt["params"] = params;
+        return true;
+    }
+
     // Build the standard JSON envelope the COM server expects for an
     // `agent_event`. The caller provides the event name, an optional JSON
     // object string containing extra params, and the source pane Guid; this
