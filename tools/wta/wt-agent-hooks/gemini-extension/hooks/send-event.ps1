@@ -205,33 +205,25 @@ try {
     if ($env:WT_SESSION) {
         $paneArg = " -p `"$($env:WT_SESSION)`""
     }
+    # Async dispatch: launch wtcli via ShellExecuteEx so the parent PowerShell
+    # process can exit immediately without waiting for wtcli's COM round-trip.
+    # The hook contract is "exit 0 quickly"; WTA is a fire-and-observe
+    # listener, so we don't need wtcli's exit code or stderr.
+    #
+    # Why UseShellExecute=$true:
+    #   - Child gets its own console (no inherited stdio handles), so this
+    #     PowerShell can exit without waiting for the child's pipes to drain.
+    #   - WindowStyle=Hidden -> wtcli runs invisibly (no flashing console).
+    #   - No cmd.exe wrapper, no handle juggling, no WaitForExit timeout.
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $wtcliPath
     $psi.Arguments = "send-event -e $EventType$paneArg `"$escaped`""
-    $psi.UseShellExecute = $false
-    $psi.CreateNoWindow = $true
-    $psi.RedirectStandardError = $true
-    $proc = [System.Diagnostics.Process]::Start($psi)
-    $exited = $proc.WaitForExit(5000)
-
-    # OK breadcrumb. `StandardError.ReadToEnd()` is synchronous and
-    # blocks until the child's pipe closes, so reading it after a
-    # `WaitForExit` timeout would hang the hook indefinitely and
-    # violate the "exit 0 quickly" contract. On timeout, kill the
-    # child and skip the stderr read. Kill exception is swallowed
-    # (process may have exited between WaitForExit and Kill).
+    $psi.UseShellExecute = $true
+    $psi.WindowStyle = 'Hidden'
+    [void][System.Diagnostics.Process]::Start($psi)
     $stamp = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss.fff')
-    if (-not $exited) {
-        try { $proc.Kill() } catch { }
-        $exitInfo = 'TIMEOUT_5s'
-        $stderrSnippet = ''
-    } else {
-        $exitInfo = "exit=$($proc.ExitCode)"
-        $stderrSnippet = ($proc.StandardError.ReadToEnd() -replace "[\r\n]+", ' ').Trim()
-        if ($stderrSnippet.Length -gt 200) { $stderrSnippet = $stderrSnippet.Substring(0, 200) + '...' }
-    }
     $sessIdShort = if ($agentSessionId) { $agentSessionId.Substring(0, [Math]::Min(8, $agentSessionId.Length)) } else { '<none>' }
-    Add-Content -LiteralPath $tracePath -Value "$stamp | OK cli=$cliSource event=$EventType $exitInfo sessId=$sessIdShort wtcli=$wtcliPath stderr=`"$stderrSnippet`"" -ErrorAction SilentlyContinue
+    Add-Content -LiteralPath $tracePath -Value "$stamp | DISPATCHED cli=$cliSource event=$EventType sessId=$sessIdShort wtcli=$wtcliPath" -ErrorAction SilentlyContinue
 } catch {
     # Single error sink. Best-effort ERROR breadcrumb; if Add-Content
     # itself throws, the `trap { exit 0 }` at the top catches it.
