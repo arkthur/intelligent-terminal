@@ -1033,8 +1033,8 @@ void WindowEmperor::_createMessageWindow(const wchar_t* className)
     StringCchCopy(_notificationIcon.szTip, ARRAYSIZE(_notificationIcon.szTip), appNameLoc.c_str());
 }
 
-// Posts a WM_QUIT as soon as we have no reason to exist anymore.
-// That basically means no windows and no message boxes.
+// Posts a WM_QUIT as soon as we have no reason to exist anymore:
+// no windows, no message boxes, and no live COM objects.
 void WindowEmperor::_postQuitMessageIfNeeded() const
 {
     if (
@@ -1185,8 +1185,12 @@ LRESULT WindowEmperor::_messageHandler(HWND window, UINT const message, WPARAM c
                 _activeComIdleTimeoutMs = 0;
                 // If we're still headless after the grace period, exit.
                 // Any remaining COM objects belong to crashed clients whose
-                // stub references haven't been reclaimed by the COM GC yet.
-                // TerminateProcess (after the message loop) cleans everything.
+                // stub references haven't been reclaimed by the COM GC yet
+                // (COM GC can take up to 6+ minutes for killed processes).
+                // We intentionally do NOT check s_GetLiveObjectCount here —
+                // the stale timer exists precisely to override those stubs.
+                // A legitimate new connection during this window would have
+                // created a window (_windowCount > 0), which is checked below.
                 if (_windowCount <= 0 &&
                     _messageBoxCount <= 0 &&
                     !_app.Logic().Settings().GlobalSettings().AllowHeadless())
