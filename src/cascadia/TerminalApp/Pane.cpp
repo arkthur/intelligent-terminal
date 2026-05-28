@@ -3399,7 +3399,7 @@ void Pane::_EnsureAgentChip()
     }
 
     Controls::TextBlock text{};
-    text.Text(RS_(L"Pane_AgentChipText"));
+    text.Text(RS_(L"FreOverlay_AgentLabel/Text"));
     text.FontSize(10.0);
     text.FontWeight(winrt::Windows::UI::Text::FontWeights::SemiBold());
     text.Foreground(Media::SolidColorBrush{ winrt::Windows::UI::Colors::White() });

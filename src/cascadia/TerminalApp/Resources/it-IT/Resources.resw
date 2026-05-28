@@ -1092,6 +1092,14 @@
     <value>Errore rilevato: {0} per correggere</value>
     <comment>{0} = scorciatoia da tastiera.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Fai clic su {0} per correggere l'errore</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Errore rilevato. Fai clic o premi {0} per chiedere all'agente AI di diagnosticare e suggerire una correzione.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Correzione pronta — {0} per applicare</value>
     <comment>{0} = scorciatoia da tastiera.</comment>

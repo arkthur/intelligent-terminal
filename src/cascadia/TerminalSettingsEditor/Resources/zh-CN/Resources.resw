@@ -2760,6 +2760,14 @@
     <value>配置智能体在整个终端中的工作方式</value>
     <comment>Subtitle shown beneath the page title on the AI Agents settings page.</comment>
   </data>
+  <data name="AIAgents_PageSubtitlePrefix" xml:space="preserve">
+    <value>配置智能体在整个终端中的工作方式。</value>
+    <comment>Subtitle shown beneath the page title on the AI Agents settings page. The hyperlink in AIAgents_PageSubtitlePrivacyLink follows this sentence inline; the trailing period belongs to this prefix.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrivacyLink" xml:space="preserve">
+    <value>了解数据的使用方式。</value>
+    <comment>Inline hyperlink text that follows the AI Agents page subtitle and navigates to the privacy policy page. Includes a trailing period.</comment>
+  </data>
   <data name="AIAgents_AcpGroupHeader.Text" xml:space="preserve">
     <value>智能体窗格</value>
     <comment>Section header for the agent pane settings group.</comment>

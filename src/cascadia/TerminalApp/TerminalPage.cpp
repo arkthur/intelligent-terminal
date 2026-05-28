@@ -2266,7 +2266,7 @@ namespace winrt::TerminalApp::implementation
                 const auto hotkey = hotkeyHint.empty()
                                         ? std::wstring{ L"Ctrl+Alt+." }
                                         : std::wstring{ hotkeyHint };
-                std::wstring labelText = L"Click " + hotkey + L" to fix error";
+                std::wstring labelText = RS_fmt(L"Diagnostics_ErrorDetectedLabelFormat", hotkey);
                 const auto accent = winrt::Windows::UI::Xaml::Media::SolidColorBrush{
                     winrt::Windows::UI::ColorHelper::FromArgb(255, 0xFF, 0xD7, 0x00)
                 };
@@ -2280,8 +2280,7 @@ namespace winrt::TerminalApp::implementation
                     label.Foreground(accent);
                     label.Visibility(Visibility::Visible);
                 }
-                std::wstring tooltip = L"Error detected. Click or press " + hotkey +
-                                       L" to ask the AI agent to diagnose and suggest a fix.";
+                std::wstring tooltip = RS_fmt(L"Diagnostics_ErrorDetectedTooltipFormat", hotkey);
                 if (!detectedSummary.empty())
                 {
                     tooltip += L"\n\n";

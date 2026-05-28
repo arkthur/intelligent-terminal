@@ -2754,6 +2754,14 @@
   </data>
   <data name="Nav_AIAgents.Content" xml:space="preserve"><value>Agenten</value><comment>Header for the "Agents" menu item. This navigates to a page that lets you configure AI agent integration settings.</comment></data>
   <data name="AIAgents_PageSubtitle.Text" xml:space="preserve"><value>Konfigurieren Sie, wie Agenten in Ihrem Terminal genutzt werden</value><comment>Subtitle shown beneath the page title on the AI Agents settings page.</comment></data>
+  <data name="AIAgents_PageSubtitlePrefix" xml:space="preserve">
+    <value>Konfigurieren Sie, wie Agenten in Ihrem Terminal genutzt werden.</value>
+    <comment>Subtitle shown beneath the page title on the AI Agents settings page. The hyperlink in AIAgents_PageSubtitlePrivacyLink follows this sentence inline; the trailing period belongs to this prefix.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrivacyLink" xml:space="preserve">
+    <value>Erfahren Sie, wie Daten verwendet werden.</value>
+    <comment>Inline hyperlink text that follows the AI Agents page subtitle and navigates to the privacy policy page. Includes a trailing period.</comment>
+  </data>
   <data name="AIAgents_AcpGroupHeader.Text" xml:space="preserve"><value>Agentbereich</value><comment>Section header for the agent pane settings group.</comment></data>
   <data name="AIAgents_DelegateGroupHeader.Text" xml:space="preserve"><value>Befehlspalette</value><comment>Section header for the command palette agent settings group.</comment></data>
   <data name="AIAgents_AcpAgent.Header" xml:space="preserve"><value>Agent</value><comment>Header for the setting that specifies which AI agent CLI powers the agent pane.</comment></data>

@@ -2754,6 +2754,14 @@
   </data>
   <data name="Nav_AIAgents.Content" xml:space="preserve"><value>AI 代理</value><comment>Header for the "Agents" menu item. This navigates to a page that lets you configure AI agent integration settings.</comment></data>
   <data name="AIAgents_PageSubtitle.Text" xml:space="preserve"><value>設定 AI 代理在整個終端機體驗中的運作方式</value><comment>Subtitle shown beneath the page title on the AI Agents settings page.</comment></data>
+  <data name="AIAgents_PageSubtitlePrefix" xml:space="preserve">
+    <value>設定 AI 代理在整個終端機體驗中的運作方式。</value>
+    <comment>Subtitle shown beneath the page title on the AI Agents settings page. The hyperlink in AIAgents_PageSubtitlePrivacyLink follows this sentence inline; the trailing period belongs to this prefix.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrivacyLink" xml:space="preserve">
+    <value>了解資料的使用方式。</value>
+    <comment>Inline hyperlink text that follows the AI Agents page subtitle and navigates to the privacy policy page. Includes a trailing period.</comment>
+  </data>
   <data name="AIAgents_AcpGroupHeader.Text" xml:space="preserve"><value>代理窗格</value><comment>Section header for the agent pane settings group.</comment></data>
   <data name="AIAgents_DelegateGroupHeader.Text" xml:space="preserve"><value>命令選擇區</value><comment>Section header for the command palette agent settings group.</comment></data>
   <data name="AIAgents_AcpAgent.Header" xml:space="preserve"><value>代理</value><comment>Header for the setting that specifies which AI agent CLI powers the agent pane.</comment></data>

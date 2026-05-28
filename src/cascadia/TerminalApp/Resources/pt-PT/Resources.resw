@@ -241,6 +241,14 @@
     <value>Erro detectado: {0} para corrigir</value>
     <comment>{0} = atalho de teclado.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Clique em {0} para corrigir o erro</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Erro detetado. Clique ou prima {0} para pedir ao agente de IA que diagnostique e sugira uma correção.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Correção pronta — {0} para aplicar</value>
     <comment>{0} = atalho de teclado.</comment>

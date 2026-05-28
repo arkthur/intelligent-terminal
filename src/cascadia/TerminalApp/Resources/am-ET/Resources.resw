@@ -133,6 +133,14 @@
     <value>ስህተት ተገኝቷል፦ ለማስተካከል {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>{0}ን ጠቅ ያድርጉ ስህተቱን ለማስተካከል</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>ስህተት ተገኝቷል። ለመመርመር እና መፍትሄ ለመጠቆም AI ወኪልን ለመጠየቅ {0}ን ጠቅ ያድርጉ ወይም ይጫኑ።</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>ማስተካከያ ዝግጁ ነው — ለመተግበር {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>

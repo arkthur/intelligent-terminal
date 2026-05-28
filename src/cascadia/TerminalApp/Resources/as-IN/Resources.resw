@@ -248,6 +248,14 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>ত্ৰুটি ধৰা পৰিছে: ঠিক কৰিবলৈ {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>ত্ৰুটি ঠিক কৰিবলৈ {0} ত ক্লিক কৰক</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>ত্ৰুটি ধৰা পৰিছে। AI এজেণ্টক সমস্যা নিৰ্ণয় কৰি এটা সমাধান পৰামৰ্শ দিবলৈ ক’বলৈ {0} ত ক্লিক কৰক বা টিপক।</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>সমাধান সাজু — প্ৰয়োগ কৰিবলৈ {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>

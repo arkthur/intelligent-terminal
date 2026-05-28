@@ -241,6 +241,14 @@
     <value>Fout gevonden: {0} om op te lossen</value>
     <comment>{0} = sneltoets.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Klik op {0} om de fout op te lossen</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Fout gedetecteerd. Klik of druk op {0} om de AI-agent te vragen de fout te analyseren en een oplossing voor te stellen.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Oplossing gereed — {0} om toe te passen</value>
     <comment>{0} = sneltoets.</comment>

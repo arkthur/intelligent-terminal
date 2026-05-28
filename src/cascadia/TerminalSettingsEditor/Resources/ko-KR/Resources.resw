@@ -2760,6 +2760,14 @@
     <value>터미널 전체에서 에이전트가 작동하는 방식을 구성합니다</value>
     <comment>Subtitle shown beneath the page title on the AI Agents settings page.</comment>
   </data>
+  <data name="AIAgents_PageSubtitlePrefix" xml:space="preserve">
+    <value>터미널 전체에서 에이전트가 작동하는 방식을 구성합니다.</value>
+    <comment>Subtitle shown beneath the page title on the AI Agents settings page. The hyperlink in AIAgents_PageSubtitlePrivacyLink follows this sentence inline; the trailing period belongs to this prefix.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrivacyLink" xml:space="preserve">
+    <value>데이터 사용 방법 알아보기.</value>
+    <comment>Inline hyperlink text that follows the AI Agents page subtitle and navigates to the privacy policy page. Includes a trailing period.</comment>
+  </data>
   <data name="AIAgents_AcpGroupHeader.Text" xml:space="preserve">
     <value>에이전트 창</value>
     <comment>Section header for the agent pane settings group.</comment>

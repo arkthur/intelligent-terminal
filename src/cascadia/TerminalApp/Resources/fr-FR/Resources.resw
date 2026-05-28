@@ -1093,6 +1093,14 @@
     <value>Erreur détectée : {0} pour corriger</value>
     <comment>Étiquette quand une correction est prête. {0} = raccourci clavier.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Cliquez sur {0} pour corriger l’erreur</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Erreur détectée. Cliquez ou appuyez sur {0} pour demander à l’agent IA de diagnostiquer et de proposer une correction.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Correction prête — {0} pour appliquer</value>
     <comment>Info-bulle quand une correction est prête. {0} = raccourci clavier.</comment>

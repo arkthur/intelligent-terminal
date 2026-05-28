@@ -247,6 +247,14 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>లోపం కనుగొనబడింది: పరిష్కరించడానికి {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>లోపాన్ని సరిచేయడానికి {0} క్లిక్ చేయండి</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>లోపం గుర్తించబడింది. AI ఏజెంట్‌కి నిర్ధారించి పరిష్కారం సూచించమని అడగడానికి {0} క్లిక్ చేయండి లేదా నొక్కండి.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>పరిష్కారం సిద్ధం — వర్తింపజేయడానికి {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>

@@ -133,6 +133,14 @@
     <value>Εντοπίστηκε σφάλμα: {0} για διόρθωση</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Κάντε κλικ στο {0} για να διορθώσετε το σφάλμα</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Εντοπίστηκε σφάλμα. Κάντε κλικ ή πατήστε το {0} για να ζητήσετε από τον πράκτορα AI να το διαγνώσει και να προτείνει μια διόρθωση.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Η διόρθωση είναι έτοιμη — {0} για εφαρμογή</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>

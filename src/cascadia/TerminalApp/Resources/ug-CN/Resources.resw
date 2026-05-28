@@ -133,6 +133,14 @@
     <value>خاتالىق بايقالدى: تۈزىتىش ئۈچۈن {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>خاتانى تۈزىتىش ئۈچۈن {0} نى چېكىڭ</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>خاتالىق بايقالدى. سۈنئىي ئەقىل ۋاكالەتچىسىگە دىياگنوز قويۇپ، تۈزىتىش تەكلىپ قىلىشىنى سوراش ئۈچۈن {0} نى چېكىڭ ياكى بېسىڭ.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>تۈزىتىش تەييار — قوللىنىش ئۈچۈن {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
