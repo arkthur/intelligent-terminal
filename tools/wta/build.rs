@@ -83,8 +83,8 @@ fn main() {
     let provider_name = extract_provider_name(&init_cpp);
     let keyword_measures = extract_define_u64(&proj_tel_h, "MICROSOFT_KEYWORD_MEASURES");
     let keyword_telemetry = extract_define_u64(&proj_tel_h, "MICROSOFT_KEYWORD_TELEMETRY");
-    let pdt_usage = extract_define_u64(&proj_tel_h, "PDT_ProductAndServiceUsage");
-    let pdt_perf = extract_define_u64(&proj_tel_h, "PDT_ProductAndServicePerformance");
+    let privacy_usage = extract_define_u64(&proj_tel_h, "PDT_ProductAndServiceUsage");
+    let privacy_perf = extract_define_u64(&proj_tel_h, "PDT_ProductAndServicePerformance");
 
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
     let out_path = out_dir.join("telemetry_codegen.rs");
@@ -104,16 +104,16 @@ fn main() {
          pub const MICROSOFT_KEYWORD_MEASURES: u64 = {keyword_measures:#x};\n\
          #[allow(dead_code)]\n\
          pub const MICROSOFT_KEYWORD_TELEMETRY: u64 = {keyword_telemetry:#x};\n\
-         pub const PDT_PRODUCT_AND_SERVICE_USAGE: u64 = {pdt_usage:#x};\n\
-         pub const PDT_PRODUCT_AND_SERVICE_PERFORMANCE: u64 = {pdt_perf:#x};\n",
+         pub const PDT_PRODUCT_AND_SERVICE_USAGE: u64 = {privacy_usage:#x};\n\
+         pub const PDT_PRODUCT_AND_SERVICE_PERFORMANCE: u64 = {privacy_perf:#x};\n",
         init_cpp = init_cpp.display(),
         proj_tel_h = proj_tel_h.display(),
         provider_name = provider_name,
         group_id = MICROSOFT_TELEMETRY_GROUP_GUID,
         keyword_measures = keyword_measures,
         keyword_telemetry = keyword_telemetry,
-        pdt_usage = pdt_usage,
-        pdt_perf = pdt_perf,
+        privacy_usage = privacy_usage,
+        privacy_perf = privacy_perf,
     );
     fs::write(&out_path, generated).unwrap_or_else(|e| {
         panic!("failed to write {}: {e}", out_path.display());
@@ -178,8 +178,8 @@ fn extract_define_u64(path: &Path, name: &str) -> u64 {
         };
         let rest = match rest.strip_prefix(name) {
             // The character immediately after `name` must not be an
-            // identifier-continuation char, otherwise `MICROSOFT_KEYWORD_X`
-            // would match `MICROSOFT_KEYWORD_XY`.
+            // identifier-continuation char; without this guard
+            // `MICROSOFT_KEYWORD_X` would also match `MICROSOFT_KEYWORD_XY`.
             Some(r) if r.chars().next().is_none_or(|c| !is_ident_continue(c)) => r.trim_start(),
             _ => continue,
         };

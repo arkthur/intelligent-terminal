@@ -6,8 +6,8 @@
 // This module registers the SAME ETW provider as the C++ Windows Terminal
 // side (`g_hTerminalAppProvider` declared in
 // `src/cascadia/TerminalApp/init.cpp`). WTA and the C++ side therefore
-// emit into a single merged ETW provider stream, so listeners
-// (xperf/wpa/UTC) see one unified view of the fork.
+// emit into a single merged ETW provider stream, so ETW listeners
+// see one unified view of the fork.
 //
 // Single source of truth — both halves of this module's compile-time
 // inputs come from the C++ side via the build-script (`build.rs`):
@@ -80,7 +80,7 @@ include!(concat!(env!("OUT_DIR"), "/telemetry_codegen.rs"));
 /// Register the ETW provider. Safe to call multiple times — the underlying
 /// `TraceLoggingRegister`-style API is guarded by a `Once`, so only the
 /// first invocation actually performs the (unsafe) registration. Subsequent
-/// calls are no-ops, which keeps tests and re-entrant startup paths safe.
+/// calls are no-ops, which keeps tests and repeated startup paths safe.
 ///
 /// # Safety
 /// `TraceLoggingRegister`-style APIs are inherently per-process. The

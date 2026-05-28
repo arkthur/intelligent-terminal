@@ -479,7 +479,7 @@ impl PromptTimingState {
         // NOTE: in the (rare) case of multiple concurrent prompts on the
         // same Client (= same agent CLI subprocess), this attributes every
         // stdout read to every in-flight prompt. ACP's transport doesn't
-        // demux stdout per session, so per-session `bytes_read_after_prompt`
+        // split stdout per session, so per-session `bytes_read_after_prompt`
         // becomes an upper bound rather than an exact count when prompts
         // overlap. The `AgentResponseComplete.TotalResponseBytes`
         // telemetry field documents this caveat.
