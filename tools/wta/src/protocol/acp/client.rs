@@ -1759,11 +1759,6 @@ impl acp::Client for WtaClient {
                 let _ = self.state.event_tx.send(AppEvent::AliveSessionRemoved(sid));
             }
             WtaExtNotification::SessionsChanged => {
-                tracing::info!(
-                    target: "acp_client",
-                    "received intellterm.wta/sessions/changed broadcast from master; \
-                     scheduling refetch for any open F2 view"
-                );
                 let _ = self.state.event_tx.send(AppEvent::SessionsChanged);
             }
             WtaExtNotification::Unknown => {
@@ -2167,16 +2162,12 @@ pub async fn run_acp_client_over_pipe(
 
     let conn = Arc::new(conn);
 
-    // DEBUG: periodic 3s tick that fans out an AppEvent::SessionsChanged
-    // to force a refetch in any open F2 view. Belt-and-suspenders against
-    // missed `intellterm.wta/sessions/changed` broadcasts (whose receipt
-    // is now also info-logged in WtaClient::ext_notification).
-    //
-    // Independent of the push channel — fires regardless of whether
-    // master actually broadcasts. If F2 shows stale data we know it's a
-    // RENDERING bug, not a push-delivery bug. Cheap: refetch only fires
-    // for tabs whose snapshot.is_some() (i.e. F2 is currently open).
-    let mut periodic_refetch = tokio::time::interval(std::time::Duration::from_secs(3));
+    // Periodic 5s tick that fans out an AppEvent::SessionsChanged to
+    // force a refetch in any open F2 view. Belt-and-suspenders against
+    // missed `intellterm.wta/sessions/changed` broadcasts. Cheap:
+    // refetch only fires for tabs whose snapshot.is_some() (i.e. F2 is
+    // currently open).
+    let mut periodic_refetch = tokio::time::interval(std::time::Duration::from_secs(5));
     periodic_refetch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     // Burn the first tick (fires immediately on creation).
     periodic_refetch.tick().await;
@@ -2190,10 +2181,6 @@ pub async fn run_acp_client_over_pipe(
         tokio::select! {
             biased;
             _ = periodic_refetch.tick() => {
-                tracing::debug!(
-                    target: "acp_client",
-                    "periodic 3s refetch tick → AppEvent::SessionsChanged"
-                );
                 let _ = event_tx.send(AppEvent::SessionsChanged);
             }
             Some(event) = session_hook_rx.recv() => {

@@ -1112,23 +1112,9 @@ impl acp::Agent for HelperHandler {
             return handle_session_hook(&self.state, &args.params).await;
         }
         if method == crate::session_registry::INTELLTERM_METHOD_SESSION_RESUME_DISPATCHED {
-            tracing::info!(
-                target: "master",
-                op = "ext_method",
-                method = %method,
-                helper_id = ?self.helper_id,
-                "handling intellterm.wta/session_resume_dispatched locally"
-            );
             return handle_session_resume_dispatched(&self.state, &args.params).await;
         }
         if method == crate::session_registry::INTELLTERM_METHOD_SESSION_FOCUS {
-            tracing::info!(
-                target: "master",
-                op = "ext_method",
-                method = %method,
-                helper_id = ?self.helper_id,
-                "handling intellterm.wta/session_focus locally"
-            );
             return handle_session_focus(&self.state, &args.params).await;
         }
         tracing::debug!(
@@ -2002,24 +1988,9 @@ async fn handle_session_focus(
     params: &serde_json::value::RawValue,
 ) -> acp::Result<acp::ExtResponse> {
     let parsed = crate::session_registry::parse_session_focus_params(params).map_err(|err| {
-        tracing::warn!(
-            target: "session_focus",
-            error = %err,
-            "rejecting malformed session_focus params"
-        );
         acp::Error::invalid_params().data(serde_json::json!({ "message": err.to_string() }))
     })?;
-    tracing::info!(
-        target: "session_focus",
-        sid = %parsed.sid.0,
-        "looking up session in registry"
-    );
     let Some(info) = state.registry.lookup(&parsed.sid).await else {
-        tracing::warn!(
-            target: "session_focus",
-            sid = %parsed.sid.0,
-            "session_id NOT in master registry; returning no_pane"
-        );
         let body = crate::session_registry::SessionFocusResponse {
             focused: false,
             pane_session_id: None,
@@ -2030,11 +2001,6 @@ async fn handle_session_focus(
         return Ok(acp::ExtResponse::new(raw.into()));
     };
     let Some(pane_session_id) = info.pane_session_id.clone() else {
-        tracing::warn!(
-            target: "session_focus",
-            sid = %parsed.sid.0,
-            "registry row has no pane_session_id; returning no_pane"
-        );
         let body = crate::session_registry::SessionFocusResponse {
             focused: false,
             pane_session_id: None,
@@ -2045,12 +2011,6 @@ async fn handle_session_focus(
         return Ok(acp::ExtResponse::new(raw.into()));
     };
     let Some(wt) = state.wt.as_ref() else {
-        tracing::error!(
-            target: "session_focus",
-            sid = %parsed.sid.0,
-            pane_session_id = %pane_session_id,
-            "WtChannel unavailable; cannot call wtcli focus-pane"
-        );
         let body = crate::session_registry::SessionFocusResponse {
             focused: false,
             pane_session_id: Some(pane_session_id),
@@ -2060,12 +2020,6 @@ async fn handle_session_focus(
         let raw = serde_json::value::to_raw_value(&body).expect("focus response serializes");
         return Ok(acp::ExtResponse::new(raw.into()));
     };
-    tracing::info!(
-        target: "session_focus",
-        sid = %parsed.sid.0,
-        pane_session_id = %pane_session_id,
-        "dispatching wtcli focus-pane via WtChannel"
-    );
     match wt
         .request(
             "focus_pane",
@@ -2073,14 +2027,7 @@ async fn handle_session_focus(
         )
         .await
     {
-        Ok(resp) => {
-            tracing::info!(
-                target: "session_focus",
-                sid = %parsed.sid.0,
-                pane_session_id = %pane_session_id,
-                response = %resp,
-                "wtcli focus-pane succeeded"
-            );
+        Ok(_) => {
             let body = crate::session_registry::SessionFocusResponse {
                 focused: true,
                 pane_session_id: Some(pane_session_id),
@@ -2094,14 +2041,6 @@ async fn handle_session_focus(
             let detail = err.to_string();
             let not_found =
                 detail.to_ascii_lowercase().contains("not found") || detail.contains("0x80070490");
-            tracing::warn!(
-                target: "session_focus",
-                sid = %parsed.sid.0,
-                pane_session_id = %pane_session_id,
-                error = %detail,
-                not_found,
-                "wtcli focus-pane FAILED"
-            );
             if not_found {
                 let mut demoted = info;
                 demoted.status = Some(crate::agent_sessions::AgentStatus::Ended);
