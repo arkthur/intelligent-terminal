@@ -1183,9 +1183,10 @@ fn status_label(status: Option<&agent_sessions::AgentStatus>) -> String {
 
 fn cli_source_label(source: Option<&agent_sessions::CliSource>) -> String {
     match source {
-        Some(agent_sessions::CliSource::Claude) => "Claude".to_string(),
+        Some(agent_sessions::CliSource::Claude)  => "Claude".to_string(),
+        Some(agent_sessions::CliSource::Codex)   => "Codex".to_string(),
         Some(agent_sessions::CliSource::Copilot) => "Copilot".to_string(),
-        Some(agent_sessions::CliSource::Gemini) => "Gemini".to_string(),
+        Some(agent_sessions::CliSource::Gemini)  => "Gemini".to_string(),
         Some(agent_sessions::CliSource::Unknown(s)) if !s.is_empty() => s.clone(),
         _ => "-".to_string(),
     }
