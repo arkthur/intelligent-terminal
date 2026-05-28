@@ -247,6 +247,14 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>പിശക് കണ്ടെത്തി: പരിഹരിക്കാൻ {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>{0} ക്ലിക്ക് ചെയ്ത് പിശക് പരിഹരിക്കുക</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>പിശക് കണ്ടെത്തി. AI ഏജന്റിനെ പ്രശ്നം നിർണയിച്ച് പരിഹാരം നിർദ്ദേശിക്കാൻ ആവശ്യപ്പെടാൻ {0} ക്ലിക്കുചെയ്യുക അല്ലെങ്കിൽ അമർത്തുക.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>പരിഹാരം തയ്യാറാണ് — പ്രയോഗിക്കാൻ {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
