@@ -36,6 +36,33 @@
         }]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [{
+          "type": "command",
+          "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource claude agent.tool.starting"
+        }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [{
+          "type": "command",
+          "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource claude agent.tool.finished"
+        }]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": ".*",
+        "hooks": [{
+          "type": "command",
+          "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/hooks/send-event.ps1\" -CliSource claude agent.tool.failed"
+        }]
+      }
+    ],
     "StopFailure": [
       {
         "matcher": ".*",
