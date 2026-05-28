@@ -87,6 +87,18 @@ namespace winrt::TerminalApp::implementation
         {
             _refreshLogo();
         }
+        // Match `SetSessionsView` and `ApplyAutofixState`: any bottom-bar-
+        // affecting state mutation on AgentPaneContent must raise
+        // `StateChanged` so subscribers (TerminalPage's bar-refresh
+        // handler) can pick up the change without polling. The bar does
+        // not currently render the agent name itself, but the cross-
+        // window-drag fix path in `TabManagement.cpp` relies on
+        // `_UpdateBottomBarState` running once after the wire-up to
+        // reflect any cached state the helper pushed before the wire
+        // was in place — without the raise here, that catch-up wouldn't
+        // observe agent_status arriving in the same race window. Also
+        // future-proofs the bar against ever displaying agent name.
+        StateChanged.raise(*this, nullptr);
     }
 
     // Swap the bar between two modes:

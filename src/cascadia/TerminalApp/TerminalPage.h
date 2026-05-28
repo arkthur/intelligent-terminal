@@ -208,6 +208,7 @@ namespace winrt::TerminalApp::implementation
         void OnCloseAgentPaneRequested(hstring eventJson);
         void OnAgentStateChanged(hstring eventJson);
         void OnResumeInNewAgentTabRequested(hstring eventJson);
+        void OnAgentChipTargetChanged(hstring eventJson);
 
         til::property_changed_event PropertyChanged;
 
@@ -421,8 +422,16 @@ namespace winrt::TerminalApp::implementation
         // Ended row" path to bundle spawn + resume atomically (replacing
         // the prior race-prone "spawn, then broadcast `load_session` VT"
         // design).
+        //
+        // `autoStash=true` is the pre-warm path called from `_InitializeTab`:
+        // the helper conpty is spawned but the pane is immediately stashed
+        // (`Tab::StashAgentPane`) so the user sees only the terminal pane.
+        // Focus stays on the original terminal; no telemetry fires (the
+        // pane wasn't *opened*, just pre-warmed). This is what makes
+        // autofix work without the user ever opening the agent pane.
         bool _AutoCreateHiddenAgentPaneShared(winrt::com_ptr<Tab> tab,
                                               bool intoSessionsView = false,
+                                              bool autoStash = false,
                                               std::string_view initialLoadSessionId = {},
                                               std::string_view initialLoadCwd = {});
         // Wraps the raw terminal pane's TerminalPaneContent in an
@@ -660,7 +669,7 @@ namespace winrt::TerminalApp::implementation
         // per-pane-wta architecture was deleted. Helper processes are now
         // ordinary conpty children of TermControl — TermControl /
         // ConptyConnection owns their lifetime.
-        void _OpenOrReuseAgentPane(const winrt::hstring& prompt, bool intoSessionsView, const wchar_t* triggerSource);
+        void _OpenOrReuseAgentPane(bool intoSessionsView, const wchar_t* triggerSource);
         void _FocusAgentPane();
         void _RepositionAgentPanes();
         static winrt::Microsoft::Terminal::Settings::Model::SplitDirection _AgentPanePositionToSplitDirection(const winrt::hstring& position);

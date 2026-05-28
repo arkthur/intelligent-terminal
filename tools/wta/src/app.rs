@@ -774,17 +774,6 @@ pub fn classify_wt_event(
                 age_ticks: 100,
             }
         }
-        "agent_prompt" => {
-            let prompt = params.get("prompt").and_then(|v| v.as_str()).unwrap_or("");
-            WtNotification {
-                severity: WtEventSeverity::Actionable,
-                pane_id: pane_id.to_string(),
-                tab_id: tab,
-                summary: format!("agent_prompt:{}", prompt),
-                acknowledged: false,
-                age_ticks: 0,
-            }
-        }
         "set_agent_state" => {
             // handle_event consumes set_agent_state at the top of WtEvent
             // before classification runs, so classify normally never sees
@@ -863,6 +852,10 @@ pub enum AppEvent {
     Key(KeyEvent),
     Tick,
     Resize(u16, u16), // terminal resize (handled by ratatui)
+    /// XAML focus on our hosting TermControl changed — true when the agent
+    /// pane gained focus, false when it lost focus. Sourced from xterm
+    /// focus-in/out (CSI I / CSI O) delivered through conpty.
+    FocusChanged(bool),
     ConnectionStage(String),
     /// `session_id` lets us route the status update to the originating tab
     /// once an ACP session is bound to it. Pre-session statuses (startup
@@ -1265,6 +1258,15 @@ pub struct TabSession {
     pub selected_button: usize,
     pub rec_scroll: Scroll,
 
+    /// Last value the helper published for this tab in a
+    /// `set_agent_chip_target` event. `Some(pane_id)` means we last asked
+    /// C++ to pin the blue "Agent" chip onto that pane; `None` means we
+    /// last asked C++ to fall back to the source-of-agent flag. Used as a
+    /// dedupe key so we only fire an event when the effective chip target
+    /// actually changes.
+    pub last_emitted_chip_override: Option<String>,
+
+
     // Input editor state — per-tab so each tab keeps its own draft text,
     // cursor, and slash-command popup across switches.
     pub input: String,
@@ -1307,10 +1309,62 @@ impl TabSession {
         self.chat_scroll.offset = 0;
     }
 
+    /// Whether the input box is the arrow-key navigational focus target.
+    /// False when the user is browsing a completed turn or a recommendation
+    /// card is showing — in both cases ↑↓ navigate elsewhere. UI indicators
+    /// that should track "is the input cell live" (e.g. the placeholder
+    /// caret cell) gate on this together with the pane's XAML focus.
+    pub fn input_has_nav_focus(&self) -> bool {
+        self.selected_completed_turn_idx.is_none() && self.turn.recommendations().is_none()
+    }
+
     pub fn clear_recommendations(&mut self) {
         self.selected_recommendation = 0;
         self.selected_button = 0;
         self.rec_scroll.reset();
+    }
+
+    /// The pane the "Agent" chip should be pinned to while this tab has a
+    /// recommendation card with a `Send` action selected, or `None` when the
+    /// tab is not in that state. Returning `None` lets the C++ side fall
+    /// back to its default behavior (chip follows the source-of-agent flag).
+    ///
+    /// Resolution order for the pane id:
+    ///   1. `Send.parent` on the selected choice when non-empty.
+    ///   2. Autofix `target_pane_id` on the current prompt (for autofix
+    ///      turns where the recommendation's `Send.parent` is left blank
+    ///      and only gets filled at execute time — see `turn_execute_card`).
+    pub fn compute_chip_card_target(&self) -> Option<String> {
+        let recs = self.turn.recommendations()?;
+        let choice = recs.choices.get(self.selected_recommendation)?;
+        let send_parent = choice.actions.iter().find_map(|a| match a {
+            crate::coordinator::RecommendedAction::Send { parent, .. } if !parent.is_empty() => {
+                Some(parent.clone())
+            }
+            _ => None,
+        });
+        if send_parent.is_some() {
+            return send_parent;
+        }
+        // Autofix fallback: the autofix prompt's `target_pane_id` is what
+        // `turn_execute_card` will fill `Send.parent` with at execute time,
+        // so the chip should already point there now. Filter out empty
+        // strings — the C++ side treats `pane_session_id == ""` as "no
+        // override", so emitting `Some("")` would let the helper's dedupe
+        // believe it pinned the chip while WT silently ignores the event.
+        if choice
+            .actions
+            .iter()
+            .any(|a| matches!(a, crate::coordinator::RecommendedAction::Send { .. }))
+        {
+            return self
+                .turn
+                .prompt()
+                .and_then(|p| p.autofix.as_ref())
+                .map(|a| a.target_pane_id.clone())
+                .filter(|s| !s.is_empty());
+        }
+        None
     }
 
     pub fn clear_chat_history(&mut self) {
@@ -1562,6 +1616,11 @@ pub struct App {
     pub wt_connected: bool,
     pub terminal_rows: u16,
     pub terminal_cols: u16,
+    /// Whether our hosting agent pane currently has XAML focus. Driven by
+    /// xterm focus-in/out delivered through conpty. Default true: a freshly
+    /// opened pane is normally focused, and conpty only delivers an event
+    /// on the *transition*, so absent a signal we assume focused.
+    pub pane_focused: bool,
     pub should_quit: bool,
     prompt_tx: mpsc::UnboundedSender<PromptSubmission>,
     recommendation_tx: mpsc::UnboundedSender<crate::coordinator::ChoiceExecution>,
@@ -1813,6 +1872,7 @@ impl App {
             wt_connected,
             terminal_rows: 24,
             terminal_cols: 80,
+            pane_focused: true,
             should_quit: false,
             prompt_tx,
             recommendation_tx,
@@ -3523,6 +3583,7 @@ impl App {
             AppEvent::Key(_) => "key",
             AppEvent::Tick => "tick",
             AppEvent::Resize(_, _) => "resize",
+            AppEvent::FocusChanged(_) => "focus_changed",
             AppEvent::ConnectionStage(_) => "connection_stage",
             AppEvent::ProgressStatus { .. } => "progress_status",
             AppEvent::AgentConnected { .. } => "agent_connected",
@@ -3617,6 +3678,9 @@ impl App {
             AppEvent::Resize(w, h) => {
                 self.terminal_cols = w;
                 self.terminal_rows = h;
+            }
+            AppEvent::FocusChanged(focused) => {
+                self.pane_focused = focused;
             }
             AppEvent::ConnectionStage(stage) => {
                 self.state = ConnectionState::Connecting(stage);
@@ -4282,6 +4346,20 @@ impl App {
                     return;
                 }
 
+                if method == "agent_prompt" {
+                    // Command palette `?<prompt>` delegation. Not a WT
+                    // notification — has nothing to do with banner/queue.
+                    let prompt = params
+                        .get("prompt")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    tracing::info!(target: "autofix", prompt_len = prompt.len(), "agent_prompt: delegating");
+                    if !prompt.is_empty() {
+                        self.delegate_to_tab_agent(prompt);
+                    }
+                    return;
+                }
+
                 if method == "autofix_enabled_changed" {
                     // C++ pushes this when the user toggles "Auto-suggest
                     // fixes" in settings while WTA is already running.
@@ -4790,56 +4868,43 @@ impl App {
                 let notification = classify_wt_event(&method, &pane_id, tab_id.as_deref(), &params);
                 tracing::debug!(target: "autofix", severity = ?notification.severity, summary = %notification.summary, tab_id = ?notification.tab_id, "classified");
 
-                // Always log to chat for critical/actionable events
-                match notification.severity {
-                    WtEventSeverity::Critical => {
-                        self.current_tab_mut()
-                            .messages
-                            .push(ChatMessage::Error(notification.summary.clone()));
-                        self.show_notification_banner = true;
-                        self.scroll_to_bottom();
+                // Per-tab filter. WT broadcasts pane-scoped events to every
+                // helper in the window, but another tab's failures are not
+                // this helper's concern. Drop notifications whose tab_id
+                // doesn't match our owner_tab_id; empty/missing tab_id falls
+                // through (no per-tab scope).
+                if let (Some(event_tab), Some(self_tab)) = (
+                    notification.tab_id.as_deref(),
+                    self.owner_tab_id.as_deref(),
+                ) {
+                    if !event_tab.is_empty()
+                        && !self_tab.is_empty()
+                        && event_tab != self_tab
+                    {
+                        tracing::debug!(
+                            target: "autofix",
+                            event_tab,
+                            self_tab,
+                            method = %method,
+                            "dropping cross-tab WT event"
+                        );
+                        return;
                     }
-                    WtEventSeverity::Actionable => {
-                        if method == "agent_prompt" {
-                            // Command palette prompt: delegate directly to a new tab agent.
-                            let prompt = params
-                                .get("prompt")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            tracing::info!(target: "autofix", prompt_len = prompt.len(), "agent_prompt: delegating");
-                            if !prompt.is_empty() {
-                                self.delegate_to_tab_agent(&prompt);
-                            }
-                            return;
-                        }
+                }
 
+                // Surface rule: WT events (connection_state, vt_sequence)
+                // surface via the bottom bar / `wt_notifications` queue ONLY.
+                // Chat is the agent dialogue surface — only user input and
+                // agent responses go there.
+                match notification.severity {
+                    WtEventSeverity::Critical | WtEventSeverity::Actionable => {
                         self.show_notification_banner = true;
-                        // Only OSC-133;D vt_sequence events carry enough info
-                        // to drive autofix (a per-command exit code from a
-                        // shell-integrated pane whose shell is still alive
-                        // so we can read its buffer). `connection_state:
-                        // closed` is just process termination — no exit
-                        // code, no command context, fires for both exit 0
-                        // and exit 1, and the pane is *gone* so any
-                        // downstream `wt_read_last_prompt(<dead_guid>)`
-                        // throws E_FAIL on the C++ side. Surface those as a
-                        // System message instead.
-                        let is_autofix_candidate = method == "vt_sequence";
-                        if is_autofix_candidate {
-                            // Always run the autofix trigger — when
-                            // auto-suggest is on we Pending+submit; when
-                            // off we just surface the Detected pill so
-                            // the user can opt in. Either way the
-                            // function pushes its own chat message.
+                        // Only OSC-133;D vt_sequence events have the exit
+                        // code + live shell buffer needed to drive autofix.
+                        // `connection_state: closed`/`failed` is just process
+                        // termination — banner-only.
+                        if method == "vt_sequence" {
                             self.maybe_trigger_autofix(&notification);
-                        } else {
-                            // Not an autofix candidate (e.g. connection_state:closed):
-                            // surface the event in chat so the user still sees it.
-                            self.current_tab_mut()
-                                .messages
-                                .push(ChatMessage::System(notification.summary.clone()));
-                            self.scroll_to_bottom();
                         }
                     }
                     WtEventSeverity::Informational => {
@@ -5390,6 +5455,10 @@ impl App {
                     self.current_tab_mut().selected_recommendation -= 1;
                     self.current_tab_mut().selected_button = self.default_button_for_selected();
                     self.scroll_rec_to_selected(self.main_area_width());
+                    // Selection moved — the new card may target a different
+                    // pane (or have no Send action), so re-pin the chip.
+                    let tab_id = self.active_tab_key().to_string();
+                    self.recompute_chip_override(&tab_id);
                 }
             }
             KeyCode::Down
@@ -5407,6 +5476,8 @@ impl App {
                     self.current_tab_mut().selected_recommendation += 1;
                     self.current_tab_mut().selected_button = default_btn;
                     self.scroll_rec_to_selected(self.main_area_width());
+                    let tab_id = self.active_tab_key().to_string();
+                    self.recompute_chip_override(&tab_id);
                 }
             }
             // Wheel-as-arrow scroll fallback: when the input is empty and no
@@ -6124,6 +6195,16 @@ impl App {
         // and the agent bar shows "Agent sessions" while the TUI below
         // actually renders chat (or vice versa).
         self.project_active_tab_state();
+
+        // Push the new active tab's chip-target (or release it) so the C++
+        // side stops drawing the previous tab's override. Helpers are
+        // per-tab and the owner-lock guard above means we only reach here
+        // for our own owner tab, so this is just a re-publish — not a
+        // cross-tab decision.
+        let to_recompute = self.tab_id.clone();
+        if let Some(t) = to_recompute {
+            self.recompute_chip_override(&t);
+        }
     }
 
     /// Drop the per-tab state for a tab that WT has just destroyed. Removes
@@ -6758,6 +6839,10 @@ impl App {
         }
         self.push_execution_info(format!("Auto-executing choice {}.", choice_label));
         self.emit_autofix_state_cleared(&active_tab);
+        // Defensive: covers the fall-back path above where we dispatched the
+        // choice directly without going through `turn_execute_card`. The
+        // matched-path case already recomputes via that callee.
+        self.recompute_chip_override(&active_tab);
     }
 
     fn emit_autofix_state_cleared(&mut self, target_tab_id: &str) {
@@ -6817,6 +6902,36 @@ impl App {
         if target_tab_id == self.active_tab_key() {
             send_bar_event(&snapshot, Some(target_tab_id));
         }
+    }
+
+    /// Recompute the chip-target override for the tab and, if it changed
+    /// since the last emit, publish a `set_agent_chip_target` event so the
+    /// C++ side pins the "Agent" chip on the right pane (or releases it,
+    /// returning to source-of-agent driven rendering). Hooked at every
+    /// state-mutation point that could affect the result: surfacing a
+    /// recommendation, navigating between cards, executing/cancelling a
+    /// card, switching the active tab.
+    fn recompute_chip_override(&mut self, tab_id: &str) {
+        let new_target = self.tab_mut(tab_id).compute_chip_card_target();
+        let tab = self.tab_mut(tab_id);
+        if tab.last_emitted_chip_override == new_target {
+            return;
+        }
+        tab.last_emitted_chip_override = new_target.clone();
+        emit_agent_chip_target(tab_id, new_target.as_deref());
+    }
+
+    /// Publish the chip-target state for this tab unconditionally, even
+    /// when it matches the last value we emitted. Used at helper startup
+    /// (right after `tab_id` is seeded from `--owner-tab-id`) so the C++
+    /// side runs `_UpdateAgentChipVisibility` against the now-current
+    /// pane tree. Without this kick, the first-launch race where the
+    /// chip-visibility hook runs *before* `IsSourceOfAgentPane` is set
+    /// leaves the chip hidden until the user induces another transition.
+    pub fn recompute_chip_override_initial(&mut self, tab_id: &str) {
+        let new_target = self.tab_mut(tab_id).compute_chip_card_target();
+        self.tab_mut(tab_id).last_emitted_chip_override = new_target.clone();
+        emit_agent_chip_target(tab_id, new_target.as_deref());
     }
 
     fn armed_fix_preview(rec: &crate::coordinator::RecommendationSet) -> String {
@@ -6950,6 +7065,16 @@ impl App {
         tab.activity_frame = 0;
         tab.timing_note = None;
         tab.turn = TurnState::Submitted(prompt);
+
+        // Submitting a new prompt dismisses any prior leftover card (the
+        // `selected_recommendation = 0` + turn reset above). If the helper
+        // had pinned the chip onto that card's pane, release it now so the
+        // chip falls back to source-of-agent while the new turn is in
+        // flight. Note: this only matters for the new-turn case; the
+        // freshly-submitted autofix path overrides chip via the eventual
+        // `turn_surface_*` callback once recommendations arrive.
+        let owned_tab = tab_id.to_string();
+        self.recompute_chip_override(&owned_tab);
     }
 
     /// Observe a streamed chunk. Thought chunks only advance the state
@@ -7176,13 +7301,8 @@ impl App {
                     details.push(ChatMessage::Agent(visible));
                 }
                 if !details.is_empty() {
-                    let pane_label = prompt
-                        .autofix
-                        .as_ref()
-                        .map(|a| a.target_pane_id.clone())
-                        .expect("autofix finalize requires autofix prompt");
                     tab.completed_turns.push(CompletedTurn {
-                        prompt: format!("Auto-diagnosed error in pane {pane_label}"),
+                        prompt: t!("chat.autofix_prompt_label").into_owned(),
                         details,
                         expanded: true,
                         trailing_marker: None,
@@ -7355,6 +7475,11 @@ impl App {
             outcome: TurnOutcome::Empty,
             end_pending,
         };
+
+        // Exiting Surfaced{Recommendation} — release any chip override the
+        // card had pinned. The C++ side falls back to source-of-agent.
+        let target_tab = self.tab_for_session(session_id);
+        self.recompute_chip_override(&target_tab);
     }
 
     /// User pressed Esc — cancel the in-flight turn. Bumps
@@ -7386,14 +7511,14 @@ impl App {
         let new_turn_data: Option<(String, Option<String>)> = match &tab.turn {
             TurnState::Submitted(prompt) => {
                 let label = match prompt.autofix.as_ref() {
-                    Some(a) => format!("Auto-diagnosed error in pane {}", a.target_pane_id),
+                    Some(_) => t!("chat.autofix_prompt_label").into_owned(),
                     None => prompt.text.clone(),
                 };
                 Some((label, None))
             }
             TurnState::Streaming { prompt, buf } => {
                 let label = match prompt.autofix.as_ref() {
-                    Some(a) => format!("Auto-diagnosed error in pane {}", a.target_pane_id),
+                    Some(_) => t!("chat.autofix_prompt_label").into_owned(),
                     None => prompt.text.clone(),
                 };
                 let visible = ui::chat::user_visible_stream_text(buf).map(|c| c.into_owned());
@@ -7434,6 +7559,11 @@ impl App {
         tab.progress_status = None;
         tab.activity_frame = 0;
         tab.turn = TurnState::Idle;
+
+        // Esc on a Send card or in-flight autofix exits the chip-override
+        // state; release whatever the helper had pinned. C++ falls back to
+        // source-of-agent driven rendering.
+        self.recompute_chip_override(&target_tab);
     }
 
     // ── Internal surface helpers (shared between eager and end-of-turn). ──
@@ -7482,6 +7612,13 @@ impl App {
             outcome: TurnOutcome::Recommendation(recommendations),
             end_pending: true,
         };
+
+        // Entering Surfaced{Recommendation} with a Send card selected is
+        // the typing→card transition; ask C++ to pin the chip onto that
+        // card's target pane (or release it when the selected card has no
+        // Send action).
+        let target_tab = self.tab_for_session(session_id);
+        self.recompute_chip_override(&target_tab);
     }
 
     /// Surface an autofix Fix recommendation as an Armed card.
@@ -7513,7 +7650,7 @@ impl App {
         self.emit_autofix_state_armed(&target_tab, &pane_id, &preview);
         let rec_idx = recommended_choice_index(&recommendations);
         let summary = format_recommendations_for_chat(&recommendations);
-        let turn_prompt_label = format!("Auto-diagnosed error in pane {pane_id}");
+        let turn_prompt_label = t!("chat.autofix_prompt_label").into_owned();
         let tab = self.session_tab_mut(session_id);
         let prompt = tab.turn.prompt().cloned().expect("prompt set");
         let mut details = tab.current_turn_details();
@@ -7536,6 +7673,11 @@ impl App {
             outcome: TurnOutcome::Recommendation(recommendations),
             end_pending: true,
         };
+
+        // Same handoff as `turn_surface_recommendation`: a fresh Send card
+        // is now selectable, pin the chip onto its target pane.
+        let target_tab = self.tab_for_session(session_id);
+        self.recompute_chip_override(&target_tab);
     }
 
     /// Surface an autofix Explain answer as a chat turn + bottom-bar
@@ -7565,7 +7707,7 @@ impl App {
             ),
         );
 
-        let turn_prompt_label = format!("Auto-diagnosed error in pane {pane_id}");
+        let turn_prompt_label = t!("chat.autofix_prompt_label").into_owned();
         {
             let tab = self.session_tab_mut(session_id);
             let mut details = tab.current_turn_details();
@@ -8015,6 +8157,22 @@ fn send_bar_event(snapshot: &AutofixBarSnapshot, tab_id: Option<&str>) {
             );
         }
     }
+    send_wt_protocol_event(evt.to_string());
+}
+
+/// Tell WT which pane in `tab_id` should display the blue "Agent" chip.
+/// `pane_session_id = None` releases the override and lets the C++ side
+/// fall back to its source-of-agent driven default. Fires per-tab; multiple
+/// helpers can publish independently and C++ routes each event by tab id.
+fn emit_agent_chip_target(tab_id: &str, pane_session_id: Option<&str>) {
+    let evt = serde_json::json!({
+        "type": "event",
+        "method": "set_agent_chip_target",
+        "params": {
+            "tab_id": tab_id,
+            "pane_session_id": pane_session_id,
+        }
+    });
     send_wt_protocol_event(evt.to_string());
 }
 
@@ -9194,7 +9352,10 @@ mod tests {
     // ─── App notification state ─────────────────────────────────────────────
 
     #[test]
-    fn wt_event_critical_shows_banner_and_error_message() {
+    fn wt_event_critical_raises_banner_only_no_chat() {
+        // WT events route through the bottom bar / `wt_notifications` queue,
+        // never the agent's chat history. The chat is for agent dialogue;
+        // process-lifecycle noise belongs in the bar.
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
@@ -9205,16 +9366,14 @@ mod tests {
         assert!(app.show_notification_banner);
         assert_eq!(app.wt_notifications.len(), 1);
         assert_eq!(app.wt_notifications[0].severity, WtEventSeverity::Critical);
-        // Should have an Error message in chat
-        assert!(app
-            .current_tab()
-            .messages
-            .iter()
-            .any(|m| matches!(m, ChatMessage::Error(_))));
+        assert!(
+            app.current_tab().messages.is_empty(),
+            "WT events must not pollute chat history with Error messages"
+        );
     }
 
     #[test]
-    fn wt_event_actionable_shows_banner_and_system_message() {
+    fn wt_event_actionable_raises_banner_only_no_chat() {
         let mut app = test_app();
         app.handle_event(AppEvent::WtEvent {
             method: "connection_state".to_string(),
@@ -9223,11 +9382,10 @@ mod tests {
             params: json!({"session_id": "5", "state": "closed"}),
         });
         assert!(app.show_notification_banner);
-        assert!(app
-            .current_tab()
-            .messages
-            .iter()
-            .any(|m| matches!(m, ChatMessage::System(_))));
+        assert!(
+            app.current_tab().messages.is_empty(),
+            "WT events must not pollute chat history with System messages"
+        );
     }
 
     #[test]
@@ -9258,6 +9416,45 @@ mod tests {
         assert!(!app.show_notification_banner);
         assert!(app.wt_notifications.is_empty());
         assert!(app.current_tab().messages.is_empty());
+    }
+
+    #[test]
+    fn wt_event_critical_from_other_tab_does_not_surface_in_owner_tab() {
+        // Regression for the cross-tab "Pane …: connection failed" leak:
+        // helper A owns tab A; tab B's Copilot pane fails; WT broadcasts
+        // the `connection_state:failed` event to every helper. Helper A
+        // must drop it instead of writing a red Error into tab A's chat.
+        let mut app = test_app();
+        app.owner_tab_id = Some("{tab-A}".to_string());
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "B-PANE".to_string(),
+            tab_id: Some("{tab-B}".to_string()),
+            params: json!({"pane_id": "B-PANE", "state": "failed", "tab_id": "{tab-B}"}),
+        });
+        assert!(!app.show_notification_banner);
+        assert!(app.wt_notifications.is_empty());
+        assert!(app.current_tab().messages.is_empty());
+    }
+
+    #[test]
+    fn wt_event_critical_from_owner_tab_raises_banner_not_chat() {
+        // Same-tab event raises the banner but still does NOT push into chat
+        // — the bar is the user-visible surface for connection failures.
+        let mut app = test_app();
+        app.owner_tab_id = Some("{tab-A}".to_string());
+        app.handle_event(AppEvent::WtEvent {
+            method: "connection_state".to_string(),
+            pane_id: "A-PANE".to_string(),
+            tab_id: Some("{tab-A}".to_string()),
+            params: json!({"pane_id": "A-PANE", "state": "failed", "tab_id": "{tab-A}"}),
+        });
+        assert!(app.show_notification_banner);
+        assert_eq!(app.wt_notifications.len(), 1);
+        assert!(
+            app.current_tab().messages.is_empty(),
+            "WT events must not pollute chat history"
+        );
     }
 
     #[test]
@@ -9418,8 +9615,9 @@ mod tests {
         assert_eq!(app.unacknowledged_count(), 2);
         // Banner should show (due to critical + actionable)
         assert!(app.show_notification_banner);
-        // Chat should have 2 messages (critical error + actionable system msg)
-        assert_eq!(app.current_tab().messages.len(), 2);
+        // Chat must stay empty — WT events surface in the bar/banner, never
+        // in agent dialogue.
+        assert!(app.current_tab().messages.is_empty());
     }
 
     // ─── Task C: Agents snapshot viewer / master refetch ────────────────────
@@ -10538,14 +10736,13 @@ mod tests {
             app.current_tab().turn.is_idle(),
             "no autofix prompt should be in-flight"
         );
-        // The user still gets a system message about the pane closing.
+        // The pane-closed event surfaces via the banner / `wt_notifications`,
+        // never in chat. Chat is the agent dialogue surface.
         assert!(
-            app.current_tab()
-                .messages
-                .iter()
-                .any(|m| matches!(m, ChatMessage::System(_))),
-            "the user still gets a system message about the pane closing"
+            app.current_tab().messages.is_empty(),
+            "WT events must not push into chat history"
         );
+        assert!(app.show_notification_banner);
     }
 
     /// Defense-in-depth: a vt_sequence (osc:133;D non-zero) inside an agent
@@ -11456,6 +11653,178 @@ mod tests {
             app.current_tab().chat_scroll.offset,
             7,
             "command popup visibility must suppress the chat-scroll fallback",
+        );
+    }
+
+    // ─── compute_chip_card_target ───────────────────────────────────────────
+
+    /// Stage a tab into `Surfaced { Recommendation(...) }` with the given
+    /// choices and selected index. Mirrors the side-effects the real
+    /// `turn_surface_recommendation` would have but skips all the
+    /// chat-history / scroll bookkeeping so the resulting state stays
+    /// minimal for the chip-target calculator.
+    fn stage_surfaced_recommendation(
+        app: &mut App,
+        choices: Vec<crate::coordinator::RecommendationChoice>,
+        selected: usize,
+        autofix_target: Option<&str>,
+    ) {
+        let prompt = SubmittedPrompt {
+            id: 1,
+            text: "p".into(),
+            submitted_at_unix_s: 0.0,
+            autofix: autofix_target.map(|t| AutofixContext {
+                target_pane_id: t.into(),
+                generation: 0,
+            }),
+        };
+        let recs = crate::coordinator::RecommendationSet {
+            recommended_choice: Some(selected),
+            choices,
+        };
+        let tab = app.tab_mut(DEFAULT_TAB_ID);
+        tab.selected_recommendation = selected;
+        tab.turn = TurnState::Surfaced {
+            prompt,
+            outcome: TurnOutcome::Recommendation(recs),
+            end_pending: false,
+        };
+    }
+
+    fn send_choice(parent: &str, input: &str) -> crate::coordinator::RecommendationChoice {
+        crate::coordinator::RecommendationChoice {
+            choice: 1,
+            title: "Run".into(),
+            rationale: String::new(),
+            actions: vec![crate::coordinator::RecommendedAction::Send {
+                parent: parent.into(),
+                input: input.into(),
+            }],
+        }
+    }
+
+    fn open_choice() -> crate::coordinator::RecommendationChoice {
+        crate::coordinator::RecommendationChoice {
+            choice: 2,
+            title: "Open".into(),
+            rationale: String::new(),
+            actions: vec![crate::coordinator::RecommendedAction::Open {
+                target: crate::coordinator::OpenTarget::Tab,
+                parent: None,
+                cwd: None,
+                title: None,
+                direction: None,
+            }],
+        }
+    }
+
+    #[test]
+    fn chip_target_returns_none_when_idle() {
+        let app = test_app();
+        assert_eq!(app.current_tab().compute_chip_card_target(), None);
+    }
+
+    #[test]
+    fn chip_target_uses_send_parent_when_set() {
+        let mut app = test_app();
+        stage_surfaced_recommendation(
+            &mut app,
+            vec![send_choice("pane-A", "ls")],
+            0,
+            None,
+        );
+        assert_eq!(
+            app.current_tab().compute_chip_card_target(),
+            Some("pane-A".to_string()),
+        );
+    }
+
+    #[test]
+    fn chip_target_falls_back_to_autofix_target_when_send_parent_empty() {
+        let mut app = test_app();
+        // Planner-emitted Send actions in autofix turns leave `parent`
+        // blank — `turn_execute_card` fills it from `target_pane_id` at
+        // execute time. The chip should already point there now.
+        stage_surfaced_recommendation(
+            &mut app,
+            vec![send_choice("", "fix --auto")],
+            0,
+            Some("pane-failing"),
+        );
+        assert_eq!(
+            app.current_tab().compute_chip_card_target(),
+            Some("pane-failing".to_string()),
+        );
+    }
+
+    #[test]
+    fn chip_target_filters_empty_autofix_target() {
+        // C++ treats `pane_session_id == ""` as "no override", so emitting
+        // Some("") would let the helper's dedupe believe it pinned the chip
+        // while WT silently ignores the event.
+        let mut app = test_app();
+        stage_surfaced_recommendation(
+            &mut app,
+            vec![send_choice("", "fix")],
+            0,
+            Some(""),
+        );
+        assert_eq!(app.current_tab().compute_chip_card_target(), None);
+    }
+
+    #[test]
+    fn chip_target_is_none_for_non_send_card() {
+        let mut app = test_app();
+        stage_surfaced_recommendation(&mut app, vec![open_choice()], 0, None);
+        assert_eq!(app.current_tab().compute_chip_card_target(), None);
+    }
+
+    #[test]
+    fn chip_target_tracks_selected_index() {
+        let mut app = test_app();
+        stage_surfaced_recommendation(
+            &mut app,
+            vec![send_choice("pane-A", "ls"), send_choice("pane-B", "pwd")],
+            0,
+            None,
+        );
+        assert_eq!(
+            app.current_tab().compute_chip_card_target(),
+            Some("pane-A".to_string()),
+        );
+        app.current_tab_mut().selected_recommendation = 1;
+        assert_eq!(
+            app.current_tab().compute_chip_card_target(),
+            Some("pane-B".to_string()),
+        );
+    }
+
+    #[test]
+    fn chip_recompute_dedupes_and_releases_on_idle() {
+        // After surfacing a Send card, recompute should record an override.
+        // Transitioning back to Idle (here: clear the recs) should make
+        // the next recompute observe a different value and clear the
+        // last_emitted slot.
+        let mut app = test_app();
+        stage_surfaced_recommendation(
+            &mut app,
+            vec![send_choice("pane-A", "ls")],
+            0,
+            None,
+        );
+        app.recompute_chip_override(DEFAULT_TAB_ID);
+        assert_eq!(
+            app.tab_mut(DEFAULT_TAB_ID).last_emitted_chip_override,
+            Some("pane-A".to_string()),
+        );
+
+        // Drop the surfaced state — chip target now resolves to None and
+        // the dedupe slot must follow so a fresh surface re-emits cleanly.
+        app.tab_mut(DEFAULT_TAB_ID).turn = TurnState::Idle;
+        app.recompute_chip_override(DEFAULT_TAB_ID);
+        assert_eq!(
+            app.tab_mut(DEFAULT_TAB_ID).last_emitted_chip_override,
+            None,
         );
     }
 }

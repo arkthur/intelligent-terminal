@@ -18,6 +18,7 @@
 
 #include "AgentPaneContent.h"
 #include "AgentPaneLog.h"
+#include "SharedWta.h"
 #include "TabRowControl.h"
 #include "DebugTapConnection.h"
 #include "DesktopNotification.h"
@@ -222,8 +223,21 @@ namespace winrt::TerminalApp::implementation
             _tabContent.Children().Append(content);
         }
 
-        // Per-tab model: no auto-create-on-tab-creation. Users open an
-        // agent pane on demand per tab via the keybinding / toolbar.
+        // Per-tab model: pre-warm a stashed agent pane on every new terminal
+        // tab. The helper conpty child is spawned but the pane is immediately
+        // stashed via `Tab::StashAgentPane`, so the user only sees the
+        // terminal pane. Toggling the agent pane (`Ctrl+Shift+.` /
+        // `Ctrl+Shift+/` / bottom-bar button) is just a stash/restore.
+        // The point of pre-warming is autofix: autofix routes through the
+        // agent helper, and gating it on "user has opened the pane at least
+        // once" silently broke autofix on every fresh tab. With pre-warm,
+        // autofix works on every tab from the moment the tab opens.
+        //
+        // The actual spawn is deferred to the same low-priority dispatcher
+        // tick as the cross-window drag rename walk below — that way
+        // (a) drag-in tabs that arrive with their own agent pane skip the
+        // pre-warm (see the `agentLeavesSeen == 0` guard there), and
+        // (b) tab initialization isn't blocked on conpty + helper spawn.
 
         // Cross-window agent-pane drag — finalize the rename and re-wire
         // bottom-bar events for any agent pane that arrived via the drag-in
@@ -326,6 +340,45 @@ namespace winrt::TerminalApp::implementation
                     winrt::to_string(newTabId) +
                     " isAgentPaneLeaves=" + std::to_string(isAgentPaneLeaves) +
                     " agentLeavesSeen=" + std::to_string(agentLeavesSeen));
+
+                // Pre-warm a stashed agent pane on this tab so the helper is
+                // running from the start (autofix needs it). Skipped if the
+                // tab already arrived with an agent pane via cross-window
+                // drag-in that landed before this deferred tick fired
+                // (`agentLeavesSeen > 0`). `_AutoCreateHiddenAgentPaneShared`
+                // itself short-circuits if wta isn't available or policy
+                // blocks all agents, and the early-return on
+                // `GetActiveTerminalControl() == null` skips the settings tab.
+                //
+                // NOTE on the race with cross-window drag-in: pre-warm fires
+                // here unconditionally (when `agentLeavesSeen == 0`), even
+                // though a drag-in's SplitPane action might land AFTER this
+                // tick and add a second AgentPaneContent on the same tab.
+                // The de-duplication happens on the drag-in side instead:
+                // `_MakeTerminalPane`'s re-wrap path closes any existing
+                // agent pane on the destination tab before installing its
+                // own. That's a per-tab decision (we know FOR SURE the drag
+                // is targeting this specific tab because the focused tab is
+                // its destination), so it doesn't suffer the false-positive
+                // problem a global "is any drag in flight?" check would
+                // have (window-A-drag would erroneously block window-B's
+                // unrelated new-tab pre-warm).
+                if (agentLeavesSeen == 0)
+                {
+                    _agentPaneLog(
+                        std::string{ "_InitializeTab(deferred): pre-warming stashed agent pane on tab " } +
+                        winrt::to_string(newTabId));
+                    self->_AutoCreateHiddenAgentPaneShared(tabImplCom, /*intoSessionsView*/ false, /*autoStash*/ true);
+                }
+                else
+                {
+                    // Cross-window drag-in path: an agent pane arrived from
+                    // another window and we just wired `_WireAgentPaneEvents`
+                    // on it (via the walk above). Refresh the bottom bar
+                    // explicitly so it picks up the autofix-state cache the
+                    // helper already populated on this AgentPaneContent.
+                    self->_UpdateBottomBarState();
+                }
             });
         }
     }
@@ -614,9 +667,23 @@ namespace winrt::TerminalApp::implementation
         // to drop the matching TabSession so a future tab that reuses any
         // index slot starts with a clean conversation.
         winrt::hstring closedTabStableId{};
+        size_t agentPanesOnTab = 0;
         if (const auto tabImpl = _GetTabImpl(tab))
         {
             closedTabStableId = tabImpl->StableId();
+
+            // Count agent panes on this tab BEFORE `tab.Shutdown()` runs.
+            // We need this for the `SharedWta::ReleasePane` decrement
+            // below — see the long comment after `tab.Shutdown()`.
+            if (const auto rootPane = tabImpl->GetRootPane())
+            {
+                rootPane->WalkTree([&agentPanesOnTab](const std::shared_ptr<Pane>& p) -> void {
+                    if (p && p->IsAgentPane())
+                    {
+                        ++agentPanesOnTab;
+                    }
+                });
+            }
         }
 
         // Removing the tab from the collection should destroy its control and disconnect its connection,
@@ -626,6 +693,28 @@ namespace winrt::TerminalApp::implementation
         if (!movingAway)
         {
             _NotifyAgentTabClosed(closedTabStableId);
+
+            // Preexisting latent leak (made worse by pre-warm): tab close
+            // goes through `Tab::Shutdown` → `Pane::Shutdown`, which only
+            // calls `_setPaneContent(nullptr)` on each leaf — it does NOT
+            // raise `Pane::Closed`. The agent pane's `Pane::Closed` handler
+            // registered in `_AutoCreateHiddenAgentPaneShared` calls
+            // `SharedWta::ReleasePane()`, so without that event firing the
+            // refcount never drops on tab close. With pre-warm every new
+            // tab adds 1 to the refcount; closing tabs never decrements,
+            // so the master process is kept alive past its last live pane
+            // (only `~SharedWta` at process exit truly cleans it up).
+            // Compensate by manually releasing once per agent pane that
+            // was on the tab — equivalent to what the missed `Closed`
+            // events would have done. Skipped for `movingAway` because
+            // the helper survives a cross-window drag (the target window's
+            // re-wrapped pane is the new owner), so decrementing here
+            // would prematurely zero the refcount and tear down the
+            // master that the dragged pane still depends on.
+            for (size_t i = 0; i < agentPanesOnTab; ++i)
+            {
+                winrt::TerminalApp::implementation::SharedWta::Instance().ReleasePane();
+            }
         }
 
         uint32_t mruIndex{};
