@@ -56,6 +56,16 @@ parameters:
   - name: beforeBuildSteps
     type: stepList
     default: []
+  - name: beforeRustBuildSteps
+    # Runs BEFORE the Rust toolchain install / cargo build. Use this for
+    # any step that rewrites source files Rust depends on — most notably
+    # the M.W.T.V versioning overlay, which edits
+    # `src/cascadia/TerminalApp/init.cpp` and
+    # `dep/telemetry/ProjectTelemetry.h` (both read by `tools/wta/build.rs`
+    # at cargo-build time). If you leave this empty, cargo builds against
+    # the on-disk OSS sources.
+    type: stepList
+    default: []
   - name: variables
     type: object
     default: {}
@@ -166,6 +176,12 @@ jobs:
       .\build\scripts\Generate-ThirdPartyNotices.ps1 -MarkdownNoticePath .\NOTICE.md -OutputPath .\src\cascadia\CascadiaPackage\NOTICE.html
     displayName: Generate NOTICE.html from NOTICE.md
 
+  # Steps that need to run BEFORE the Rust build — typically the M.W.T.V
+  # versioning overlay, so that `tools/wta/build.rs` sees the same source
+  # files the C++ side will compile. See the `beforeRustBuildSteps`
+  # parameter doc above for details.
+  - ${{ parameters.beforeRustBuildSteps }}
+
   # ────────────────────────────────────────────────────────────────────────
   # Rust toolchain for wta (1ES-compliant pattern).
   # Placed early — before vcpkg/nuget/VC-tools setup — so that Rust pipeline
@@ -188,6 +204,12 @@ jobs:
   #     `crates.io` upstream. (Project-scope, terminal team can create it.)
   #   - The CI account ("Project Collection Build Service (microsoft)") has
   #     at least Collaborator permission on the `RustTools` feed.
+  # The `Placed early — before vcpkg/nuget/VC-tools setup — so that Rust
+  # pipeline validation is independent of any C++ build environment
+  # problems.` design property is preserved: `beforeRustBuildSteps` above
+  # only carries M.W.T.V (which is repo-source-only — it does not touch
+  # the C++ build environment), so a misconfigured vcpkg/VS install still
+  # cannot poison Rust.
   # ────────────────────────────────────────────────────────────────────────
   - task: RustInstaller@1
     displayName: Install Rust toolchain (MSRustup)

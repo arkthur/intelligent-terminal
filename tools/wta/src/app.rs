@@ -1188,8 +1188,11 @@ pub struct TabAutofixState {
     /// (Esc), the error resolves (exit 0 on the same pane), or the fix
     /// is executed.
     pub pane_id: Option<String>,
+    /// Monotonic timestamp captured when `pane_id` is armed, used for
+    /// ErrorFixResolved telemetry elapsed time.
+    pub armed_at: Option<std::time::Instant>,
     /// Failing pane for the Suggested terminal state (a non-actionable
-    /// explanation in chat — distinct from autofix_pane_id so the two
+    /// explanation in chat — distinct from `pane_id` so the two
     /// kinds of "the bar is showing something" can be reasoned about
     /// independently).
     pub suggested_pane_id: Option<String>,
@@ -1720,7 +1723,8 @@ pub struct App {
     pub wt_notifications: std::collections::VecDeque<WtNotification>,
     pub show_notification_banner: bool,
     // Auto-fix global on/off. Per-tab autofix machinery (pane_id,
-    // generation, suggested_pane_id, bar_snapshot) lives on `TabSession.autofix`.
+    // generation, suggested_pane_id, armed_at, bar_snapshot) lives on
+    // `TabSession.autofix`.
     pub autofix_enabled: bool,
     // Per-tab conversation sessions. Keyed by the stable tab GUID WT mints
     // at tab construction. The active tab is `tab_id` — seeded from the
@@ -4954,6 +4958,24 @@ impl App {
                     }
                 }
 
+                // Telemetry: emit ErrorDetected for any non-acknowledged
+                // critical/actionable classification. Acknowledged events are
+                // the auto-silenced "unknown"/"connected"/success cases.
+                if !notification.acknowledged {
+                    let severity_str = match notification.severity {
+                        WtEventSeverity::Critical => Some("Critical"),
+                        WtEventSeverity::Actionable => Some("Actionable"),
+                        WtEventSeverity::Informational => None,
+                    };
+                    if let Some(severity_str) = severity_str {
+                        crate::telemetry::log_error_detected(
+                            severity_str,
+                            &method,
+                            &pane_id,
+                        );
+                    }
+                }
+
                 // Surface rule: WT events (connection_state, vt_sequence)
                 // surface via the bottom bar / `wt_notifications` queue ONLY.
                 // Chat is the agent dialogue surface — only user input and
@@ -5036,6 +5058,22 @@ impl App {
                                 let target_tab = event_tab
                                     .clone()
                                     .expect("armed_in_event_tab requires tab_id present");
+                                // Telemetry: a fix was armed for this pane and the next
+                                // command exited cleanly — the user's problem resolved.
+                                // Elapsed is monotonic (`Instant::elapsed`) from arm to
+                                // clean exit, not wall-clock.
+                                if let Some(armed) = self
+                                    .tab_mut(&target_tab)
+                                    .autofix
+                                    .armed_at
+                                    .take()
+                                {
+                                    let elapsed_ms = armed.elapsed().as_secs_f64() * 1000.0;
+                                    crate::telemetry::log_error_fix_resolved(
+                                        pane_id.as_str(),
+                                        elapsed_ms,
+                                    );
+                                }
                                 // `turn_cancel` owns the full cleanup: bumps
                                 // the tab's autofix_generation, emits cleared
                                 // (resolving the pane from AutofixContext, or
@@ -5736,6 +5774,7 @@ impl App {
                     let pane_to_clear = {
                         let tab = self.current_tab_mut();
                         tab.autofix.generation = tab.autofix.generation.wrapping_add(1);
+                        tab.autofix.armed_at = None;
                         tab.autofix.pane_id.take()
                     };
                     if pane_to_clear.is_some() {
@@ -6764,8 +6803,12 @@ impl App {
 
         // Store the failing pane ID on the target tab so the Esc dismiss
         // path can find it (legacy; the new state machine carries it via
-        // AutofixContext).
-        self.tab_mut(&target_tab_id).autofix.pane_id = Some(notification.pane_id.clone());
+        // AutofixContext), and arm telemetry timing for resolution.
+        {
+            let tab = self.tab_mut(&target_tab_id);
+            tab.autofix.pane_id = Some(notification.pane_id.clone());
+            tab.autofix.armed_at = Some(std::time::Instant::now());
+        }
 
         let prompt = PromptSubmission::new_autofix(prompt_text, Some(pane_context));
         let submitted = SubmittedPrompt {
@@ -6909,7 +6952,9 @@ impl App {
             Some(r) => r,
             None => {
                 self.emit_autofix_state_cleared(&active_tab);
-                self.current_tab_mut().autofix.pane_id = None;
+                let autofix = &mut self.current_tab_mut().autofix;
+                autofix.pane_id = None;
+                autofix.armed_at = None;
                 return;
             }
         };
@@ -6919,7 +6964,9 @@ impl App {
             .min(rec.choices.len().saturating_sub(1));
         let Some(mut choice) = rec.choices.get(idx).cloned() else {
             self.emit_autofix_state_cleared(&active_tab);
-            self.current_tab_mut().autofix.pane_id = None;
+            let autofix = &mut self.current_tab_mut().autofix;
+            autofix.pane_id = None;
+            autofix.armed_at = None;
             return;
         };
         // Auto-fill parent for Send actions, same as Enter path.
@@ -6954,7 +7001,9 @@ impl App {
         };
         let choice_label = choice.choice;
         if !routed {
-            self.current_tab_mut().autofix.pane_id = None;
+            let autofix = &mut self.current_tab_mut().autofix;
+            autofix.pane_id = None;
+            autofix.armed_at = None;
             self.clear_recommendations();
             let _ = self
                 .recommendation_tx
@@ -7388,7 +7437,9 @@ impl App {
         };
         if autofix_pane.is_some() {
             self.emit_autofix_state_cleared(&target_tab);
-            self.session_tab_mut(session_id).autofix.pane_id = None;
+            let autofix = &mut self.session_tab_mut(session_id).autofix;
+            autofix.pane_id = None;
+            autofix.armed_at = None;
         }
         self.turn_release_end_pending(session_id);
         self.turn_clear_agent_progress(session_id);
@@ -7417,7 +7468,9 @@ impl App {
                 if pane_id.is_some() {
                     self.emit_autofix_state_cleared(&target_tab);
                 }
-                self.session_tab_mut(session_id).autofix.pane_id = None;
+                let autofix = &mut self.session_tab_mut(session_id).autofix;
+                autofix.pane_id = None;
+                autofix.armed_at = None;
                 let tab = self.session_tab_mut(session_id);
                 let prompt = tab.turn.prompt().cloned().expect("prompt set");
                 // Preserve only what the user actually saw streaming (prose
@@ -7580,7 +7633,9 @@ impl App {
         if armed_pane.is_some() {
             self.emit_autofix_state_cleared(&target_tab);
         }
-        self.session_tab_mut(session_id).autofix.pane_id = None;
+        let autofix = &mut self.session_tab_mut(session_id).autofix;
+        autofix.pane_id = None;
+        autofix.armed_at = None;
         let tab = self.session_tab_mut(session_id);
         let TurnState::Surfaced {
             prompt,
@@ -7630,6 +7685,7 @@ impl App {
             self.emit_autofix_state_cleared(&target_tab);
         }
         let tab = self.session_tab_mut(session_id);
+        tab.autofix.armed_at = None;
         let canceled_marker = t!("chat.turn_canceled").into_owned();
         // Three paths into cancel:
         //   - Submitted / Streaming → commit a fresh completed_turn (prompt +
@@ -7863,6 +7919,7 @@ impl App {
             let tab = self.session_tab_mut(session_id);
             tab.autofix.suggested_pane_id = Some(pane_id.clone());
             tab.autofix.pane_id = None;
+            tab.autofix.armed_at = None;
         }
 
         let tab = self.session_tab_mut(session_id);
