@@ -1565,7 +1565,7 @@ impl TabSession {
     }
 
     /// Tab-completion: replace the input buffer with `/<name> ` (with a
-    /// trailing space if the command takes args, otherwise just the
+    /// trailing space if the command takes args; otherwise just the
     /// name) and reset the cursor to the end. Triggered by Tab when the
     /// popup is visible.
     pub fn accept_command_popup_completion(&mut self) {
@@ -4243,7 +4243,7 @@ impl App {
                     "alive session removed by master"
                 );
                 // Mirror PaneClosed's reducer for this sid synchronously,
-                // before the async mirror update lands. Otherwise the F2
+                // before the async mirror update lands. Otherwise, the F2
                 // row stays stuck on Live until the next bootstrap, since
                 // `apply_alive_pane_snapshot` is only called at startup
                 // and `AliveSessionRemoved` had no path into the reducer
@@ -5248,7 +5248,7 @@ impl App {
                         // Go back to setup screen
                         self.mode = AppMode::Setup;
                     } else {
-                        // No setup to go back to (e.g. preflight auth failure) —
+                        // No setup state to go back to (e.g. preflight auth failure) —
                         // rebuild setup as AgentMissing for this agent
                         let agent_id = self
                             .auth

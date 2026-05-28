@@ -28,6 +28,7 @@ claude
 CLAUDECODE
 clickable
 clippy
+clis
 CLIs
 cmark
 cmdkey
@@ -37,6 +38,7 @@ colorbrewer
 commandlines
 consvc
 copyable
+crossterm
 Crossterm
 CWDs
 dcs
@@ -169,6 +171,7 @@ qps
 qqqqq
 quickfix
 Rasterize
+ratatui
 Ratatui
 rclt
 recognises
@@ -230,6 +233,7 @@ txs
 ubuntu
 UEFI
 uiatextrange
+Uids
 UIDs
 und
 undercounted
@@ -256,3 +260,4 @@ YBox
 yeelam
 ymdhms
 ZDOTDIR
+zzzzz

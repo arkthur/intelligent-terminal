@@ -1865,7 +1865,7 @@ mod tests {
     #[test]
     fn merge_historical_inserts_only_new_keys() {
         let mut reg = AgentSessionRegistry::new();
-        // Pre-existing live session.
+        // Preexisting live session.
         reg.apply(SessionEvent::SessionStarted {
             key:             "live-1".into(),
             cli_source:      CliSource::Copilot,

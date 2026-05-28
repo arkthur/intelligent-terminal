@@ -2375,7 +2375,7 @@ mod tests {
 
     /// Companion invariant to `drop_sessions_for_helper_retains_only_other_helpers`:
     /// the same teardown call must also remove the corresponding rows
-    /// from `state.registry`. Otherwise a `session/list` response (or
+    /// from `state.registry`. Otherwise, a `session/list` response (or
     /// a downstream `intellterm.wta/focus_session` lookup) could hand
     /// out a SessionId whose helper is already gone, and the F2 view
     /// would route Enter to a dead pane.
