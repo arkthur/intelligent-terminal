@@ -100,7 +100,8 @@ pub fn lookup_title_for_session(cli: CliSource, key: &str) -> Option<String> {
         CliSource::Copilot => copilot_title_for_key(&home, key),
         CliSource::Claude  => claude_title_for_key(&home, key),
         CliSource::Gemini  => gemini_title_for_key(&home, key),
-        _ => None,
+        CliSource::Codex   => codex_title_for_key(&home, key),
+        CliSource::Unknown(_) => None,
     }
 }
 
@@ -762,6 +763,48 @@ fn codex_title_from_file(path: &Path) -> Option<String> {
 
 fn first_nonblank_line(raw: &str) -> String {
     raw.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string()
+}
+
+pub fn codex_title_for_key(home: &Path, key: &str) -> Option<String> {
+    let path = find_codex_rollout_by_id(home, key)?;
+    codex_title_from_file(&path)
+}
+
+/// Locate the rollout file for a given session UUID.
+///
+/// Defensive walking: only an unreadable ROOT (`~/.codex/sessions`) returns
+/// None. Subtree errors (an unreadable year / month / day directory)
+/// `continue` so the search proceeds across siblings — same contract as
+/// `load_codex`.
+///
+/// The filename suffix `<id>.jsonl` is a fast pre-filter; we still verify
+/// `payload.id == id` to guard against renamed files or UUID-prefix
+/// collisions.
+fn find_codex_rollout_by_id(home: &Path, id: &str) -> Option<PathBuf> {
+    let root = home.join(".codex").join("sessions");
+    let Ok(years) = fs::read_dir(&root) else { return None };
+    for y in years.flatten() {
+        let Ok(months) = fs::read_dir(y.path()) else { continue };
+        for m in months.flatten() {
+            let Ok(days) = fs::read_dir(m.path()) else { continue };
+            for d in days.flatten() {
+                let Ok(files) = fs::read_dir(d.path()) else { continue };
+                for f in files.flatten() {
+                    let p = f.path();
+                    let Some(name) = p.file_name().and_then(|s| s.to_str()) else { continue };
+                    if !(name.starts_with("rollout-") && name.ends_with(&format!("-{}.jsonl", id))) {
+                        continue;
+                    }
+                    if let Some(meta) = read_codex_session_meta(&p) {
+                        if meta.id == id {
+                            return Some(p);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }
 
 /// Parse a subset of ISO 8601 timestamps into `SystemTime`.
@@ -2248,6 +2291,30 @@ mod tests {
         assert!(rows[0].title.contains("refactor the parser"),
                 "got title: {:?}", rows[0].title);
         let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn codex_title_for_key_finds_user_message() {
+        let home = tmp_root("codex-title-by-key");
+        let dir = home.join(".codex").join("sessions").join("2026").join("05").join("28");
+        fs::create_dir_all(&dir).unwrap();
+        let id = "cafebabe-1111-2222-3333-444444444444";
+        let path = dir.join(format!("rollout-2026-05-28T12-00-00-{}.jsonl", id));
+        write_file(&path,
+            &format!("{{\"timestamp\":\"2026-05-28T12:00:00Z\",\"type\":\"session_meta\",\
+\"payload\":{{\"id\":\"{id}\",\"timestamp\":\"2026-05-28T12:00:00Z\",\
+\"cwd\":\"C:/x\",\"originator\":\"codex-tui\",\"cli_version\":\"0.1.0\",\"source\":\"cli\"}}}}\n\
+{{\"timestamp\":\"2026-05-28T12:00:05Z\",\"type\":\"event_msg\",\
+\"payload\":{{\"type\":\"user_message\",\"message\":\"refactor the parser\"}}}}\n"));
+        assert_eq!(codex_title_for_key(&home, id).as_deref(), Some("refactor the parser"));
+        fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn codex_title_for_key_returns_none_for_unknown_id() {
+        let home = tmp_root("codex-title-missing");
+        assert_eq!(codex_title_for_key(&home, "no-such-id"), None);
+        fs::remove_dir_all(&home).ok();
     }
 
     #[test]
