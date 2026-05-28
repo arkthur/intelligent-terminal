@@ -1202,11 +1202,17 @@ pub struct App {
     // Monotonic timestamp captured at the moment the current `autofix_pane_id`
     // was armed. Used to compute `TimeSinceFixMs` (a monotonic elapsed
     // duration, not wall-clock — `Instant` is unaffected by clock jumps) when
-    // the fix resolves (next command in the same pane exits zero). This field
-    // is always cleared together with `autofix_pane_id`: every site that
-    // clears the pane id (whether via `= None` or `.take()`) also clears
-    // `autofix_armed_at` in the same handling block. The two are therefore
-    // kept in sync and a stale arming timestamp cannot outlive its pane id.
+    // the fix resolves (next command in the same pane exits zero).
+    //
+    // Lifecycle: armed in lockstep with `autofix_pane_id` and cleared
+    // alongside it on every cancel/rearm/clear path. The single exception
+    // is the `ErrorFixResolved` emission site: there we `.take()` the
+    // timestamp *first* (so the elapsed-ms read happens before
+    // `turn_cancel` runs and to guarantee at most one telemetry event per
+    // arming), and `autofix_pane_id` is cleared a few lines later inside
+    // `turn_cancel` / its no-session fallback. The window between the two
+    // clears is purely local to that handler; the field can never outlive
+    // its pane id beyond that block.
     pub autofix_armed_at: Option<std::time::Instant>,
     // Auto-fix Suggested state: pane ID with a non-actionable suggestion shown on
     // the bottom bar. Cleared when the user runs a successful command in the
