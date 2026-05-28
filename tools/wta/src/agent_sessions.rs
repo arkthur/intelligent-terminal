@@ -1058,11 +1058,12 @@ impl AgentSessionRegistry {
     ///
     /// Layout (sorted by last_activity_at desc, newest first):
     ///   1. copilot  WORKING    — currently running a tool
-    ///   2. claude   ATTENTION  — needs user approval
-    ///   3. gemini   IDLE       — sitting waiting for input
-    ///   4. copilot  ERROR      — connection failed
-    ///   5. claude   ENDED      — exited normally a moment ago
-    ///   6. gemini   HISTORICAL — loaded from an old log (no live pane)
+    ///   2. codex    WORKING    — running a tool (second active session)
+    ///   3. claude   ATTENTION  — needs user approval
+    ///   4. gemini   IDLE       — sitting waiting for input
+    ///   5. copilot  ERROR      — connection failed
+    ///   6. claude   ENDED      — exited normally a moment ago
+    ///   7. gemini   HISTORICAL — loaded from an old log (no live pane)
     pub fn populate_demo_data(&mut self) {
         use std::time::Duration;
 
@@ -1082,7 +1083,20 @@ impl AgentSessionRegistry {
             tool_name: "shell".to_string(),
         });
 
-        // 2. Attention — claude waiting for tool approval
+        // 2. Working — codex running a tool concurrently
+        self.apply(SessionEvent::SessionStarted {
+            key:             "demo-codex-working".to_string(),
+            cli_source:      CliSource::Codex,
+            pane_session_id: "77777777-7777-7777-7777-777777777777".to_string(),
+            cwd:             cwd.clone(),
+            title:           "codex — implement refactor parser".to_string(),
+        });
+        self.apply(SessionEvent::ToolStarting {
+            key:       "demo-codex-working".to_string(),
+            tool_name: "shell".to_string(),
+        });
+
+        // 3. Attention — claude waiting for tool approval
         self.apply(SessionEvent::SessionStarted {
             key:             "demo-claude-attention".to_string(),
             cli_source:      CliSource::Claude,
@@ -1095,7 +1109,7 @@ impl AgentSessionRegistry {
             message: "Allow tool: write_file ./src/lib.rs?".to_string(),
         });
 
-        // 3. Idle — gemini waiting for next prompt
+        // 4. Idle — gemini waiting for next prompt
         self.apply(SessionEvent::SessionStarted {
             key:             "demo-gemini-idle".to_string(),
             cli_source:      CliSource::Gemini,
@@ -1104,7 +1118,7 @@ impl AgentSessionRegistry {
             title:           "gemini — explain build system".to_string(),
         });
 
-        // 4. Error — copilot lost network
+        // 5. Error — copilot lost network
         self.apply(SessionEvent::SessionStarted {
             key:             "demo-copilot-error".to_string(),
             cli_source:      CliSource::Copilot,
@@ -1117,7 +1131,7 @@ impl AgentSessionRegistry {
             reason:          "API request failed: 503 Service Unavailable".to_string(),
         });
 
-        // 5. Ended — claude finished cleanly a moment ago
+        // 6. Ended — claude finished cleanly a moment ago
         self.apply(SessionEvent::SessionStarted {
             key:             "demo-claude-ended".to_string(),
             cli_source:      CliSource::Claude,
@@ -1125,7 +1139,7 @@ impl AgentSessionRegistry {
             cwd:             cwd.clone(),
             title:           "claude — review PR diff".to_string(),
         });
-        // 5. Ended — claude finished cleanly a moment ago. Origin is the
+        // 6. Ended — claude finished cleanly a moment ago. Origin is the
         // default (Unknown), so SessionStopped takes the original
         // immediate-Ended path — no PaneClosed needed.
         self.apply(SessionEvent::SessionStopped {
@@ -1133,7 +1147,7 @@ impl AgentSessionRegistry {
             reason: "end_turn".to_string(),
         });
 
-        // 6. Historical — loaded from old log, no live pane
+        // 7. Historical — loaded from old log, no live pane
         let two_hours_ago = now - Duration::from_secs(2 * 60 * 60);
         let key = "demo-gemini-historical".to_string();
         self.sessions.insert(key.clone(), AgentSession {
@@ -1158,6 +1172,7 @@ impl AgentSessionRegistry {
         // narrative (working newest, historical oldest).
         let stagger = |secs: u64| now - Duration::from_secs(secs);
         if let Some(s) = self.sessions.get_mut("demo-copilot-working")  { s.last_activity_at = stagger(2); }
+        if let Some(s) = self.sessions.get_mut("demo-codex-working")    { s.last_activity_at = stagger(5); }
         if let Some(s) = self.sessions.get_mut("demo-claude-attention") { s.last_activity_at = stagger(15); }
         if let Some(s) = self.sessions.get_mut("demo-gemini-idle")      { s.last_activity_at = stagger(45); }
         if let Some(s) = self.sessions.get_mut("demo-copilot-error")    { s.last_activity_at = stagger(120); }
@@ -1835,12 +1850,12 @@ mod tests {
         let mut reg = AgentSessionRegistry::new();
         reg.populate_demo_data();
         let sessions = reg.iter_sorted();
-        assert_eq!(sessions.len(), 6, "demo data should yield exactly 6 sessions");
+        assert_eq!(sessions.len(), 7, "demo data should yield exactly 7 sessions");
 
-        // Verify each status appears exactly once.
+        // Verify each non-Working status appears exactly once; Working appears
+        // twice (copilot + codex are both running tools concurrently).
         let statuses: Vec<AgentStatus> = sessions.iter().map(|s| s.status.clone()).collect();
         for st in [
-            AgentStatus::Working,
             AgentStatus::Attention,
             AgentStatus::Idle,
             AgentStatus::Error,
@@ -1849,12 +1864,16 @@ mod tests {
         ] {
             assert_eq!(statuses.iter().filter(|s| **s == st).count(), 1, "expected exactly one {:?}", st);
         }
+        assert_eq!(
+            statuses.iter().filter(|s| **s == AgentStatus::Working).count(), 2,
+            "expected exactly two Working sessions (copilot + codex)",
+        );
 
         // Working session must come first (most recent activity).
         assert_eq!(sessions[0].status, AgentStatus::Working);
         // Historical session must be last and have no live pane binding.
-        assert_eq!(sessions[5].status, AgentStatus::Historical);
-        assert!(sessions[5].pane_session_id.is_none());
+        assert_eq!(sessions[6].status, AgentStatus::Historical);
+        assert!(sessions[6].pane_session_id.is_none());
 
         // Error session must carry the failure reason.
         let err = sessions.iter().find(|s| s.status == AgentStatus::Error).unwrap();
