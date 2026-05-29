@@ -497,6 +497,9 @@ pub fn ensure_installed_scoped(scope: CliScope) {
     if scope.includes(CliKind::Gemini) {
         install_for_gemini(&home);
     }
+    if scope.includes(CliKind::Codex) {
+        install_for_codex(&home);
+    }
 }
 
 /// Run the installer against a specific home directory. Split out from
@@ -506,6 +509,7 @@ fn ensure_installed_in(home: &Path) {
     install_for_claude(home);
     install_for_copilot(home);
     install_for_gemini(home);
+    install_for_codex(home);
 }
 
 // ---------------------------------------------------------------------------
@@ -610,6 +614,101 @@ fn install_for_claude(home: &Path) {
             plugin = %plugin_ref,
             "claude plugin install failed",
         );
+    }
+}
+
+/// Install hooks for Codex CLI by spawning `codex plugin marketplace add`
+/// followed by `codex plugin add`. Mirrors `install_for_claude` in shape.
+///
+/// Subcommand differences vs Claude:
+///   * `codex plugin add` (not `install`)
+///   * `codex plugin remove` (not `uninstall`) — used by `uninstall_for_codex`
+///   * Marketplace metadata lives in `.agents/plugins/marketplace.json`
+///     under the bundle root (not `.claude-plugin/marketplace.json`)
+///
+/// Trust step: after install, the user must run `/hooks` inside Codex
+/// to trust the plugin before any events fire. That's documented in
+/// the slice-C README; this function returns success on registration.
+fn install_for_codex(home: &Path) {
+    let codex_dir = home.join(".codex");
+    if !codex_dir.is_dir() {
+        tracing::debug!(target: "agent_hooks", "no ~/.codex dir; Codex not present");
+        return;
+    }
+
+    let bundle_dir = match bundle::resolve_cli_dir(CliKind::Codex) {
+        Some(p) => p,
+        None => {
+            tracing::warn!(
+                target: "agent_hooks",
+                "no wt-agent-hooks/codex bundle found next to wta.exe or in dev tree; \
+                 skipping Codex plugin install (set WTA_HOOKS_BUNDLE_DIR to override)",
+            );
+            return;
+        }
+    };
+
+    // Stage out of WindowsApps if necessary — Codex is Rust-native so it
+    // shouldn't hit the cpSync EPERM that bites Claude, but staging is
+    // cheap insurance and keeps the per-CLI install flow uniform.
+    let staged_dir = maybe_stage_bundle_for_codex(&bundle_dir);
+    let bundle_dir = staged_dir.as_deref().unwrap_or(&bundle_dir);
+
+    let bundle_path = bundle_dir.to_string_lossy().into_owned();
+    if let Err(e) = run_plugin_cli(
+        "codex",
+        &["plugin", "marketplace", "add", &bundle_path],
+        "agent_hooks",
+        &["already registered"],
+    ) {
+        tracing::warn!(
+            target: "agent_hooks",
+            err = %e,
+            "codex plugin marketplace add failed; aborting plugin install",
+        );
+        return;
+    }
+
+    let plugin_ref = format!("{}@{}", PLUGIN_NAME, MARKETPLACE_NAME);
+    if let Err(e) = run_plugin_cli("codex", &["plugin", "add", &plugin_ref], "agent_hooks", &[]) {
+        tracing::warn!(
+            target: "agent_hooks",
+            err = %e,
+            plugin = %plugin_ref,
+            "codex plugin add failed",
+        );
+    }
+}
+
+/// WindowsApps -> LOCALAPPDATA staging for Codex bundles. Mirrors
+/// `maybe_stage_bundle_for_claude`; see that function's comment for
+/// rationale.
+fn maybe_stage_bundle_for_codex(source: &Path) -> Option<PathBuf> {
+    if !is_under_windows_apps(source) {
+        return None;
+    }
+    let root = crate::runtime_paths::intelligent_terminal_root()?;
+    let staged = root.join(STAGING_SUBDIR).join(CliKind::Codex.dir_name());
+    match restage_bundle_dir(source, &staged) {
+        Ok(()) => {
+            tracing::info!(
+                target: "agent_hooks",
+                source = %source.display(),
+                staged = %staged.display(),
+                "restaged codex bundle out of WindowsApps",
+            );
+            Some(staged)
+        }
+        Err(e) => {
+            tracing::warn!(
+                target: "agent_hooks",
+                err = %e,
+                source = %source.display(),
+                staged = %staged.display(),
+                "failed to restage codex bundle out of WindowsApps; using original path",
+            );
+            None
+        }
     }
 }
 
@@ -804,6 +903,7 @@ fn status_for(cli: CliKind, home: Option<&Path>) -> CliStatus {
         CliKind::Copilot => copilot_status(on_path, bin_path, home),
         CliKind::Claude => claude_status(on_path, bin_path, home),
         CliKind::Gemini => gemini_status(on_path, bin_path, home),
+        CliKind::Codex => codex_status(on_path, bin_path, home),
     }
 }
 
@@ -1165,6 +1265,7 @@ fn populate_marketplace_path(out: &mut CliStatus, cli: CliKind, home: Option<&Pa
         CliKind::Copilot => copilot_marketplace_info(home),
         CliKind::Claude => claude_marketplace_info(home),
         CliKind::Gemini => gemini_marketplace_info(home),
+        CliKind::Codex => codex_marketplace_info(home),
     };
     out.marketplace_path = info.path;
     out.marketplace_path_valid = info.valid;
@@ -1407,6 +1508,7 @@ fn uninstall_for(cli: CliKind, home: Option<&Path>) -> CliUninstallResult {
         CliKind::Copilot => copilot_uninstall(home),
         CliKind::Claude => claude_uninstall(home),
         CliKind::Gemini => gemini_uninstall(home),
+        CliKind::Codex => codex_uninstall(home),
     }
 }
 
@@ -1679,6 +1781,7 @@ fn legacy_staging_dirs(cli: CliKind) -> Vec<PathBuf> {
             root.join("gemini-plugin-src")
                 .join(GEMINI_EXTENSION_DIR_NAME),
         ),
+        CliKind::Codex => dirs.push(root.join("codex-plugin-src").join(MARKETPLACE_NAME)),
     }
     // #20-first-commit-style embedded-fallback materialization.
     dirs.push(root.join("hook-bundle-fallback").join(cli.dir_name()));
@@ -2238,6 +2341,44 @@ fn paths_equivalent(a: &Path, b: &Path) -> bool {
             .collect()
     }
     normalize(a) == normalize(b)
+}
+
+// ---------------------------------------------------------------------------
+// Codex placeholders — replaced by Tasks 7 and 8 with real implementations.
+// They are correct as "not installed" responses so runtime behavior stays
+// safe between slice-B Rust commits.
+// ---------------------------------------------------------------------------
+
+fn codex_status(on_path: bool, bin_path: Option<String>, _home: Option<&Path>) -> CliStatus {
+    CliStatus {
+        name: CliKind::Codex.name(),
+        binary_on_path: on_path,
+        binary_path: bin_path,
+        marketplace_registered: false,
+        marketplace_path: None,
+        marketplace_path_valid: false,
+        plugin_installed: false,
+        plugin_enabled: false,
+        detection_fallback: None,
+    }
+}
+
+fn codex_marketplace_info(_home: &Path) -> MarketplaceInfo {
+    MarketplaceInfo {
+        path: None,
+        valid: false,
+    }
+}
+
+fn codex_uninstall(_home: Option<&Path>) -> CliUninstallResult {
+    CliUninstallResult {
+        name: CliKind::Codex.name(),
+        attempted: false,
+        plugin_uninstalled: None,
+        marketplace_removed: None,
+        staging_dir_removed: false,
+        messages: Vec::new(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -3638,5 +3779,23 @@ Registered marketplaces:
         assert_eq!(CliKind::Codex.name(), "codex");
         assert_eq!(CliKind::Codex.dir_name(), "codex");
         assert!(CliKind::ALL.contains(&CliKind::Codex));
+    }
+
+    #[test]
+    fn install_for_codex_skips_when_home_absent() {
+        let tmp = unique_dir("codex-home-absent");
+        // No ~/.codex created. Function should return cleanly without panic
+        // and without spawning `codex` (which may or may not be on PATH on CI).
+        install_for_codex(&tmp);
+        let _ = fs::remove_dir_all(tmp);
+    }
+
+    #[test]
+    fn install_dispatches_codex() {
+        // Smoke: dispatch on an empty HOME shouldn't panic when CliKind::Codex
+        // is in CliKind::ALL but ~/.codex doesn't exist.
+        let tmp = unique_dir("codex-dispatch");
+        ensure_installed_in(&tmp);
+        let _ = fs::remove_dir_all(tmp);
     }
 }
