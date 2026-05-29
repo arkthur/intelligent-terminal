@@ -382,7 +382,7 @@ namespace winrt::TerminalApp::implementation
         // _OnTabSelectionChanged once a terminal tab is active.
         bool _pendingAgentRebuild{ false };
 
-        // Plan-C resume-into-new-tab bookkeeping. When the F2 session
+        // Plan-C resume-into-new-tab bookkeeping. When the session
         // manager's Enter handler on a Historical/Ended row creates a
         // new tab, it stashes the requested session id + cwd here keyed
         // by the new tab's StableId. `OnAgentStateChanged` consumes the
@@ -430,7 +430,7 @@ namespace winrt::TerminalApp::implementation
         // resume hint down to the helper: when non-empty, the spawned wta
         // process gets `--initial-load-session-id` (+ `--initial-load-cwd`)
         // on its cmdline and immediately calls `session/load` instead of
-        // creating a fresh session. Used by the F2 "Enter on Historical /
+        // creating a fresh session. Used by the "Enter on Historical /
         // Ended row" path to bundle spawn + resume atomically (replacing
         // the prior race-prone "spawn, then broadcast `load_session` VT"
         // design).

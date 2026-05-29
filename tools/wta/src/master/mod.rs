@@ -135,7 +135,7 @@ struct MasterStateInner {
     /// helper sharing this master.
     session_to_helper: Mutex<HashMap<acp::SessionId, HelperRoute>>,
     /// Authoritative live-session set, owned by master. Mirrors what
-    /// helpers learn via ext-notifications and what the F2 view sees
+    /// helpers learn via ext-notifications and what the session management view sees
     /// via the standard ACP `session/list` request. Kept beside
     /// `session_to_helper` (rather than fused with it) so the
     /// per-row metadata that `SessionInfo` carries — cwd, future
@@ -195,11 +195,11 @@ struct MasterStateInner {
     /// startup from `cli.agent` via `agent_registry::resolve_agent_id_from_cmd`.
     /// Used to stamp `cli_source` on every SessionInfo upserted from
     /// `session/new` and `session/load` so agent-pane sessions are not
-    /// reported with cli_source=None (which would make F2 Enter on a
+    /// reported with cli_source=None (which would make session management Enter on a
     /// Live row fall through to the resume path and fail with
     /// "unknown CLI"). `None` only when running with an agent CLI we
     /// don't recognize (e.g. `--agent codex` — tracked in CliSource::Unknown
-    /// but not surfaced as a known F2 filter).
+    /// but not surfaced as a known session management filter).
     pub(crate) cli_source: Option<crate::agent_sessions::CliSource>,
 }
 
@@ -773,7 +773,7 @@ impl acp::Agent for HelperHandler {
         info.pane_session_id = wta_meta.pane_session_id;
         // Stamp the row as a Live agent-pane session. Without this, the
         // row lands in master's registry with status=cli_source=origin=None,
-        // and helper-side F2 routing treats it as Historical (the default
+        // and helper-side session management routing treats it as Historical (the default
         // fallback in session_info_to_agent_session). Enter on it then
         // tries to resume and fails with "unknown CLI" since cli_source
         // is None. Agent-pane sessions never get a SessionStarted hook
@@ -884,7 +884,7 @@ impl acp::Agent for HelperHandler {
                 // which include the disk-derived chat title (e.g.
                 // "# Terminal AgentYou"). A naked `SessionInfo::new`
                 // upsert would clobber that title with `None`, leaving
-                // the resumed Live row showing "—" in F2. By copying
+                // the resumed Live row showing "—" in session management view. By copying
                 // the prior title we keep the resumed row identifiable
                 // to the user.
                 if let Some(existing) =
@@ -998,8 +998,8 @@ impl acp::Agent for HelperHandler {
     /// Answer `session/list` from our own live-session registry instead
     /// of forwarding to the agent CLI.
     ///
-    /// Rationale: the only live-session view that matters to the F2
-    /// Terminal session-management panel is "what's wired up through
+    /// Rationale: the only live-session view that matters to the
+    /// Terminal session management panel is "what's wired up through
     /// master right now" — agent-CLI-side dormant history is exposed
     /// separately through `agent-pane-sessions.jsonl` + per-CLI
     /// `<cli> --resume`. Forwarding to the agent CLI would conflate
@@ -1381,12 +1381,12 @@ async fn run_master_loop(cli: Cli, pipe_name: String) -> Result<()> {
 
     // Seed the registry with historical sessions scanned from
     // `~/.copilot/`, `~/.claude/`, `~/.gemini/` so `wta sessions list`
-    // and helper F2 viewers see the full set, not just live sessions
+    // and helper session management viewers see the full set, not just live sessions
     // created via `session/new` after master booted. Disk scan can take
     // ~100ms-1s for users with many sessions, so we run it in
     // spawn_blocking and broadcast `sessions/changed` once when done.
-    // Helpers that have F2 open at that moment will refetch and pick
-    // up the historicals; helpers that open F2 later will see them on
+    // Helpers that have session management view open at that moment will refetch and pick
+    // up the historicals; helpers that open session management view later will see them on
     // the next `sessions/list` call.
     let inner_for_history = Arc::clone(&inner);
     tokio::task::spawn_local(async move {
@@ -1829,7 +1829,7 @@ async fn handle_sessions_list(
 /// row for a "synthetic" title (cwd basename / empty) and try to upgrade it
 /// by reading the CLI's on-disk session artefacts (Copilot's `workspace.yaml
 /// summary:`/`name:`, Claude/Gemini's first user prompt). The helper already
-/// runs the equivalent refresh against its *local* registry, but F2 renders
+/// runs the equivalent refresh against its *local* registry, but session management view renders
 /// from master's snapshot — without this refresh master never sees the
 /// upgraded title and the row keeps showing the cwd basename forever for
 /// shell-pane CLI sessions whose first hook arrives before the CLI has
@@ -2518,7 +2518,7 @@ mod tests {
     /// the same teardown call must also remove the corresponding rows
     /// from `state.registry`. Otherwise, a `session/list` response (or
     /// a downstream `intellterm.wta/focus_session` lookup) could hand
-    /// out a SessionId whose helper is already gone, and the F2 view
+    /// out a SessionId whose helper is already gone, and the session management view
     /// would route Enter to a dead pane.
     #[tokio::test]
     async fn drop_sessions_for_helper_also_clears_registry() {

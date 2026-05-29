@@ -34,12 +34,12 @@ pub fn render(
     activity_frame: usize,
     cli_filter: Option<&CliSource>,
     // MVP origin filter — `ShellOnly` by default, see
-    // `app.rs::MVP_F2_ORIGIN_FILTER`. Must match whatever filter
+    // `app.rs::MVP_SESSIONS_ORIGIN_FILTER`. Must match whatever filter
     // `App::agents_rows_for_tab` applies so the rendered rows line
     // up with the cursor / Enter dispatch model. Caller threads the
-    // stored `app.f2_origin_filter`.
+    // stored `app.sessions_origin_filter`.
     origin_filter: OriginFilter,
-    // True iff the F2 view is waiting on its first `session/list`
+    // True iff the session management view is waiting on its first `session/list`
     // snapshot from master (snapshot is currently empty AND a refetch
     // request is in flight). Without this signal we have no way to
     // distinguish "view just opened, master hasn't responded yet" from
@@ -121,7 +121,7 @@ pub fn render(
         }
         // MVP origin filter. Stays in sync with the same retain inside
         // `App::agents_rows_for_tab` (which feeds the cursor / Enter
-        // dispatch); both call sites read `app.f2_origin_filter`.
+        // dispatch); both call sites read `app.sessions_origin_filter`.
         // `session_info_to_agent_session` collapses None origin to
         // SessionOrigin::Unknown so `matches(&s.origin)` is correct
         // for the snapshot path too.
@@ -182,7 +182,7 @@ pub fn render(
     //     on-disk history scan still in progress (pre-PR-#73 behaviour,
     //     kept for completeness — `using_snapshot` is now always true
     //     when the view is open).
-    //   * Snapshot path: F2 was just opened, master hasn't yet replied
+    //   * Snapshot path: session management view was just opened, master hasn't yet replied
     //     to our `session/list` refetch, and the placeholder snapshot
     //     is still the empty Vec primed by `open_agents_view_for_tab`.
     //     Without this branch the user sees a blank list (no shimmer,

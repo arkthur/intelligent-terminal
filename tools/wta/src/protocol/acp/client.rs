@@ -1857,7 +1857,7 @@ impl acp::Client for WtaClient {
 /// `_meta.wta.pane_session_id`, and broadcasts it via
 /// `intellterm.wta/session_added` notifications. Other helpers
 /// listening on those broadcasts use it to populate `alive_mirror`
-/// pane bindings so cross-helper Focus actions (F2 Enter on a row
+/// pane bindings so cross-helper Focus actions (session management Enter on a row
 /// owned by a sibling helper) have a real WT pane GUID to target.
 ///
 /// No-op when `WT_SESSION` is unset/empty (e.g. when running outside
@@ -1885,7 +1885,7 @@ fn inject_wta_pane_meta(meta: &mut Option<acp::Meta>) {
 /// `load_session_rx` arm of `run_acp_client_over_pipe`.
 ///
 /// Two cases:
-///   * `old_sid = Some` (mid-life F2 load failure): restore the prior
+///   * `old_sid = Some` (mid-life session management load failure): restore the prior
 ///     binding so the pane keeps a usable session. The user sees a
 ///     `TabError` and their existing session is still alive.
 ///   * `old_sid = None` (boot-time load failure with no bootstrap):
@@ -1903,7 +1903,7 @@ async fn handle_load_failure(
     error_message: String,
 ) {
     if let Some(old) = old_sid {
-        // Mid-life F2 load failure path: restore prior binding.
+        // Mid-life session management load failure path: restore prior binding.
         let mut g = tab_to_session.lock().await;
         g.insert(tab_id.clone(), old.clone());
         drop(g);
@@ -1943,7 +1943,7 @@ async fn handle_load_failure(
                 g.insert(tab_id.clone(), new_sid.clone());
             }
             // Index the fallback session as an agent-pane origin so
-            // F2 can show it as a Historical row on next cold start
+            // session management view can show it as a Historical row on next cold start
             // (it is now a real, persistent session).
             let pane_session_id = std::env::var("WT_SESSION").unwrap_or_default();
             let pane_for_index = if pane_session_id.is_empty() {
@@ -2179,7 +2179,7 @@ pub async fn run_acp_client_over_pipe(
     // The call is fire-and-forget: if list_sessions fails (e.g. an
     // older master without `unstable_session_list`) the alive mirror
     // just stays empty and `alive_loaded` stays false, which keeps
-    // F2 routing on the legacy path.
+    // session management routing on the legacy path.
     match conn.list_sessions(acp::ListSessionsRequest::new()).await {
         Ok(resp) => {
             let items: Vec<crate::session_registry::SessionInfo> = resp
@@ -2215,9 +2215,9 @@ pub async fn run_acp_client_over_pipe(
     // helper was spawned with `--initial-load-session-id`, in which case
     // we skip the bootstrap entirely and let the boot-time `load_session`
     // (queued by main.rs as an `AppEvent::WtEvent`) be the helper's
-    // first session. Skipping the bootstrap avoids the F2 duplicate-row
+    // first session. Skipping the bootstrap avoids the session management duplicate-row
     // bug: master used to register both the bootstrap and the loaded
-    // sid (both bound to the same WT pane) and the F2 view showed two
+    // sid (both bound to the same WT pane) and the session management view showed two
     // Live rows for the same agent pane.
     let cwd = std::env::current_dir().unwrap_or_default();
     let (session_id, available_models, current_model_id, has_bootstrap) =
@@ -2382,9 +2382,9 @@ pub async fn run_acp_client_over_pipe(
     let conn = Arc::new(conn);
 
     // Periodic 5s tick that fans out an AppEvent::SessionsChanged to
-    // force a refetch in any open F2 view. Belt-and-suspenders against
+    // force a refetch in any open session management view. Belt-and-suspenders against
     // missed `intellterm.wta/sessions/changed` broadcasts. Cheap:
-    // refetch only fires for tabs whose snapshot.is_some() (i.e. F2 is
+    // refetch only fires for tabs whose snapshot.is_some() (i.e. session management view is
     // currently open).
     let mut periodic_refetch = tokio::time::interval(std::time::Duration::from_secs(5));
     periodic_refetch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -2618,7 +2618,7 @@ pub async fn run_acp_client_over_pipe(
                     // about to rehydrate, so the registry row for the
                     // resumed sid carries `pane_session_id = <this
                     // pane's GUID>` and cross-helper Focus actions
-                    // (F2 Enter on the resumed row in a sibling
+                    // (session management Enter on the resumed row in a sibling
                     // window's tab) can resolve to a real WT pane to
                     // focus. Without this the row appears live but
                     // pane_session_id stays None, and the focus
@@ -4004,7 +4004,7 @@ mod tests {
     /// `session/load` path must inject `_meta.wta.pane_session_id`
     /// alongside the request so master's `SessionInfo.pane_session_id`
     /// for the resumed sid points at THIS pane's GUID. Without the
-    /// binding the row in a sibling window's F2 list appears live but
+    /// binding the row in a sibling window's session management list appears live but
     /// `decide_enter_action` returns `NotResumable { LiveWithoutPane }`
     /// and the user sees "Cannot focus session …: it appears live but
     /// no pane GUID is bound yet."

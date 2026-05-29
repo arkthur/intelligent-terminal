@@ -1696,7 +1696,7 @@ namespace winrt::TerminalApp::implementation
         // Plan-C: bundle the resume request with helper spawn. Caller
         // (currently `OnResumeInNewAgentTabRequested` via the pending-
         // load-session map in `OnAgentStateChanged`) sets these when the
-        // F2 Enter-on-Historical/Ended-row path needs the freshly-spawned
+        // session management Enter-on-Historical/Ended-row path needs the freshly-spawned
         // helper to immediately ACP `session/load` instead of creating a
         // fresh session. Helper-side flag handling lives in main.rs
         // (`--initial-load-session-id` + `--initial-load-cwd`).
@@ -4117,7 +4117,7 @@ namespace winrt::TerminalApp::implementation
     //   - `tab_changed` (active tab swap; via `project_active_tab_state`
     //     in `switch_tab_session`).
     //   - `set_agent_state` (C++-originated request; wta echoes back).
-    //   - Esc out of Agents view, `/sessions` slash command,
+    //   - Esc out of agent session view, `/sessions` slash command,
     //     `load_session`, Ctrl+C×2 reset, and once at startup after
     //     `--initial-view`.
     //
@@ -4216,7 +4216,7 @@ namespace winrt::TerminalApp::implementation
                     // Plan-C: consume any pending load-session hint for
                     // this tab. Set by `OnResumeInNewAgentTabRequested`
                     // when the user pressed Enter on a Historical/Ended
-                    // row in F2 — the new helper boots straight into a
+                    // row in session management view — the new helper boots straight into a
                     // `session/load` of the requested session id instead
                     // of creating a fresh session. One-shot: the entry
                     // is moved out and erased here so a later

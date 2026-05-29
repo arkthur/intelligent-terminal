@@ -35,7 +35,7 @@ pub async fn read_crossterm_events(tx: mpsc::UnboundedSender<AppEvent>) {
                         // out of the loop on the very first error — that
                         // killed both the ticker and the keyboard reader,
                         // so the TUI kept rendering on WT-pipe events but
-                        // never saw another keypress (Up/Down/F2 all dead).
+                        // never saw another keypress (Up/Down/Ctrl+Shift+/ all dead).
                         // Instead, log and keep going. If we ever see a
                         // sustained burst of errors, drop the EventStream
                         // and rebuild it; that resyncs against the current

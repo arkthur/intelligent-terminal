@@ -53,7 +53,7 @@ impl CliSource {
     /// Map an `agent_registry` agent id (`"copilot"`, `"claude"`, `"gemini"`,
     /// ...) to the matching `CliSource` variant. Returns `None` for agents
     /// the session registry does not track (e.g. `"codex"`, `"unknown"`, or
-    /// an empty string), which the session-management view treats as
+    /// an empty string), which the session management view treats as
     /// "no filter — show all rows".
     pub fn from_agent_id(agent_id: &str) -> Option<Self> {
         match agent_id.to_ascii_lowercase().as_str() {
@@ -77,8 +77,8 @@ pub enum AgentStatus {
 
 /// 2D session-state model — **activity** dimension.
 ///
-/// Captured separately from [`LivenessState`] so the session-management
-/// view (F2) can answer two orthogonal questions independently:
+/// Captured separately from [`LivenessState`] so the session management
+/// view can answer two orthogonal questions independently:
 ///
 ///   * "Is this row still alive?" → [`LivenessState`]
 ///   * "If alive, what's it doing?" → [`ActivityState`]
@@ -141,13 +141,13 @@ pub enum SessionOrigin {
     AgentPane,
 }
 
-/// View-layer filter for `SessionOrigin`. Used by the F2 / `/sessions`
+/// View-layer filter for `SessionOrigin`. Used by the `/sessions`
 /// picker so an MVP build can restrict the list to shell-pane sessions
 /// (user typed `copilot` in a normal shell) and hide WTA-spawned
 /// agent-pane sessions, without removing the data from the registry.
 ///
-/// Set the MVP default in `app.rs::MVP_F2_ORIGIN_FILTER`. Set
-/// `WTA_F2_SHOW_AGENT_PANE=1` to flip a single helper process to
+/// Set the MVP default in `app.rs::MVP_SESSIONS_ORIGIN_FILTER`. Set
+/// `WTA_SESSIONS_SHOW_AGENT_PANE=1` to flip a single helper process to
 /// `All` for debugging. The `wta sessions list` CLI also accepts
 /// `--origin <shell|agent-pane|all>` for the same purpose.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -679,7 +679,7 @@ impl AgentSessionRegistry {
 
     /// Like [`iter_sorted`], but keeps only rows whose `cli_source` matches
     /// the supplied filter. Passing `None` disables filtering and returns
-    /// the same list as `iter_sorted`. Used by the session-management view
+    /// the same list as `iter_sorted`. Used by the session management view
     /// so that, when the agent pane is running a known CLI (copilot /
     /// claude / gemini), the list only shows sessions for that CLI.
     pub fn iter_sorted_filtered(&self, filter: Option<&CliSource>) -> Vec<&AgentSession> {
@@ -689,7 +689,7 @@ impl AgentSessionRegistry {
     /// Two-axis variant of [`iter_sorted_filtered`]: filter on both
     /// `cli_source` (CLI the row belongs to) and `origin` (whether the
     /// session was started in a shell pane or by WTA's own agent pane).
-    /// Used by the F2 / `/sessions` picker and by `wta sessions list
+    /// Used by the `/sessions` picker and by `wta sessions list
     /// --origin`; the registry itself stays complete so other consumers
     /// (Enter routing, alive-mirror reconciliation, `wta sessions list`
     /// without `--origin`) see every row.
@@ -750,7 +750,7 @@ impl AgentSessionRegistry {
     /// no-ops because no session matches, AND the event never reaches
     /// master (the routing layer drops synthetic keys to avoid duplicate
     /// rows). Net effect: the row stays at `Working` from the prior
-    /// `tool.starting` and never flips to `Attention`, so F2 shows
+    /// `tool.starting` and never flips to `Attention`, so session management view shows
     /// "Active" instead of "Waiting for input".
     ///
     /// Returns `None` for [`CliSource::Unknown`] — we never want to
@@ -983,7 +983,7 @@ impl AgentSessionRegistry {
     /// to an existing master in another WT window may never see the
     /// originating `SessionStarted` hook event. Without this join, a
     /// session that is still alive in some pane would be shown as
-    /// Historical in F2 and Enter would mis-route to "resume new"
+    /// Historical in session management view and Enter would mis-route to "resume new"
     /// instead of "focus existing".
     ///
     /// Idempotent — re-applying with the same snapshot is a no-op
@@ -1006,7 +1006,7 @@ impl AgentSessionRegistry {
     /// and refuse to resurrect them, because the alternative (a stale
     /// `session_added` broadcast arriving before master detects the
     /// helper disconnect) would silently resurrect a pane that's
-    /// already gone, leaving the F2 row Live forever with no demotion
+    /// already gone, leaving the session management row Live forever with no demotion
     /// path. Cross-WTA-process resume-after-disconnect is rare;
     /// preferring the safe direction.
     ///
@@ -1016,7 +1016,7 @@ impl AgentSessionRegistry {
     /// however, are upgraded just enough to bind the pane carried in
     /// the snapshot — without touching `status` or any tool/attention
     /// state. This handles the cross-window resume race: in the tab
-    /// that issued the F2 Enter on a Historical row,
+    /// that issued the session management Enter on a Historical row,
     /// `dispatch_resume_in_agent_pane` fires `ResumeDispatched`, which
     /// optimistically flips the row to `Idle (Live)` so a rapid double
     /// press can't dispatch twice — but leaves `pane_session_id =
@@ -1026,7 +1026,7 @@ impl AgentSessionRegistry {
     /// helper (the one that pressed Enter) is no longer `Historical`,
     /// so without this rebind it would drop the broadcast on the floor
     /// and leave the row permanently `Live` without a pane — every
-    /// subsequent F2 Enter on the same row would return `NotResumable
+    /// subsequent session management Enter on the same row would return `NotResumable
     /// { LiveWithoutPane }`.
     pub fn apply_alive_session_join<'a>(
         &mut self,
@@ -1156,7 +1156,7 @@ impl AgentSessionRegistry {
 
     /// Populate the registry with synthetic data covering all 6 statuses.
     /// Triggered by the `WTA_DEMO_AGENTS=1` env var on App startup so the
-    /// Agents view (F2) can be exercised without running any real CLI.
+    /// agent session view can be exercised without running any real CLI.
     ///
     /// Layout (sorted by last_activity_at desc, newest first):
     ///   1. copilot  WORKING    — currently running a tool
@@ -2086,7 +2086,7 @@ mod tests {
 
     #[test]
     fn from_agent_id_returns_none_for_untracked_or_empty() {
-        // Empty / unknown / codex are all "no filter" — the F2 view will
+        // Empty / unknown / codex are all "no filter" — the session management view will
         // fall back to showing every row.
         assert_eq!(CliSource::from_agent_id(""),         None);
         assert_eq!(CliSource::from_agent_id("codex"),    None);
@@ -2180,7 +2180,7 @@ mod tests {
     fn iter_sorted_with_filters_partitions_by_origin() {
         // Two rows, identical CLI, different SessionOrigin. ShellOnly
         // must hide the AgentPane row; AgentPaneOnly is the inverse;
-        // All keeps both. Confirms the MVP F2 filter contract.
+        // All keeps both. Confirms the MVP sessions filter contract.
         let mut reg = AgentSessionRegistry::new();
         reg.apply(SessionEvent::SessionStarted {
             key: k("shell-row"),
@@ -2422,7 +2422,7 @@ mod tests {
     #[test]
     fn apply_alive_pane_snapshot_is_idempotent_when_replayed() {
         // Calling the same snapshot twice must not flag the registry
-        // dirty the second time — the F2 view re-applies snapshots
+        // dirty the second time — the session management view re-applies snapshots
         // every time master pushes a session_added/removed batch.
         let mut reg = AgentSessionRegistry::new();
         reg.apply(SessionEvent::SessionStarted {
@@ -2495,7 +2495,7 @@ mod tests {
         // row as Historical (it pre-dates this WTA process), but the
         // master's alive snapshot says the session is still running in
         // some pane. The join must upgrade the row to Live (Idle) and
-        // bind the pane so a subsequent F2 Enter routes to "focus".
+        // bind the pane so a subsequent session management Enter routes to "focus".
         let mut reg = AgentSessionRegistry::new();
         reg.merge_historical(vec![make_historical("sid-hist")]);
         assert_eq!(reg.sessions.get("sid-hist").unwrap().liveness(),
@@ -2562,7 +2562,7 @@ mod tests {
 
     #[test]
     fn apply_alive_session_join_binds_pane_to_live_without_pane_row() {
-        // Regression for the cross-window F2-Enter focus bug:
+        // Regression for the cross-window session management Enter focus bug:
         // `dispatch_resume_in_agent_pane` fires `ResumeDispatched`,
         // which optimistically promotes a Historical row to `Idle (Live)`
         // *without* binding a pane (the resume runs in a freshly spawned
@@ -2571,7 +2571,7 @@ mod tests {
         // the new helper-pane's GUID, the gating helper's row is no
         // longer Historical — but it must still adopt the pane binding,
         // otherwise the row stays Live-without-pane forever and every
-        // subsequent F2 Enter on the same row returns
+        // subsequent session management Enter on the same row returns
         // `NotResumable { LiveWithoutPane }` ("Cannot focus session …:
         // it appears live but no pane GUID is bound yet").
         let mut reg = AgentSessionRegistry::new();
@@ -2675,7 +2675,7 @@ mod tests {
         // Mirrors PaneClosed: Live row → Ended with pane binding cleared.
         // Driven by master's `intellterm.wta/session_removed` broadcast
         // when a helper exits — without this path the agent_sessions
-        // reducer never sees the disappearance and the F2 row stays
+        // reducer never sees the disappearance and the session management row stays
         // stuck on Live.
         let mut reg = AgentSessionRegistry::new();
         reg.apply(SessionEvent::SessionStarted {
@@ -2849,7 +2849,7 @@ mod tests {
         // Ended/Historical rows must NOT be candidates — the fallback is
         // for routing a *live* event to the right *live* session, and
         // resurrecting a dead session via a stray notification would be
-        // worse than no-op (it would resurface a terminated row in F2
+        // worse than no-op (it would resurface a terminated row in session management view
         // with bogus Attention state).
         let mut reg = AgentSessionRegistry::new();
         reg.apply(SessionEvent::SessionStarted {

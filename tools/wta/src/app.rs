@@ -35,9 +35,9 @@ use autofix::*;
 
 pub use turn_state::{AutofixContext, ChunkKind, SubmittedPrompt, TurnOutcome, TurnState};
 
-// ─── MVP F2 origin filter ────────────────────────────────────────────────────
+// ─── MVP sessions origin filter ────────────────────────────────────────────────────
 //
-// The session-management view (F2 / `/sessions`) currently ships in MVP
+// The session management view (`/sessions`) currently ships in MVP
 // mode: it only surfaces shell-pane sessions (the user manually ran
 // `copilot` / `claude` / `gemini` in a regular shell). Agent-pane
 // sessions (Class A — created by WTA on behalf of an Intelligent
@@ -47,23 +47,23 @@ pub use turn_state::{AutofixContext, ChunkKind, SubmittedPrompt, TurnOutcome, Tu
 //
 // To bring agent-pane sessions back into the picker once the manage UX
 // is ready, flip this constant to `OriginFilter::All` and delete the
-// `WTA_F2_SHOW_AGENT_PANE` env override below. No other call sites
+// `WTA_SESSIONS_SHOW_AGENT_PANE` env override below. No other call sites
 // need to change — all consumers go through
-// `App::f2_origin_filter`.
-const MVP_F2_ORIGIN_FILTER: crate::agent_sessions::OriginFilter =
+// `App::sessions_origin_filter`.
+const MVP_SESSIONS_ORIGIN_FILTER: crate::agent_sessions::OriginFilter =
     crate::agent_sessions::OriginFilter::ShellOnly;
 
-/// Resolve the F2 / `/sessions` origin filter for this process.
+/// Resolve the `/sessions` origin filter for this process.
 ///
-/// Defaults to [`MVP_F2_ORIGIN_FILTER`]. The `WTA_F2_SHOW_AGENT_PANE`
+/// Defaults to [`MVP_SESSIONS_ORIGIN_FILTER`]. The `WTA_SESSIONS_SHOW_AGENT_PANE`
 /// env var (set to `1` / `true`) flips a single helper to
 /// `OriginFilter::All` for debugging — matches the existing
 /// `WTA_LOG_AGENT_EVENT` / `WTA_SOURCE_*` convention. Each helper is
 /// a separate process so the override only affects the pane that
 /// launched with the env var set; the rest of the Terminal keeps the
 /// MVP default.
-pub fn resolve_f2_origin_filter() -> crate::agent_sessions::OriginFilter {
-    match std::env::var("WTA_F2_SHOW_AGENT_PANE")
+pub fn resolve_sessions_origin_filter() -> crate::agent_sessions::OriginFilter {
+    match std::env::var("WTA_SESSIONS_SHOW_AGENT_PANE")
         .ok()
         .as_deref()
         .map(str::trim)
@@ -71,7 +71,7 @@ pub fn resolve_f2_origin_filter() -> crate::agent_sessions::OriginFilter {
         Some("1") | Some("true") | Some("TRUE") | Some("True") | Some("yes") => {
             crate::agent_sessions::OriginFilter::All
         }
-        _ => MVP_F2_ORIGIN_FILTER,
+        _ => MVP_SESSIONS_ORIGIN_FILTER,
     }
 }
 
@@ -493,7 +493,7 @@ where
     // session row owns. The reducer then no-ops, AND the synthetic
     // key gates the event out of the master publish path (see
     // `key_is_synthetic` below), so master never learns the row is
-    // now waiting for input. Net effect: the F2 row stays at
+    // now waiting for input. Net effect: the session management row stays at
     // `Working` ("Active") from the prior `tool.starting` and never
     // flips to `Attention` ("Waiting for input").
     //
@@ -576,7 +576,7 @@ where
     // bookkeeping (so `is_agent_pane(pane_id)` works for the OSC 133;A
     // handler) but DO NOT publish these to master — master only ever
     // learns about real ACP sessions via `new_session`/`load_session`,
-    // and feeding it synthetic rows produces duplicate F2 entries that
+    // and feeding it synthetic rows produces duplicate session management entries that
     // shadow the real session (one with the real sid, one with `pane:`
     // key, both pointing at the same agent — see PR B debug session log
     // around 2026-05-28T00:30 for the user-visible repro).
@@ -681,7 +681,7 @@ where
     // row is now Ended for a managed CLI (Claude/Copilot/Gemini) whose
     // on-disk artefacts contain no resumable content, drop it from the
     // registry now. Without this, the user who opens `<cli>` and exits
-    // without typing a real prompt is left with an Ended row in F2
+    // without typing a real prompt is left with an Ended row in session management view
     // whose Enter would launch `<cli> --resume <id>` — and the CLI
     // itself would then reject the request (`No conversation found`
     // for Claude, `No session, task, or name matched` for Copilot,
@@ -952,7 +952,7 @@ pub struct AcpModelInfo {
 
 /// Test-visible record of a wtcli command the App fired through the
 /// `wt_channel::spawn_*` helpers. Captured under `cfg(test)` so we can
-/// assert the F2 Agents view dispatches the right shape of command
+/// assert the agent session view dispatches the right shape of command
 /// without needing a live wtcli to verify against.
 #[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1016,7 +1016,7 @@ pub enum AppEvent {
         /// ACP-advertised current model id (NewSessionResponse.models.current_model_id).
         current_model_id: Option<String>,
         /// Whether the agent advertised the `loadSession` capability in
-        /// the initialize response. Used by the session-management
+        /// the initialize response. Used by the session management
         /// view's Shift+Enter handler to short-circuit with a clear
         /// error before opening a new tab when the agent can't
         /// rehydrate ACP sessions.
@@ -1174,7 +1174,7 @@ pub enum AppEvent {
     /// Initial bootstrap of the alive-session mirror from master, in
     /// response to the helper's startup `session/list` request. The
     /// payload replaces any existing entries and flips `alive_loaded`
-    /// to true so F2 routing logic can start trusting `alive.lookup()`
+    /// to true so session management routing logic can start trusting `alive.lookup()`
     /// misses as "session is gone". See
     /// `crate::session_registry::apply_snapshot`.
     AliveSnapshotLoaded(Vec<crate::session_registry::SessionInfo>),
@@ -1363,7 +1363,7 @@ pub struct TabSession {
     #[allow(dead_code)]
     pub session_id: Option<String>,
 
-    // Agents picker view (F2 / `/sessions`) — per-tab so each WT tab keeps
+    // agent session view (`/sessions`) — per-tab so each WT tab keeps
     // its own open/closed state and selected row across tab switches.
     pub current_view: View,
     pub agents_list_state: ratatui::widgets::ListState,
@@ -1825,25 +1825,25 @@ pub struct App {
     /// + selected row) lives per-tab on `TabSession`.
     pub agent_sessions: crate::agent_sessions::AgentSessionRegistry,
     /// Tracks the lazy load of historical sessions. Flipped to Loading
-    /// on first session-management-view open; flipped to Loaded when
+    /// on first session management-view open; flipped to Loaded when
     /// `HistoricalSessionsLoaded` arrives. The agents_view reads this to
     /// render a "Loading..." row instead of an empty list during the
     /// scan.
     pub history_load_state: HistoryLoadState,
     /// Whether the connected ACP agent advertised the `loadSession`
     /// capability in its initialize response. Used by the
-    /// session-management view's Shift+Enter handler to short-circuit
+    /// session management view's Shift+Enter handler to short-circuit
     /// with a clear error before opening a new tab when the agent
     /// can't rehydrate ACP sessions. Set on `AgentConnected`.
     pub agent_supports_load_session: bool,
-    /// Origin filter for the F2 / `/sessions` picker. Captured once at
-    /// `App::new` time via [`resolve_f2_origin_filter`] so the value is
+    /// Origin filter for the `/sessions` picker. Captured once at
+    /// `App::new` time via [`resolve_sessions_origin_filter`] so the value is
     /// stable for the lifetime of this helper process. Read by
     /// [`Self::agents_rows_for_tab`] (the cursor / Enter source of
     /// truth), the post-history-scan auto-select, the Delete clamp,
     /// and the `agents_view::render` call in `ui/layout.rs`. See
-    /// [`MVP_F2_ORIGIN_FILTER`] for the gate to flip when un-MVP.
-    pub f2_origin_filter: crate::agent_sessions::OriginFilter,
+    /// [`MVP_SESSIONS_ORIGIN_FILTER`] for the gate to flip when un-MVP.
+    pub sessions_origin_filter: crate::agent_sessions::OriginFilter,
     // Onboarding: signals main.rs to install agent hook plugins on demand.
     install_request_tx: Option<mpsc::UnboundedSender<()>>,
     /// Posts `AppEvent::AgentSessionEvent` from background callbacks
@@ -1855,7 +1855,7 @@ pub struct App {
     agent_event_tx: Option<mpsc::UnboundedSender<AppEvent>>,
     /// Helper-mode fire-and-forget publisher for `intellterm.wta/session_hook`.
     session_hook_tx: Option<mpsc::UnboundedSender<crate::agent_sessions::SessionEvent>>,
-    /// Test-only: last command issued via the F2 Agents view's Enter
+    /// Test-only: last command issued via the agent session view's Enter
     /// dispatch (`dispatch_resume` / focus). Used by unit tests in
     /// place of a live wtcli; not compiled into release builds.
     #[cfg(test)]
@@ -1886,7 +1886,7 @@ pub struct App {
     /// recorded deadline.
     pub transient_hint: Option<(String, std::time::Instant)>,
     /// Mirror of master's authoritative live-session set, pushed via
-    /// ACP `intellterm.wta/session_*` ext-notifications. F2 Enter
+    /// ACP `intellterm.wta/session_*` ext-notifications. session management Enter
     /// routing reads this to decide Focus vs Resume without an extra
     /// IPC round-trip. Wired into B-6 (subscribe) and B-10 (consult);
     /// here we just hold the mirror so the rest of the helper can
@@ -1906,7 +1906,7 @@ pub struct App {
 /// a stale arm doesn't bite the next time they want to clear input.
 pub const CLOSE_PANE_ARM_WINDOW: std::time::Duration = std::time::Duration::from_millis(1500);
 
-/// Top-level UI view selector. Toggled with F2.
+/// Top-level UI view selector. Toggled with Ctrl+Shift+/.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
     Chat,
@@ -1939,8 +1939,8 @@ pub struct AgentsViewState {
 ///
 /// Doing that eagerly on every wta spawn (including every model
 /// switch, which kills the old wta and starts a new one) is wasted
-/// work — the data is only consumed by the Agents view (F2). We
-/// defer the scan to the first F2 press and cache the result for
+/// work — the data is only consumed by the agent session view. We
+/// defer the scan to the first Ctrl+Shift+/ press and cache the result for
 /// the rest of this wta's lifetime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistoryLoadState {
@@ -2054,7 +2054,7 @@ impl App {
             agent_sessions: crate::agent_sessions::AgentSessionRegistry::new(),
             history_load_state: HistoryLoadState::NotStarted,
             agent_supports_load_session: false,
-            f2_origin_filter: resolve_f2_origin_filter(),
+            sessions_origin_filter: resolve_sessions_origin_filter(),
             install_request_tx: None,
             agent_event_tx: None,
             session_hook_tx: None,
@@ -2236,7 +2236,7 @@ impl App {
         }
     }
 
-    /// Filter to apply to the F2 session-management view based on which
+    /// Filter to apply to the session management view based on which
     /// agent CLI the WTA agent pane is currently driving. Returns
     /// `Some(CliSource::*)` when `current_agent_id` resolves to a tracked
     /// CLI (copilot / claude / gemini) so only matching rows are listed.
@@ -2370,7 +2370,7 @@ impl App {
             EnterAction::NotResumable { reason } => {
                 // Surface a user-visible system message scoped to the
                 // current tab so the user can read it from the
-                // Agents view (which is rendered in-tab).
+                // agent session view (which is rendered in-tab).
                 let cli_id = match s.cli_source {
                     crate::agent_sessions::CliSource::Claude => "claude",
                     crate::agent_sessions::CliSource::Copilot => "copilot",
@@ -2429,7 +2429,7 @@ impl App {
         }
     }
 
-    /// Enter handler for the F2 Agents view. For live rows (Idle / Working
+    /// Enter handler for the agent session view. For live rows (Idle / Working
     /// / Attention / Error), focus the underlying WT pane. For terminal-
     /// state rows (Ended / Historical), spawn a new pane that runs the
     /// CLI's `--resume <session_id>` flow via [`Self::dispatch_resume`].
@@ -2830,7 +2830,7 @@ impl App {
         }
     }
 
-    /// Test-only accessor for the most recent F2 Agents-view dispatch.
+    /// Test-only accessor for the most recent agent session view dispatch.
     #[cfg(test)]
     pub fn last_dispatched_command_for_test(&self) -> Option<DispatchedCommand> {
         self.last_dispatched_command.clone()
@@ -3001,7 +3001,7 @@ impl App {
 
     fn agents_rows_for_tab(&self, tab_id: &str) -> Vec<crate::agent_sessions::AgentSession> {
         let filter = self.current_cli_filter();
-        let origin = self.f2_origin_filter;
+        let origin = self.sessions_origin_filter;
         if let Some(snapshot) = self
             .tab_sessions
             .get(tab_id)
@@ -3092,10 +3092,10 @@ impl App {
     ///
     /// Called eagerly from `run_acp_app` right after `set_event_tx` so the
     /// scan starts overlapping with ACP startup and is usually done by the
-    /// time the user first opens the Agents view. Also called defensively
-    /// from the F2 / `/sessions` toggle in case startup raced ahead of
+    /// time the user first opens the agent session view. Also called defensively
+    /// from the `/sessions` toggle in case startup raced ahead of
     /// `set_event_tx` (Setup/FRE mode — `event_tx` not yet wired, so the
-    /// eager call early-returns and the F2 press picks it up).
+    /// eager call early-returns and the Ctrl+Shift+/ press picks it up).
     ///
     /// Pre-eager-load this was strictly lazy because each wta restart
     /// (model switch, new agent pane) re-pays the ~10s scan. The eager
@@ -3106,7 +3106,7 @@ impl App {
             return;
         }
         let Some(tx) = self.event_tx.clone() else {
-            // No event channel yet — Setup mode at startup. The first F2
+            // No event channel yet — Setup mode at startup. The first Ctrl+Shift+/
             // press post-FRE will retry. Safe to leave state as NotStarted.
             return;
         };
@@ -4373,18 +4373,18 @@ impl App {
                     }
                 }
 
-                // If the user is already on the Agents view (e.g. they were
+                // If the user is already on the agent session view (e.g. they were
                 // dropped there by --initial-view sessions, or they pressed
-                // F2 / Ctrl+Shift+/ before the scan finished) and nothing
+                // Ctrl+Shift+/ before the scan finished) and nothing
                 // is selected yet, seed selection on row 0 so Enter
-                // activates immediately. Mirrors the F2 enter-Agents path.
+                // activates immediately. Mirrors the session management enter-Agents path.
                 if self.current_tab().current_view == View::Agents
                     && self.current_tab().agents_list_state.selected().is_none()
                     && !self
                         .agent_sessions
                         .iter_sorted_with_filters(
                             self.current_cli_filter().as_ref(),
-                            self.f2_origin_filter,
+                            self.sessions_origin_filter,
                         )
                         .is_empty()
                 {
@@ -4437,7 +4437,7 @@ impl App {
                 // tells us it's alive. Without this, only the bootstrap
                 // `AliveSnapshotLoaded` join would upgrade rows — every
                 // subsequent `session_added` broadcast would land only
-                // in the mirror and the F2 row would stay Historical.
+                // in the mirror and the session management row would stay Historical.
                 self.agent_sessions
                     .apply_alive_session_join([(sid.0.as_ref(), info.pane_session_id.as_deref())]);
                 let reg = std::sync::Arc::clone(&self.alive);
@@ -4452,8 +4452,9 @@ impl App {
                     "alive session removed by master"
                 );
                 // Mirror PaneClosed's reducer for this sid synchronously,
-                // before the async mirror update lands. Otherwise, the F2
-                // row stays stuck on Live until the next bootstrap, since
+                // before the async mirror update lands. Otherwise, the
+                // session management row stays stuck on Live until the next
+                // bootstrap, since
                 // `apply_alive_pane_snapshot` is only called at startup
                 // and `AliveSessionRemoved` had no path into the reducer
                 // (the bug rubber-duck Finding 2 surfaced post-B-12).
@@ -4498,7 +4499,7 @@ impl App {
                 tracing::debug!(target: "autofix", method = %method, pane_id = %pane_id, tab_id = ?tab_id, self_pane_id = ?self.pane_id, "WtEvent");
 
                 // Hook bridge events: fire-and-forget into the agent registry
-                // so the F2 Agents view stays current. Unrelated to autofix /
+                // so the agent session view stays current. Unrelated to autofix /
                 // tab routing; runs before the same-pane skip because we want
                 // to record events from our own pane too.
                 if method == "agent_event" {
@@ -4968,7 +4969,7 @@ impl App {
                 // (Idle/Working/...) when the underlying pane dies. The
                 // hook-bridge path (`agent.session.end` → `SessionStopped`)
                 // handles Claude/Copilot, but Gemini has no end-of-session
-                // hook, so without this wire a Gemini row spawned via F2
+                // hook, so without this wire a Gemini row spawned via session management view
                 // resume stays Idle forever after the user types `/exit`.
                 //
                 // Both event variants are no-ops in the registry when
@@ -5054,7 +5055,7 @@ impl App {
                     // ANY bound session and demoted the row to Ended
                     // even though the agent CLI was happily still
                     // streaming notifications — the user sees this as
-                    // "F2 Enter on a Live row spawned a new pane
+                    // "session management Enter on a Live row spawned a new pane
                     // instead of focusing the existing one" because
                     // the row demoted between snapshot and Enter.
                     //
@@ -5450,7 +5451,7 @@ impl App {
             AppEvent::Tick => self.has_activity_indicator() || self.show_notification_banner,
             AppEvent::AgentMessageChunk { .. } => true,
             AppEvent::DebugPipeMessage(_) => self.show_debug_panel,
-            // History only affects the Agents view; chat doesn't read it.
+            // History only affects the agent session view; chat doesn't read it.
             // A redraw is cheap enough that we don't bother gating on which
             // view is showing — pay the one frame.
             AppEvent::HistoricalSessionsLoaded(_) => true,
@@ -5608,7 +5609,7 @@ impl App {
             return;
         }
 
-        // Agents view (F2): list navigation + Enter to focus pane + Delete
+        // agent session view: list navigation + Enter to focus pane + Delete
         // to evict an Ended/Historical row. Captures all input while open
         // — including Esc which closes the view. View open-state and the
         // selection cursor are per-tab on `TabSession` so each WT tab
@@ -5672,7 +5673,7 @@ impl App {
                                     .agent_sessions
                                     .iter_sorted_with_filters(
                                         self.current_cli_filter().as_ref(),
-                                        self.f2_origin_filter,
+                                        self.sessions_origin_filter,
                                     )
                                     .len();
                                 let tab = self.current_tab_mut();
@@ -6317,13 +6318,13 @@ impl App {
                 tab.scroll_to_bottom();
             }
             CommandKind::Sessions => {
-                // Mirror the F2 keybinding's open path: jump straight to
+                // Mirror the Ctrl+Shift+/ keybinding's open path: jump straight to
                 // the Agents picker and seed a selection so Enter/Up/Down
-                // are immediately useful. Esc / F2 still close the view.
+                // are immediately useful. Esc / Ctrl+Shift+/ still close the view.
                 // Per-tab — only flips the active tab's view state.
                 let tab_id = self.active_tab_key().to_string();
                 self.open_agents_view_for_tab(tab_id);
-                // F2 path also kicks the lazy history scan here. Without this,
+                // session management path also kicks the lazy history scan here. Without this,
                 // /sessions left the registry empty and rendered a blank view
                 // forever (state stuck at NotStarted, no Loading row, no rows).
                 self.ensure_history_loaded();
@@ -7953,7 +7954,7 @@ impl App {
     ///   - `set_agent_state` handler end — echoes C++'s request back so C++
     ///     mirrors it (the round-trip the new architecture is built on).
     ///   - `load_session` after the per-tab mutation.
-    ///   - Esc out of Agents view, `/sessions` slash command, Ctrl+C×2
+    ///   - Esc out of agent session view, `/sessions` slash command, Ctrl+C×2
     ///     multi-tab reset.
     ///   - Once at startup (after `--initial-view` has been applied) so
     ///     the bar and the agent-pane-open flag both pick up the spawn
@@ -8510,7 +8511,7 @@ mod tests {
     fn session_info_to_agent_session_preserves_live_agent_pane_session_fields() {
         // Regression: master's new_session/load_session handlers stamp
         // status=Idle, cli_source=<resolved>, origin=AgentPane on the
-        // SessionInfo so helper-side F2 routing sees a Live row. Without
+        // SessionInfo so helper-side session management routing sees a Live row. Without
         // this stamping the row would land with all fields None, the
         // converter would map status=None -> AgentStatus::Historical (its
         // documented default), and Enter would fall through to the resume
@@ -8624,7 +8625,7 @@ mod tests {
 
     #[test]
     fn helper_agent_event_without_agent_session_id_does_not_publish_synthetic_to_master() {
-        // Regression for the user-reported duplicate F2 row:
+        // Regression for the user-reported duplicate session management row:
         //   "system32  Error                          29 minutes ago"
         //   "Agent pane session b832a8d3: system32  Active · copilot"
         //
@@ -8632,8 +8633,9 @@ mod tests {
         // hook, race, or hook from a workspace shell pane that doesn't
         // own an ACP session), the helper used to synthesize a
         // `pane:<guid>` placeholder, apply it locally, AND publish it to
-        // master. Master then surfaced the placeholder as a separate F2
-        // row alongside the real session, both pointing at the same
+        // master. Master then surfaced the placeholder as a separate
+        // session management row alongside the real session, both pointing
+        // at the same
         // underlying pane — hence the duplicate.
         //
         // Fix: keep the synthetic placeholder local for helper
@@ -9844,7 +9846,7 @@ mod tests {
         assert!(master_rx.try_recv().is_err(), "closed UI must not refetch");
     }
 
-    /// MVP F2 origin filter: with `ShellOnly`, agent-pane rows must
+    /// MVP sessions origin filter: with `ShellOnly`, agent-pane rows must
     /// be hidden from `agents_rows_for_tab` (the cursor / Enter
     /// dispatch source of truth) — *not just* from `agents_view::render`.
     /// A bug where render filtered but `agents_rows_for_tab` didn't
@@ -9853,7 +9855,7 @@ mod tests {
     fn shell_only_filter_hides_agent_pane_rows_from_cursor_model() {
         use crate::agent_sessions::{OriginFilter, SessionOrigin};
         let mut app = test_app();
-        app.f2_origin_filter = OriginFilter::ShellOnly;
+        app.sessions_origin_filter = OriginFilter::ShellOnly;
         // Snapshot path: master pushed two rows — one tagged
         // AgentPane (Class A, hidden under ShellOnly), one tagged
         // Unknown (Class B, visible).
@@ -9871,12 +9873,12 @@ mod tests {
 
         // Flip to All — both rows must reappear so the un-MVP toggle
         // brings agent-pane rows back without any other code change.
-        app.f2_origin_filter = OriginFilter::All;
+        app.sessions_origin_filter = OriginFilter::All;
         let rows = app.agents_rows_for_tab(DEFAULT_TAB_ID);
         assert_eq!(rows.len(), 2);
 
         // AgentPaneOnly is the inverse — only Class A surfaces.
-        app.f2_origin_filter = OriginFilter::AgentPaneOnly;
+        app.sessions_origin_filter = OriginFilter::AgentPaneOnly;
         let rows = app.agents_rows_for_tab(DEFAULT_TAB_ID);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].key, "class-a");
@@ -9891,7 +9893,7 @@ mod tests {
         use crate::agent_sessions::{CliSource, OriginFilter, SessionEvent, SessionOrigin};
         use std::path::PathBuf;
         let mut app = test_app();
-        app.f2_origin_filter = OriginFilter::ShellOnly;
+        app.sessions_origin_filter = OriginFilter::ShellOnly;
         // No snapshot primed — `agents_rows_for_tab` goes through
         // `iter_sorted_with_filters` on the registry.
         app.agent_sessions.apply(SessionEvent::SessionStarted {
@@ -9915,35 +9917,35 @@ mod tests {
         assert_eq!(rows[0].key, "shell-key");
     }
 
-    /// `resolve_f2_origin_filter` reads the `WTA_F2_SHOW_AGENT_PANE`
+    /// `resolve_sessions_origin_filter` reads the `WTA_SESSIONS_SHOW_AGENT_PANE`
     /// env var. With it unset (or 0/false) the MVP default
     /// (`ShellOnly`) wins; with it set to a truthy value we flip to
     /// `All` so a single debug helper can see everything without a
     /// rebuild.
     ///
     /// Env vars are process-global, so this test serializes via the
-    /// `WTA_F2_SHOW_AGENT_PANE_TEST_LOCK` mutex shared with any other
+    /// `WTA_SESSIONS_SHOW_AGENT_PANE_TEST_LOCK` mutex shared with any other
     /// future test that touches the same var.
     #[test]
-    fn resolve_f2_origin_filter_respects_env_override() {
+    fn resolve_sessions_origin_filter_respects_env_override() {
         use crate::agent_sessions::OriginFilter;
         static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
-        std::env::remove_var("WTA_F2_SHOW_AGENT_PANE");
-        assert_eq!(crate::app::resolve_f2_origin_filter(), MVP_F2_ORIGIN_FILTER);
-        assert_eq!(MVP_F2_ORIGIN_FILTER, OriginFilter::ShellOnly);
+        std::env::remove_var("WTA_SESSIONS_SHOW_AGENT_PANE");
+        assert_eq!(crate::app::resolve_sessions_origin_filter(), MVP_SESSIONS_ORIGIN_FILTER);
+        assert_eq!(MVP_SESSIONS_ORIGIN_FILTER, OriginFilter::ShellOnly);
 
-        std::env::set_var("WTA_F2_SHOW_AGENT_PANE", "1");
-        assert_eq!(crate::app::resolve_f2_origin_filter(), OriginFilter::All);
+        std::env::set_var("WTA_SESSIONS_SHOW_AGENT_PANE", "1");
+        assert_eq!(crate::app::resolve_sessions_origin_filter(), OriginFilter::All);
 
-        std::env::set_var("WTA_F2_SHOW_AGENT_PANE", "true");
-        assert_eq!(crate::app::resolve_f2_origin_filter(), OriginFilter::All);
+        std::env::set_var("WTA_SESSIONS_SHOW_AGENT_PANE", "true");
+        assert_eq!(crate::app::resolve_sessions_origin_filter(), OriginFilter::All);
 
-        std::env::set_var("WTA_F2_SHOW_AGENT_PANE", "0");
-        assert_eq!(crate::app::resolve_f2_origin_filter(), MVP_F2_ORIGIN_FILTER);
+        std::env::set_var("WTA_SESSIONS_SHOW_AGENT_PANE", "0");
+        assert_eq!(crate::app::resolve_sessions_origin_filter(), MVP_SESSIONS_ORIGIN_FILTER);
 
-        std::env::remove_var("WTA_F2_SHOW_AGENT_PANE");
+        std::env::remove_var("WTA_SESSIONS_SHOW_AGENT_PANE");
     }
 
     #[test]
@@ -10039,7 +10041,7 @@ mod tests {
         info
     }
 
-    // ─── F2 Agents view: Enter / Delete dispatch ───────────────────────────
+    // ─── agent session view: Enter / Delete dispatch ───────────────────────────
     //
     // Originally added in commit `e4723510e` ("Enter/Delete actions on Agents
     // view (M4.4-M4.6)") and lost in the post-#29 merge that stubbed out
@@ -10269,10 +10271,10 @@ mod tests {
         use std::path::PathBuf;
         let mut app = test_app();
         // This test exercises the Class A (AgentPane) Enter routing,
-        // which the MVP F2 filter hides. Opt out so the row is
+        // which the MVP sessions filter hides. Opt out so the row is
         // visible to the cursor; the dispatch logic under test is
         // unchanged by the filter.
-        app.f2_origin_filter = OriginFilter::All;
+        app.sessions_origin_filter = OriginFilter::All;
         app.agent_supports_load_session = true;
         app.agent_sessions.apply(SessionEvent::SessionStarted {
             key: "abc-class-a".into(),
@@ -10313,7 +10315,7 @@ mod tests {
         // for the OriginFilter::All rationale — the MVP filter hides
         // Class A rows from the cursor model; this test exercises the
         // routing logic that fires when they ARE visible.
-        app.f2_origin_filter = OriginFilter::All;
+        app.sessions_origin_filter = OriginFilter::All;
         app.agent_supports_load_session = true;
         app.agent_sessions.apply(SessionEvent::SessionStarted {
             key: "abc-class-a-shift".into(),
@@ -10357,9 +10359,9 @@ mod tests {
         use std::path::PathBuf;
         let mut app = test_app();
         // Same rationale as the Class A dead-row tests above:
-        // MVP F2 filter hides AgentPane rows, this test verifies the
+        // MVP sessions filter hides AgentPane rows, this test verifies the
         // dispatch logic for when they are visible.
-        app.f2_origin_filter = OriginFilter::All;
+        app.sessions_origin_filter = OriginFilter::All;
         app.agent_sessions.apply(SessionEvent::SessionStarted {
             key: "live-class-a".into(),
             cli_source: CliSource::Claude,
@@ -10382,8 +10384,8 @@ mod tests {
     }
 
     /// Class B (Unknown origin) + plain Enter on a Live row preserves
-    /// the legacy focus behavior — this exercises the most common F2
-    /// path (user-started `copilot` in a normal pane via hooks).
+    /// the legacy focus behavior — this exercises the most common
+    /// session management path (user-started `copilot` in a normal pane via hooks).
     #[test]
     fn enter_on_class_b_live_row_focuses() {
         use crate::agent_sessions::{CliSource, SessionEvent};
@@ -10555,7 +10557,7 @@ mod tests {
     fn prune_phantom_session_keeps_ended_row_when_resumable() {
         // Symmetric to the per-CLI drop tests: if the on-disk
         // artefact has real content, the prune is a no-op so the user
-        // can resume via Enter in F2.
+        // can resume via Enter in session management view.
         use crate::agent_sessions::CliSource;
         let mut reg = make_ended_session(CliSource::Claude, "real-id");
         crate::app::prune_phantom_session_if_ended_with(&mut reg, "real-id", |_cli, _k| true);
@@ -10647,7 +10649,7 @@ mod tests {
         // session id (it only flushes when there's content). With
         // the previous lenient probe ("missing artefact → defer to
         // CLI → resumable=true"), the post-`SessionStopped` prune
-        // believed the row was real and left it Ended in F2. Pressing
+        // believed the row was real and left it Ended in session management view. Pressing
         // Enter then launched `claude --resume <id>` and dead-ended
         // on `No conversation found with session ID: <id>`.
         //
@@ -10809,7 +10811,7 @@ mod tests {
     #[test]
     fn closing_other_tab_preserves_per_tab_view_when_tab_changed_follows() {
         // Reproduces the user-reported bug:
-        //   tab1 has the session list (Agents view) open. User opens
+        //   tab1 has the session list (agent session view) open. User opens
         //   tab2, then closes tab2. Focus returns to tab1, the agent
         //   pane is still visible, but the session list has vanished
         //   — the user has to press the shortcut again to bring it
@@ -10848,7 +10850,7 @@ mod tests {
             });
         }
 
-        // (1) tab1 active, Agents view, selection at row 2.
+        // (1) tab1 active, agent session view, selection at row 2.
         let tab1 = "tab1-stable-id";
         let tab2 = "tab2-stable-id";
         app.tab_id = Some(tab1.into());
@@ -11335,7 +11337,7 @@ mod tests {
     /// signal we get when the user `/exit`s a resumed Gemini pane is
     /// WT-native `connection_state: closed`. Without bridging that into a
     /// `SessionEvent::PaneClosed`, the row stays stuck at Idle/Working
-    /// forever in the F2 list.
+    /// forever in the session management list.
     #[test]
     fn connection_state_closed_transitions_agent_row_to_ended() {
         use crate::agent_sessions::{AgentStatus, CliSource, SessionEvent};

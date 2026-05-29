@@ -11,7 +11,7 @@
 // originate from a small PowerShell bridge (`send-event.ps1`) that the
 // CLI invokes through its hook system. If the user hasn't run a manual
 // plugin-install step, the CLI never invokes the bridge, the registry
-// stays empty, and the F2 list looks frozen.
+// stays empty, and the session management list looks frozen.
 //
 // Bundle = single source of truth (issue #20)
 // -------------------------------------------

@@ -176,7 +176,7 @@ struct Cli {
 
     /// Initial TUI view to show on startup. `chat` (default) starts in the
     /// chat view; `sessions` starts in the Agents (session list) view —
-    /// equivalent to the user pressing F2 right after the pane opens.
+    /// equivalent to the user pressing Ctrl+Shift+/ right after the pane opens.
     /// Wired to WT's Ctrl+Shift+/ binding via TerminalPage.
     #[arg(long, value_enum, default_value_t = InitialView::Chat)]
     initial_view: InitialView,
@@ -201,7 +201,7 @@ struct Cli {
     /// Boot-time hint: instead of letting the helper create a fresh ACP
     /// session via `session/new`, immediately resume the given session id
     /// via `session/load`. Used by the "Enter on Historical/Ended row in
-    /// F2 session manager" path: C++ spawns a new helper for the new
+    /// session manager" path: C++ spawns a new helper for the new
     /// agent pane and bundles the resume request via these flags so the
     /// resume is atomic — no separate `load_session` VT broadcast that
     /// could race the helper's pipe-attach.
@@ -477,7 +477,7 @@ enum SessionsAction {
         /// Restrict the list to a session origin. `all` (default) shows
         /// every row — that matches the historical debug behavior.
         /// `shell` shows only user-started shell-pane sessions (the
-        /// MVP F2 default). `agent-pane` shows only sessions that
+        /// MVP sessions default). `agent-pane` shows only sessions that
         /// WTA spawned for an Intelligent Terminal agent pane.
         #[arg(long, value_enum, default_value_t = SessionsOriginArg::All)]
         origin: SessionsOriginArg,
@@ -490,9 +490,9 @@ enum SessionsAction {
 /// crate with clap as a dependency.
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 enum SessionsOriginArg {
-    /// Shell-pane sessions only (Class B). Matches the MVP F2 picker.
+    /// Shell-pane sessions only (Class B). Matches the MVP sessions picker.
     Shell,
-    /// Agent-pane sessions only (Class A). Hidden from the MVP F2
+    /// Agent-pane sessions only (Class A). Hidden from the MVP sessions
     /// picker; surfaced here for debugging.
     AgentPane,
     /// Every row in the registry — historical debug default.
@@ -1114,8 +1114,8 @@ async fn run_sessions_list(
     // Origin filter is applied client-side: master always returns the
     // full registry so this command can act as the debug eye-of-god
     // view (default `--origin all`). `--origin shell` matches what
-    // the MVP F2 picker shows; `--origin agent-pane` surfaces the
-    // rows MVP F2 hides.
+    // the MVP sessions picker shows; `--origin agent-pane` surfaces the
+    // rows MVP sessions hides.
     let filtered: Vec<session_registry::SessionInfo> = sessions
         .into_iter()
         .filter(|s| origin_filter.matches_opt(s.origin.as_ref()))
@@ -2429,7 +2429,7 @@ async fn run_acp_app(
             drop(initial_load_tx);
 
             // Apply --initial-view: if `sessions`, jump straight into the
-            // Agents view (mirrors the F2 Chat→Agents toggle). Wired to
+            // agent session view (mirrors the Chat→Agents toggle). Wired to
             // WT's Ctrl+Shift+/ binding via `--initial-view sessions` on
             // the wta cmdline. Must run after set_agent_event_tx so that
             // ensure_history_loaded()'s event_tx clone is populated —
@@ -2439,7 +2439,7 @@ async fn run_acp_app(
             // Skip in setup mode: --setup takes the FRE path and the user
             // shouldn't be dropped into an empty session list.
             if cli.setup.is_none() && cli.initial_view == InitialView::Sessions {
-                tracing::info!(target: "initial_view", "starting in Agents view");
+                tracing::info!(target: "initial_view", "starting in agent session view");
                 let tab_id = app_state
                     .tab_id
                     .clone()
@@ -2468,14 +2468,14 @@ async fn run_acp_app(
             // NOTE: historical agent sessions used to be loaded here via
             // `history_loader::load_all()` (later as a `spawn_blocking`).
             // That work is now deferred — the registry is scanned lazily
-            // on the first F2 press via `App::ensure_history_loaded()`.
+            // on the first Ctrl+Shift+/ press via `App::ensure_history_loaded()`.
             //
             // Why: load_all() is hundreds of file opens (one per Copilot
             // session-state dir, reading events.jsonl for the autofix
             // fingerprint). On a populated machine it's ~10s of disk I/O.
             // Every wta spawn — including every model switch in the agent
             // pane — paid that cost, even though the data is only ever
-            // consumed by the Agents view. Lazy-loading on F2 keeps the
+            // consumed by the agent session view. Lazy-loading on Ctrl+Shift+/ keeps the
             // model-switch path free of this overhead entirely.
 
             // Enter setup mode if --setup <reason> was passed.
@@ -2517,11 +2517,11 @@ async fn run_acp_app(
             app_state.set_event_tx(event_tx.clone());
 
             // Kick the historical-session scan immediately on agent-pane
-            // startup so the F2 sessions view is populated by the time the
+            // startup so the sessions view is populated by the time the
             // user opens it. The scan runs on a `spawn_blocking` thread and
             // posts `HistoricalSessionsLoaded` back, so it never blocks the
             // LocalSet or the first frame. Subsequent `ensure_history_loaded`
-            // calls (from F2 / `/sessions`) short-circuit on `Loading`/`Loaded`.
+            // calls (from `/sessions`) short-circuit on `Loading`/`Loaded`.
             //
             // Only the ACP TUI path reaches here — `wta delegate`, `wta mcp`,
             // and CLI subcommands never construct an App that wires
@@ -2689,8 +2689,8 @@ mod cli_tests {
             Some(Command::Sessions { action: SessionsAction::List { master, origin } }) => {
                 assert_eq!(master.as_deref(), Some(r"\\.\pipe\wta-master-test"));
                 // Default keeps the historical debug behavior — show
-                // every origin. MVP F2 picker has its own default in
-                // `app::resolve_f2_origin_filter`; this CLI default is
+                // every origin. MVP sessions picker has its own default in
+                // `app::resolve_sessions_origin_filter`; this CLI default is
                 // intentionally divergent so `wta sessions list` is
                 // the "see everything" debug tool.
                 assert_eq!(origin, SessionsOriginArg::All);
