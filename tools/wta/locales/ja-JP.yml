@@ -7,10 +7,10 @@ setup.title.not_available: "エージェントを利用できません"
 setup.title.sign_in: "サインインが必要です"
 
 # %{agent} は実行時にエージェントの表示名に置換されます。
-setup.subtitle.copilot_missing: "エージェント \"%{agent}\" がインストールされていません。以下の手順に従ってインストールしてください。エージェントを切り替えるにはIntelligent Terminal Settings > Agent に移動してください。"
-setup.subtitle.agent_missing: "エージェント \"%{agent}\" がインストールされていません。手動で再インストールしてから再試行してください。エージェントを切り替えるにはIntelligent Terminal Settings > Agent に移動してください。"
-setup.subtitle.copilot_auth: "エージェント \"%{agent}\" には認証が必要です。以下の手順に従ってサインインしてください。エージェントを切り替えるにはIntelligent Terminal Settings > Agent に移動してください。"
-setup.subtitle.agent_auth: "エージェント \"%{agent}\" には認証が必要です。エージェントからサインインし、下の \"サインイン済み\" を選択してください。エージェントを切り替えるにはIntelligent Terminal Settings > Agent に移動してください。"
+setup.subtitle.copilot_missing: "エージェント \"%{agent}\" がインストールされていません。以下の手順に従ってインストールしてください。エージェントを切り替えるにはインテリジェント ターミナル Settings > Agent に移動してください。"
+setup.subtitle.agent_missing: "エージェント \"%{agent}\" がインストールされていません。手動で再インストールしてから再試行してください。エージェントを切り替えるにはインテリジェント ターミナル Settings > Agent に移動してください。"
+setup.subtitle.copilot_auth: "エージェント \"%{agent}\" には認証が必要です。以下の手順に従ってサインインしてください。エージェントを切り替えるにはインテリジェント ターミナル Settings > Agent に移動してください。"
+setup.subtitle.agent_auth: "エージェント \"%{agent}\" には認証が必要です。エージェントからサインインし、下の \"サインイン済み\" を選択してください。エージェントを切り替えるにはインテリジェント ターミナル Settings > Agent に移動してください。"
 setup.description.fre_line1: "インテリジェント ターミナルで使用する既定のエージェントを選択してください。"
 setup.description.fre_line2: "設定に移動してワークスペースを構成およびセットアップできます。"
 
