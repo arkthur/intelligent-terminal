@@ -66,7 +66,8 @@ namespace winrt::TerminalApp::implementation
         static winrt::Windows::Foundation::IAsyncOperation<bool> _WingetInstallAsync(winrt::hstring packageId);
 
         // Run wta.exe hooks install on a background thread.
-        static winrt::Windows::Foundation::IAsyncAction _InstallHooksAsync(winrt::hstring agentId);
+        // Returns true on success.
+        static winrt::Windows::Foundation::IAsyncOperation<bool> _InstallHooksAsync(winrt::hstring agentId);
 
 
         // Perform the full save + install flow asynchronously.

@@ -348,7 +348,7 @@ namespace winrt::TerminalApp::implementation
 
     // ── Hooks install helper ────────────────────────────────────────────
 
-    IAsyncAction FreOverlay::_InstallHooksAsync(winrt::hstring agentId)
+    IAsyncOperation<bool> FreOverlay::_InstallHooksAsync(winrt::hstring agentId)
     {
         auto id = std::wstring{ agentId };
 
@@ -361,8 +361,8 @@ namespace winrt::TerminalApp::implementation
         // are discoverable by the hooks installer.
         auto envBlock = Wta::BuildExtendedPathEnvBlock();
         auto args = L"hooks install --cli " + id;
-        Wta::RunWtaAndWait(wtaPath, args, 60'000,
-                           envBlock.empty() ? nullptr : envBlock.data());
+        co_return Wta::RunWtaAndWait(wtaPath, args, 60'000,
+                                     envBlock.empty() ? nullptr : envBlock.data());
     }
 
     // ── Save + install flow ─────────────────────────────────────────────
@@ -436,25 +436,29 @@ namespace winrt::TerminalApp::implementation
             }
         }
 
-        // 4. Install hooks (non-blocking — agent works without hooks)
-        //    Skip if AllowAgentSessionHooks GPO blocks it.
+        // 4+5. Install hooks and shell integration. Run both, then
+        // report any failures together so the user only needs one retry.
+        bool hooksFailed = false;
+        bool shellIntegFailed = false;
+
+        // 4. Hooks — skip if GPO blocks it.
         if (SessionManagementToggle().IsOn() &&
             !_settings.GlobalSettings().IsAgentSessionHooksPolicyLocked())
         {
             auto self = weak.get();
             if (!self) co_return;
 
-            if (SessionManagementToggle().IsOn())
+            bool hooksOk = co_await _InstallHooksAsync(agentId);
+            self = weak.get();
+            if (!self) co_return;
+
+            if (!hooksOk)
             {
-                co_await _InstallHooksAsync(agentId);
+                hooksFailed = true;
             }
         }
 
-        // 5. Install shell integration only when error detection is enabled.
-        // Detection is driven by the OSC 133 marks emitted by shell
-        // integration; with detection off we honour "don't access my shell"
-        // and skip the install entirely. (The suggestion toggle is a
-        // strict subset — it can't be on unless detection is on.)
+        // 5. Shell integration — only when error detection is enabled.
         if (AutoDetectToggle().IsOn())
         {
             auto self = weak.get();
@@ -462,8 +466,54 @@ namespace winrt::TerminalApp::implementation
 
             co_await winrt::resume_background();
             namespace SI = ::Microsoft::Terminal::ShellIntegration;
-            SI::InstallForTarget(SI::Target::Pwsh);
-            SI::InstallForTarget(SI::Target::WindowsPowerShell);
+            const auto pwshResult = SI::InstallForTarget(SI::Target::Pwsh);
+            const auto wpshResult = SI::InstallForTarget(SI::Target::WindowsPowerShell);
+
+            if (!pwshResult.success && !wpshResult.success)
+            {
+                shellIntegFailed = true;
+            }
+        }
+
+        // Handle failures: turn off affected toggles, show combined error.
+        if (hooksFailed || shellIntegFailed)
+        {
+            co_await winrt::resume_foreground(Dispatcher());
+            auto self = weak.get();
+            if (!self) co_return;
+
+            if (hooksFailed)
+            {
+                SessionManagementToggle().IsOn(false);
+            }
+            if (shellIntegFailed)
+            {
+                AutoDetectToggle().IsOn(false);
+                _UpdateSuggestionEnabledState();
+                if (_settings)
+                {
+                    _settings.GlobalSettings().AutoErrorDetectionEnabled(false);
+                    _settings.GlobalSettings().AutoFixEnabled(false);
+                }
+            }
+
+            // Show appropriate error message
+            if (hooksFailed && shellIntegFailed)
+            {
+                ErrorText().Text(RS_(L"FreOverlay_InstallErrorBoth"));
+            }
+            else if (hooksFailed)
+            {
+                ErrorText().Text(RS_(L"FreOverlay_InstallErrorHooks"));
+            }
+            else
+            {
+                ErrorText().Text(RS_(L"FreOverlay_InstallErrorShellIntegration"));
+            }
+            ErrorText().Visibility(Visibility::Visible);
+            SaveButton().Content(winrt::box_value(RS_(L"FreOverlay_SaveButton/Content")));
+            SaveButton().IsEnabled(true);
+            co_return;
         }
 
         // 6. Resume UI thread before touching controls / raising events
