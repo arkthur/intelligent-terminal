@@ -769,6 +769,27 @@ pub trait SessionRegistry: Send + Sync {
     /// Returns Some((flipped, current_status_label)) where `flipped` is true
     /// only when the row was Historical and was transitioned this call.
     async fn mark_resume_dispatched(&self, sid: &acp::SessionId) -> Option<(bool, String)>;
+
+    /// Atomically replace `title` for `sid` only if the current title is
+    /// "synthetic" (`None`, empty, or equal to the cwd basename). Returns
+    /// `true` iff the title was actually changed. The candidate must be
+    /// non-empty.
+    ///
+    /// Mirrors the helper-side `AgentSessionRegistry::upgrade_title_if_synthetic`
+    /// (see `agent_sessions.rs`). Master needs the same surface so it can
+    /// upgrade titles from disk after a `session_hook` ExtRequest applies an
+    /// event — without it, F2 (which renders master's snapshot) keeps showing
+    /// the synthetic cwd-basename title even after the CLI writes the real
+    /// chat title to disk.
+    ///
+    /// The check + mutate happen under one lock so a concurrent `apply_event`
+    /// or `upsert` can't race the disk-read-and-write that an alternative
+    /// `lookup → mutate clone → upsert` flow would produce.
+    async fn upgrade_title_if_synthetic(
+        &self,
+        sid: &acp::SessionId,
+        candidate: &str,
+    ) -> bool;
 }
 
 /// Production implementation. Uses `tokio::sync::Mutex` for parity with the
@@ -848,6 +869,37 @@ impl SessionRegistry for InMemoryRegistry {
         } else {
             Some((false, current_label))
         }
+    }
+
+    async fn upgrade_title_if_synthetic(
+        &self,
+        sid: &acp::SessionId,
+        candidate: &str,
+    ) -> bool {
+        if candidate.is_empty() {
+            return false;
+        }
+        let mut guard = self.inner.lock().await;
+        let Some(entry) = guard.sessions.get_mut(sid) else {
+            return false;
+        };
+        let cwd_leaf = entry
+            .cwd
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        let is_synthetic = match entry.title.as_deref() {
+            None | Some("") => true,
+            Some(t) => t == cwd_leaf,
+        };
+        if !is_synthetic {
+            return false;
+        }
+        if entry.title.as_deref() == Some(candidate) {
+            return false;
+        }
+        entry.title = Some(candidate.to_string());
+        true
     }
 }
 
@@ -1385,6 +1437,135 @@ mod tests {
         apply_snapshot(&reg, &loaded, items.clone()).await;
         apply_snapshot(&reg, &loaded, items).await;
         assert_eq!(reg.snapshot().await.len(), 2, "second apply matches first");
+    }
+
+    // ── upgrade_title_if_synthetic ──────────────────────────────────
+
+    fn info_with(id: &str, cwd: &str, title: Option<&str>) -> SessionInfo {
+        let mut s = SessionInfo::new(acp::SessionId::new(id.to_string()), PathBuf::from(cwd));
+        s.title = title.map(str::to_owned);
+        s
+    }
+
+    #[tokio::test]
+    async fn upgrade_title_replaces_none_title() {
+        let reg = InMemoryRegistry::new();
+        reg.upsert(info_with("s1", "/repo/proj", None)).await;
+        let sid = acp::SessionId::new("s1".to_string());
+        assert!(reg.upgrade_title_if_synthetic(&sid, "Real Title").await);
+        assert_eq!(
+            reg.lookup(&sid).await.unwrap().title.as_deref(),
+            Some("Real Title")
+        );
+    }
+
+    #[tokio::test]
+    async fn upgrade_title_replaces_empty_title() {
+        let reg = InMemoryRegistry::new();
+        reg.upsert(info_with("s1", "/repo/proj", Some(""))).await;
+        let sid = acp::SessionId::new("s1".to_string());
+        assert!(reg.upgrade_title_if_synthetic(&sid, "Real Title").await);
+        assert_eq!(
+            reg.lookup(&sid).await.unwrap().title.as_deref(),
+            Some("Real Title")
+        );
+    }
+
+    #[tokio::test]
+    async fn upgrade_title_replaces_cwd_basename_title() {
+        // The exact bug from the helper logs: cwd=C:\Users\<user>,
+        // title="<user>" (cwd basename). Helper-local upgrade ran but
+        // never reached master; master keeps "<user>" forever. This
+        // method is the atomic primitive that lets handle_session_hook
+        // upgrade master's row when it observes the same condition.
+        let reg = InMemoryRegistry::new();
+        reg.upsert(info_with("s1", "C:\\Users\\alice", Some("alice")))
+            .await;
+        let sid = acp::SessionId::new("s1".to_string());
+        assert!(
+            reg.upgrade_title_if_synthetic(&sid, "No Coding Task Identified")
+                .await
+        );
+        assert_eq!(
+            reg.lookup(&sid).await.unwrap().title.as_deref(),
+            Some("No Coding Task Identified")
+        );
+    }
+
+    #[tokio::test]
+    async fn upgrade_title_leaves_real_title_untouched() {
+        let reg = InMemoryRegistry::new();
+        reg.upsert(info_with("s1", "/repo/proj", Some("Real Existing Title")))
+            .await;
+        let sid = acp::SessionId::new("s1".to_string());
+        // "proj" (cwd basename) ≠ "Real Existing Title", so the row is
+        // NOT synthetic — even an attempted upgrade must not clobber it.
+        assert!(
+            !reg.upgrade_title_if_synthetic(&sid, "Different Title").await
+        );
+        assert_eq!(
+            reg.lookup(&sid).await.unwrap().title.as_deref(),
+            Some("Real Existing Title")
+        );
+    }
+
+    #[tokio::test]
+    async fn upgrade_title_rejects_empty_candidate() {
+        let reg = InMemoryRegistry::new();
+        reg.upsert(info_with("s1", "/repo/proj", None)).await;
+        let sid = acp::SessionId::new("s1".to_string());
+        assert!(!reg.upgrade_title_if_synthetic(&sid, "").await);
+        assert!(reg.lookup(&sid).await.unwrap().title.is_none());
+    }
+
+    #[tokio::test]
+    async fn upgrade_title_idempotent_when_candidate_matches_existing() {
+        let reg = InMemoryRegistry::new();
+        reg.upsert(info_with("s1", "/repo/proj", Some("Same"))).await;
+        let sid = acp::SessionId::new("s1".to_string());
+        // Same != "proj" basename, so the row isn't synthetic — and
+        // even if it were, returning false on no-op keeps the
+        // broadcast budget low.
+        assert!(!reg.upgrade_title_if_synthetic(&sid, "Same").await);
+    }
+
+    #[tokio::test]
+    async fn upgrade_title_returns_false_for_missing_session() {
+        let reg = InMemoryRegistry::new();
+        let sid = acp::SessionId::new("nope".to_string());
+        assert!(!reg.upgrade_title_if_synthetic(&sid, "Real Title").await);
+    }
+
+    #[tokio::test]
+    async fn upgrade_title_preserves_other_fields() {
+        // Regression guard for the rubber-duck concern: a naïve
+        // lookup → clone → mutate title → upsert flow would clobber
+        // status / pane_session_id / current_tool / last_activity_at
+        // if another writer raced between lookup and upsert. The
+        // atomic method must touch *only* `title`.
+        let reg = InMemoryRegistry::new();
+        let mut row = info_with("s1", "C:\\Users\\alice", Some("alice"));
+        row.pane_session_id = Some("pane-abc".to_string());
+        row.status = Some(AgentStatus::Working);
+        row.cli_source = Some(CliSource::Copilot);
+        row.current_tool = Some("write".to_string());
+        row.last_activity_at_ms = Some(123_456_789);
+        row.origin = Some(SessionOrigin::Unknown);
+        reg.upsert(row.clone()).await;
+
+        let sid = acp::SessionId::new("s1".to_string());
+        assert!(reg.upgrade_title_if_synthetic(&sid, "Real Title").await);
+
+        let found = reg.lookup(&sid).await.unwrap();
+        assert_eq!(found.title.as_deref(), Some("Real Title"));
+        // Everything else is preserved.
+        assert_eq!(found.pane_session_id.as_deref(), Some("pane-abc"));
+        assert_eq!(found.status, Some(AgentStatus::Working));
+        assert_eq!(found.cli_source, Some(CliSource::Copilot));
+        assert_eq!(found.current_tool.as_deref(), Some("write"));
+        assert_eq!(found.last_activity_at_ms, Some(123_456_789));
+        assert_eq!(found.origin, Some(SessionOrigin::Unknown));
+        assert_eq!(found.cwd, PathBuf::from("C:\\Users\\alice"));
     }
 
     // ── _meta.wta extract / inject ──────────────────────────────────

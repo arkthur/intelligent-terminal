@@ -1824,6 +1824,17 @@ async fn handle_sessions_list(
 /// (added in Task A), and broadcasts `sessions/changed` to every connected
 /// helper when the reducer actually mutated state. Idempotent / no-op events
 /// (reducer returned `false`) skip the broadcast to avoid push storms.
+///
+/// Title-from-disk refresh: after the reducer applies, we re-check master's
+/// row for a "synthetic" title (cwd basename / empty) and try to upgrade it
+/// by reading the CLI's on-disk session artefacts (Copilot's `workspace.yaml
+/// summary:`/`name:`, Claude/Gemini's first user prompt). The helper already
+/// runs the equivalent refresh against its *local* registry, but F2 renders
+/// from master's snapshot — without this refresh master never sees the
+/// upgraded title and the row keeps showing the cwd basename forever for
+/// shell-pane CLI sessions whose first hook arrives before the CLI has
+/// written the chat title to disk (e.g. Copilot's UserPromptSubmit fires
+/// before its LLM-generated `name:` is written).
 async fn handle_session_hook(
     state: &MasterStateInner,
     params: &serde_json::value::RawValue,
@@ -1843,8 +1854,23 @@ async fn handle_session_hook(
         "received helper session hook"
     );
 
+    // Capture the session key BEFORE moving `event` into the reducer so
+    // we can dispatch the post-apply title refresh against the right
+    // row. Pane-keyed variants (PaneClosed, ConnectionFailed) don't
+    // carry a session key — they only transition the row to Ended /
+    // Error, where the title is whatever it already was, so skipping
+    // the refresh is fine.
+    let refresh_key = session_event_key(&event).map(str::to_owned);
+
     let applied = state.registry.apply_event(event).await;
-    if applied {
+
+    let title_upgraded = if let Some(key) = refresh_key {
+        try_refresh_title_from_disk(&state.registry, &acp::SessionId::new(key)).await
+    } else {
+        false
+    };
+
+    if applied || title_upgraded {
         broadcast_ext_to_helpers(
             state,
             crate::session_registry::build_sessions_changed_notification(),
@@ -1853,6 +1879,102 @@ async fn handle_session_hook(
     }
 
     Ok(crate::session_registry::build_session_hook_response(applied))
+}
+
+/// Extract the session key from event variants that carry one. Returns
+/// `None` for pane-only variants (PaneClosed, ConnectionFailed) — those
+/// don't have a stable session id without a reverse lookup, and they
+/// transition the row to a terminal state where the title doesn't need
+/// refreshing anyway.
+fn session_event_key(event: &crate::agent_sessions::SessionEvent) -> Option<&str> {
+    use crate::agent_sessions::SessionEvent;
+    match event {
+        SessionEvent::SessionStarted { key, .. }
+        | SessionEvent::ToolStarting { key, .. }
+        | SessionEvent::ToolCompleted { key }
+        | SessionEvent::Notification { key, .. }
+        | SessionEvent::SessionStopped { key, .. }
+        | SessionEvent::ResumeDispatched { key }
+        | SessionEvent::ResumePaneAssigned { key, .. } => Some(key.as_str()),
+        SessionEvent::PaneClosed { .. } | SessionEvent::ConnectionFailed { .. } => None,
+    }
+}
+
+/// If the row for `sid` has a synthetic title (None / empty / cwd
+/// basename) and we can resolve a richer title from the CLI's on-disk
+/// session artefacts, atomically upgrade the row's title. Returns
+/// `true` iff the title actually changed.
+///
+/// Reads workspace.yaml / JSONL outside the registry lock; commits via
+/// the atomic `upgrade_title_if_synthetic` registry method so a
+/// concurrent `apply_event` can't lose status / pane_session_id from a
+/// full-row upsert with a stale clone (which is what naïve
+/// lookup→clone→mutate→upsert would do here).
+async fn try_refresh_title_from_disk(
+    registry: &std::sync::Arc<dyn crate::session_registry::SessionRegistry>,
+    sid: &acp::SessionId,
+) -> bool {
+    try_refresh_title_from_disk_with(registry, sid, |cli, key| {
+        crate::history_loader::lookup_title_for_session(cli, key)
+    })
+    .await
+}
+
+/// Testable inner of [`try_refresh_title_from_disk`]: the disk lookup
+/// is injected as a closure so tests can avoid mutating `USERPROFILE`
+/// or staging files. Production code uses the wrapper above which
+/// pins the closure to `history_loader::lookup_title_for_session`.
+async fn try_refresh_title_from_disk_with<F>(
+    registry: &std::sync::Arc<dyn crate::session_registry::SessionRegistry>,
+    sid: &acp::SessionId,
+    lookup: F,
+) -> bool
+where
+    F: FnOnce(crate::agent_sessions::CliSource, &str) -> Option<String>,
+{
+    let Some(info) = registry.lookup(sid).await else {
+        return false;
+    };
+    // Skip the disk read when the title is already a real one (not
+    // empty / None / equal to the cwd basename). Avoids hammering
+    // workspace.yaml / JSONL on every hook event for sessions that are
+    // already labelled.
+    let cwd_leaf = info
+        .cwd
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    let is_synthetic = match info.title.as_deref() {
+        None | Some("") => true,
+        Some(t) => t == cwd_leaf,
+    };
+    if !is_synthetic {
+        return false;
+    }
+    // cli_source is needed to dispatch the right per-CLI on-disk
+    // scanner; rows that landed in master without one (legacy /
+    // partially-populated history seeds) can't be refreshed.
+    let Some(cli) = info.cli_source.clone() else {
+        return false;
+    };
+    let Some(disk_title) = lookup(cli, &info.session_id.0) else {
+        return false;
+    };
+    if disk_title.is_empty() {
+        return false;
+    }
+    let upgraded = registry
+        .upgrade_title_if_synthetic(sid, &disk_title)
+        .await;
+    if upgraded {
+        tracing::info!(
+            target: "session_hook",
+            session_id = %sid.0,
+            new_title = %disk_title,
+            "upgraded synthetic title from on-disk session artefacts",
+        );
+    }
+    upgraded
 }
 
 /// Pure async handler for the `intellterm.wta/focus_session` ExtRequest.
@@ -3082,5 +3204,200 @@ mod tests {
             crate::session_registry::INTELLTERM_METHOD_SESSIONS_CHANGED
         );
         assert_eq!(notification.params.get(), "{}");
+    }
+
+    // ── try_refresh_title_from_disk_with ────────────────────────────
+
+    #[tokio::test]
+    async fn try_refresh_title_upgrades_synthetic_cwd_basename_title() {
+        // Repro of the production bug: shell-pane Copilot first hook arrives
+        // with title = cwd basename ("alice" for cwd C:\Users\alice). Later,
+        // the on-disk workspace.yaml has the real `name:` field, but the
+        // helper-local upgrade never reaches master. This is the master-side
+        // upgrade path.
+        let state = make_state();
+        let event = crate::agent_sessions::SessionEvent::SessionStarted {
+            key: "sid-y".to_string(),
+            cli_source: crate::agent_sessions::CliSource::Copilot,
+            pane_session_id: "pane-y".to_string(),
+            cwd: std::path::PathBuf::from("C:\\Users\\alice"),
+            title: "alice".to_string(),
+        };
+        state.registry.apply_event(event).await;
+
+        let sid = acp::SessionId::new("sid-y".to_string());
+        let upgraded = try_refresh_title_from_disk_with(&state.registry, &sid, |cli, key| {
+            assert_eq!(cli, crate::agent_sessions::CliSource::Copilot);
+            assert_eq!(key, "sid-y");
+            Some("No Coding Task Identified".to_string())
+        })
+        .await;
+        assert!(upgraded, "title should be upgraded from synthetic basename");
+        assert_eq!(
+            state.registry.lookup(&sid).await.unwrap().title.as_deref(),
+            Some("No Coding Task Identified")
+        );
+    }
+
+    #[tokio::test]
+    async fn try_refresh_title_skips_when_title_is_real() {
+        let state = make_state();
+        let event = crate::agent_sessions::SessionEvent::SessionStarted {
+            key: "sid-real".to_string(),
+            cli_source: crate::agent_sessions::CliSource::Copilot,
+            pane_session_id: "pane-real".to_string(),
+            cwd: std::path::PathBuf::from("/repo/proj"),
+            // "Some Real Title" ≠ "proj" → not synthetic. Lookup must not run.
+            title: "Some Real Title".to_string(),
+        };
+        state.registry.apply_event(event).await;
+
+        let sid = acp::SessionId::new("sid-real".to_string());
+        let lookup_called = std::cell::Cell::new(false);
+        let upgraded = try_refresh_title_from_disk_with(&state.registry, &sid, |_, _| {
+            lookup_called.set(true);
+            Some("would-be-overwrite".to_string())
+        })
+        .await;
+        assert!(!upgraded);
+        assert!(
+            !lookup_called.get(),
+            "disk lookup must be skipped when title is already real"
+        );
+        assert_eq!(
+            state.registry.lookup(&sid).await.unwrap().title.as_deref(),
+            Some("Some Real Title")
+        );
+    }
+
+    #[tokio::test]
+    async fn try_refresh_title_skips_when_cli_source_missing() {
+        // Rows without a cli_source (legacy / partial seeds) can't be
+        // dispatched to a per-CLI on-disk scanner; refresh must be a
+        // no-op rather than trying to guess.
+        let state = make_state();
+        let mut info = crate::session_registry::SessionInfo::new(
+            acp::SessionId::new("sid-bare".to_string()),
+            std::path::PathBuf::from("/x/proj"),
+        );
+        info.title = Some("proj".to_string()); // synthetic
+        // info.cli_source intentionally left as None
+        state.registry.upsert(info).await;
+
+        let sid = acp::SessionId::new("sid-bare".to_string());
+        let upgraded = try_refresh_title_from_disk_with(&state.registry, &sid, |_, _| {
+            panic!("lookup must not be invoked without cli_source");
+        })
+        .await;
+        assert!(!upgraded);
+    }
+
+    #[tokio::test]
+    async fn try_refresh_title_skips_when_lookup_returns_none_or_empty() {
+        let state = make_state();
+        let event = crate::agent_sessions::SessionEvent::SessionStarted {
+            key: "sid-none".to_string(),
+            cli_source: crate::agent_sessions::CliSource::Copilot,
+            pane_session_id: "pane-none".to_string(),
+            cwd: std::path::PathBuf::from("/x/proj"),
+            title: "proj".to_string(),
+        };
+        state.registry.apply_event(event).await;
+        let sid = acp::SessionId::new("sid-none".to_string());
+
+        // Disk lookup returns None (e.g. workspace.yaml `name:` not yet
+        // written by Copilot at the moment this hook arrives).
+        let upgraded = try_refresh_title_from_disk_with(&state.registry, &sid, |_, _| None).await;
+        assert!(!upgraded);
+        assert_eq!(
+            state.registry.lookup(&sid).await.unwrap().title.as_deref(),
+            Some("proj"),
+            "title must stay synthetic when no disk title is available"
+        );
+
+        // Disk lookup returns empty string — treat as None.
+        let upgraded = try_refresh_title_from_disk_with(&state.registry, &sid, |_, _| {
+            Some(String::new())
+        })
+        .await;
+        assert!(!upgraded);
+    }
+
+    #[tokio::test]
+    async fn try_refresh_title_returns_false_for_missing_session() {
+        let state = make_state();
+        let sid = acp::SessionId::new("nope".to_string());
+        let upgraded = try_refresh_title_from_disk_with(&state.registry, &sid, |_, _| {
+            panic!("lookup must not run for missing session");
+        })
+        .await;
+        assert!(!upgraded);
+    }
+
+    #[test]
+    fn session_event_key_returns_key_for_keyed_variants() {
+        use crate::agent_sessions::{CliSource, SessionEvent};
+        let cases: Vec<(SessionEvent, Option<&str>)> = vec![
+            (
+                SessionEvent::SessionStarted {
+                    key: "k1".into(),
+                    cli_source: CliSource::Copilot,
+                    pane_session_id: "p".into(),
+                    cwd: std::path::PathBuf::new(),
+                    title: String::new(),
+                },
+                Some("k1"),
+            ),
+            (
+                SessionEvent::ToolStarting {
+                    key: "k2".into(),
+                    tool_name: "t".into(),
+                },
+                Some("k2"),
+            ),
+            (SessionEvent::ToolCompleted { key: "k3".into() }, Some("k3")),
+            (
+                SessionEvent::Notification {
+                    key: "k4".into(),
+                    message: "m".into(),
+                },
+                Some("k4"),
+            ),
+            (
+                SessionEvent::SessionStopped {
+                    key: "k5".into(),
+                    reason: "r".into(),
+                },
+                Some("k5"),
+            ),
+            (
+                SessionEvent::ResumeDispatched { key: "k6".into() },
+                Some("k6"),
+            ),
+            (
+                SessionEvent::ResumePaneAssigned {
+                    key: "k7".into(),
+                    pane_session_id: "p".into(),
+                },
+                Some("k7"),
+            ),
+            // Pane-only variants: no session key → refresh skipped.
+            (
+                SessionEvent::PaneClosed {
+                    pane_session_id: "p".into(),
+                },
+                None,
+            ),
+            (
+                SessionEvent::ConnectionFailed {
+                    pane_session_id: "p".into(),
+                    reason: "r".into(),
+                },
+                None,
+            ),
+        ];
+        for (event, expected) in cases {
+            assert_eq!(session_event_key(&event), expected, "event={event:?}");
+        }
     }
 }
