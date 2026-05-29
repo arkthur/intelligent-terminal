@@ -153,10 +153,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>İndi nəyi qurmaq istədiyinizi seçin. Bunları istənilən vaxt </value>
+    <value>İndi nəyi qurmaq istədiyinizi seçin. Bunları istənilən vaxt dəyişə bilərsiniz. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Parametrlər</value>
+    <value>Verilənlərin necə istifadə edildiyini öyrənin</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Agent</value>
@@ -171,10 +171,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Uğursuz əmrlər üçün düzəlişləri avtomatik təklif et</value>
+    <value>Avtomatik səhv təklifi</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Aktiv edildikdə, AI agenti uğursuz əmrləri avtomatik təhlil edir və düzəliş təklif edir. Deaktiv edildikdə, uğursuz əmrlər status panelində klikləmək mümkün olan ipucu göstərir — düzəliş tələb etmək üçün Ctrl+Alt+. düyməsini basın və ya ipucunu klikləyin.</value>
+    <value>Intelligent Terminal-ə düzəlişləri avtomatik təklif etmək üçün səhvləri agentinizə göndərmək icazəsi verin.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -246,6 +246,14 @@
     <value>Xəta aşkarlandı: düzəltmək üçün {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Xətanı düzəltmək üçün {0} üzərinə klikləyin</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Xəta aşkar edildi. AI agentindən diaqnostika aparmasını və düzəliş təklif etməsini istəmək üçün {0} üzərinə klikləyin və ya basın.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Düzəliş hazırdır — tətbiq etmək üçün {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -281,5 +289,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Avtomatik səhv aşkarlanması</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Intelligent Terminal-ə qabığınıza daxil olmaq və səhvləri avtomatik aşkarlamaq icazəsi verin.</value>
   </data>
 </root>

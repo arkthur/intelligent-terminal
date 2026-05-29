@@ -154,10 +154,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>בחר מה להגדיר כעת. תוכל לשנות אלה בכל עת ב</value>
+    <value>בחר מה להגדיר כעת. ניתן לשנות הגדרות אלה בכל עת. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>הגדרות</value>
+    <value>למד כיצד נעשה שימוש בנתונים</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>סוכן</value>
@@ -172,10 +172,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>הצע אוטומטית תיקונים לפקודות שנכשלו</value>
+    <value>הצעת שגיאות אוטומטית</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>כאשר מופעל, סוכן הבינה המלאכותית מנתח אוטומטית פקודות שנכשלו ומציע תיקון. כאשר מושבת, פקודות שנכשלו מציגות רמז שניתן ללחוץ עליו בשורת המצב — הקש Ctrl+Alt+. או לחץ על הרמז כדי לבקש תיקון.</value>
+    <value>העניק ל-Intelligent Terminal הרשאה לשלוח שגיאות לסוכן שלך כדי להציע תיקונים באופן אוטומטי.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -247,6 +247,14 @@
     <value>זוהתה שגיאה: {0} לתיקון</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>לחץ על {0} כדי לתקן את השגיאה</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>זוהתה שגיאה. לחץ או הקש על {0} כדי לבקש מהסוכן של ה‑AI לאבחן ולהציע תיקון.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>התיקון מוכן — {0} להחלה</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -282,5 +290,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>זיהוי שגיאות אוטומטי</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>העניק ל-Intelligent Terminal הרשאה לגשת למעטפת שלך ולזהות שגיאות באופן אוטומטי.</value>
   </data>
 </root>

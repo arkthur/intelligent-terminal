@@ -150,10 +150,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Kies wat u nu wilt instellen. U kunt deze instellingen op elk moment wijzigen in </value>
+    <value>Kies wat u nu wilt instellen. U kunt deze instellingen op elk gewenst moment wijzigen. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Instellingen</value>
+    <value>Meer informatie over het gebruik van gegevens</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Agent</value>
@@ -167,10 +167,10 @@
     <comment>{Locked="Node.js","NPX"}</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Automatisch oplossingen voorstellen voor mislukte opdrachten</value>
+    <value>Automatische foutsuggestie</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Wanneer ingeschakeld, analyseert de AI-agent automatisch mislukte opdrachten en stelt een oplossing voor. Wanneer uitgeschakeld, tonen mislukte opdrachten een klikbare hint in de statusbalk — druk op Ctrl+Alt+. of klik op de hint om een oplossing aan te vragen.</value>
+    <value>Geef Intelligent Terminal toestemming om fouten naar uw agent te sturen om automatisch oplossingen voor te stellen.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -241,6 +241,14 @@
     <value>Fout gevonden: {0} om op te lossen</value>
     <comment>{0} = sneltoets.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Klik op {0} om de fout op te lossen</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Fout gedetecteerd. Klik of druk op {0} om de AI-agent te vragen de fout te analyseren en een oplossing voor te stellen.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Oplossing gereed — {0} om toe te passen</value>
     <comment>{0} = sneltoets.</comment>
@@ -276,5 +284,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>{Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Automatische foutdetectie</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Geef Intelligent Terminal toestemming om toegang te krijgen tot uw shell en automatisch fouten te detecteren.</value>
   </data>
 </root>

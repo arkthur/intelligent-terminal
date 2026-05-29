@@ -40,10 +40,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Επιλέξτε τι θα ρυθμίσετε τώρα. Μπορείτε να τα αλλάξετε ανά πάσα στιγμή στις </value>
+    <value>Επιλέξτε τι θέλετε να ρυθμίσετε τώρα. Μπορείτε να αλλάξετε αυτές τις ρυθμίσεις ανά πάσα στιγμή. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Ρυθμίσεις</value>
+    <value>Μάθετε πώς χρησιμοποιούνται τα δεδομένα</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Πράκτορας</value>
@@ -58,10 +58,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Αυτόματη πρόταση διορθώσεων για αποτυχημένες εντολές</value>
+    <value>Αυτόματη πρόταση σφαλμάτων</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Όταν είναι ενεργοποιημένο, ο πράκτορας τεχνητής νοημοσύνης αναλύει αυτόματα τις αποτυχημένες εντολές και προτείνει μια διόρθωση. Όταν είναι απενεργοποιημένο, οι αποτυχημένες εντολές εμφανίζουν μια υπόδειξη με δυνατότητα κλικ στη γραμμή κατάστασης — πατήστε Ctrl+Alt+. ή κάντε κλικ στην υπόδειξη για να ζητήσετε μια διόρθωση.</value>
+    <value>Επιτρέψτε στο Intelligent Terminal να στέλνει σφάλματα στον agent για αυτόματη πρόταση διορθώσεων.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -133,6 +133,14 @@
     <value>Εντοπίστηκε σφάλμα: {0} για διόρθωση</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Κάντε κλικ στο {0} για να διορθώσετε το σφάλμα</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Εντοπίστηκε σφάλμα. Κάντε κλικ ή πατήστε το {0} για να ζητήσετε από τον πράκτορα AI να το διαγνώσει και να προτείνει μια διόρθωση.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Η διόρθωση είναι έτοιμη — {0} για εφαρμογή</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -168,5 +176,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Αυτόματος εντοπισμός σφαλμάτων</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Επιτρέψτε στο Intelligent Terminal να αποκτήσει πρόσβαση στο κέλυφος και να εντοπίζει αυτόματα σφάλματα.</value>
   </data>
 </root>

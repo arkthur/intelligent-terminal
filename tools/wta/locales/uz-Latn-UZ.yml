@@ -45,6 +45,7 @@ auth.hint_footer: "  Tizimga kirish uchun Enter, orqaga qaytish uchun Esc bosing
 chat.activity_thinking: "Oʻylayapman…"
 # {Locked="Intelligent Terminal"} - product name, do not translate
 chat.welcome_title: "Intelligent Terminal-ga xush kelibsiz!"
+chat.welcome_disclaimer: "Intelligent Terminal AI-dan foydalanadi. Xatolarni tekshiring."
 chat.plan_header: "Reja:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -73,7 +74,7 @@ commands.help_close_hint: "  Esc        Bu yordamni yopish"  # {Locked="Esc"}
 commands.help.summary: "Bu buyruqlar roʻyxatini koʻrsat"
 commands.clear.summary: "Chat aylantirish tarixini tozalash (seansni saqlaydi)"
 commands.new.summary: "Yangi ACP seansini boshlash (tarixni oʻchiradi)"  # {Locked="ACP"}
-commands.restart.summary: "Qayta ulanish: agent jarayonini tugatib, qayta ishga tushirish"
+commands.restart.summary: "Agentni qayta ishga tushiring"
 commands.stop.summary: "Bajarilayotgan soʻrovni bekor qilish"
 commands.sessions.summary: "Tarixiy seanslar tanlagichini ochish (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
@@ -116,8 +117,8 @@ agent.custom.auth_hint: "%{name} oʻrnatilganligiga va PATH-da ekanligiga ishonc
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Yuklanmoqda..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ navigatsiya uchun • Enter yangi varaqda seansni ochish uchun • Shift+enter agent panelida seansni ochish uchun • Esc chiqish uchun)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ navigatsiya uchun • Enter seansni ochish uchun • Esc chiqish uchun)"
 agents.status.active: "Faol"
 agents.status.waiting_for_input: "Kiritish kutilmoqda"
 agents.status.error: "Xatolik"

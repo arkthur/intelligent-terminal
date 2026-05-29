@@ -153,10 +153,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Válassza ki, mit szeretne most beállítani. Ezeket bármikor módosíthatja a következő helyen: </value>
+    <value>Válassza ki, mit szeretne most beállítani. Ezeket a beállításokat bármikor módosíthatja. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Beállítások</value>
+    <value>Tudjon meg többet az adatok felhasználásáról</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Ügynök</value>
@@ -171,10 +171,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Javítások automatikus javaslata sikertelen parancsokhoz</value>
+    <value>Automatikus hibajavaslat</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Ha engedélyezve van, az AI ügynök automatikusan elemzi a sikertelen parancsokat, és javaslatot tesz egy javításra. Ha le van tiltva, a sikertelen parancsok kattintható tippet jelenítenek meg az állapotsorban — nyomja meg a Ctrl+Alt+. billentyűkombinációt, vagy kattintson a tippre a javítás kéréséhez.</value>
+    <value>Engedélyezze az Intelligent Terminal számára, hogy hibákat küldjön az ügynöknek a javítások automatikus javaslásához.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -246,6 +246,14 @@
     <value>Hiba észlelve: {0} a javításhoz</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Kattintson a(z) {0} elemre a hiba kijavításához</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Hiba észlelve. Kattintson vagy nyomja le a(z) {0} billentyűt, hogy az AI ügynök diagnosztizáljon és javasoljon egy javítást.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Javítás kész — {0} az alkalmazáshoz</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -281,5 +289,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Automatikus hibafelismerés</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Engedélyezze az Intelligent Terminal számára, hogy hozzáférjen a parancshéjhoz, és automatikusan felismerje a hibákat.</value>
   </data>
 </root>

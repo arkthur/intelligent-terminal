@@ -698,6 +698,14 @@
   </data><data name="AIAgents_PageSubtitle.Text" xml:space="preserve">
     <value>Подесите начин на који агенти раде у терминалу</value>
     <comment>Subtitle shown beneath the page title on the AI Agents settings page.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrefix" xml:space="preserve">
+    <value>Подесите начин на који агенти раде у терминалу.</value>
+    <comment>Subtitle shown beneath the page title on the AI Agents settings page. The hyperlink in AIAgents_PageSubtitlePrivacyLink follows this sentence inline; the trailing period belongs to this prefix.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrivacyLink" xml:space="preserve">
+    <value>Сазнајте како се подаци користе.</value>
+    <comment>Inline hyperlink text that follows the AI Agents page subtitle and navigates to the privacy policy page. Includes a trailing period.</comment>
   </data><data name="AIAgents_AcpGroupHeader.Text" xml:space="preserve">
     <value>Панел агента</value>
     <comment>Section header for the agent pane settings group.</comment>
@@ -2909,5 +2917,17 @@
   <data name="AIAgents_HooksInstallationFailedSummary" xml:space="preserve">
     <value>Инсталација Hooks није успела. Детаље потражите у %LOCALAPPDATA%\IntelligentTerminal\logs\wta-install-hooks.log.</value>
     <comment>Failure summary shown when installing agent session tracking hooks fails. {Locked="Hooks","%LOCALAPPDATA%","IntelligentTerminal","logs","wta-install-hooks.log"}</comment>
+  </data>
+  <data name="AIAgents_AutoErrorDetectionTitle.Text" xml:space="preserve">
+    <value>Аутоматско откривање грешака</value>
+  </data>
+  <data name="AIAgents_AutoErrorDetectionCaption.Text" xml:space="preserve">
+    <value>Дозволите да Intelligent Terminal приступи вашој командној линији и аутоматски открива грешке. Доступно у PowerShell и Windows PowerShell.</value>
+  </data>
+  <data name="AIAgents_AutoErrorSuggestionTitle.Text" xml:space="preserve">
+    <value>Аутоматски предлог исправки</value>
+  </data>
+  <data name="AIAgents_AutoErrorSuggestionCaption.Text" xml:space="preserve">
+    <value>Дозволите да Intelligent Terminal шаље грешке вашем агенту ради аутоматског предлагања исправки.</value>
   </data>
 </root>

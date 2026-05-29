@@ -996,10 +996,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Wählen Sie, was Sie jetzt einrichten möchten. Sie können diese Einstellungen jederzeit in den </value>
+    <value>Wählen Sie, was Sie jetzt einrichten möchten. Sie können diese Einstellungen jederzeit ändern. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Einstellungen</value>
+    <value>Erfahren Sie, wie Daten verwendet werden</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Agent</value>
@@ -1013,10 +1013,10 @@
     <comment>{Locked="Node.js","NPX"}</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Korrekturen für fehlgeschlagene Befehle automatisch vorschlagen</value>
+    <value>Automatischer Fehlervorschlag</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Wenn aktiviert, analysiert der KI-Agent fehlgeschlagene Befehle automatisch und schlägt eine Korrektur vor. Wenn deaktiviert, wird für fehlgeschlagene Befehle ein anklickbarer Hinweis in der Statusleiste angezeigt — drücken Sie Ctrl+Alt+. oder klicken Sie auf den Hinweis, um eine Korrektur anzufordern.</value>
+    <value>Erlauben Sie Intelligent Terminal, Fehler an Ihren Agent zu senden, um automatisch Korrekturen vorzuschlagen.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -1095,6 +1095,14 @@
     <value>Fehler erkannt: {0} zum Beheben</value>
     <comment>Kurze Statusbeschriftung, wenn eine Korrektur bereit ist. {0} ist das Tastenkürzel.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Klicken Sie auf {0}, um den Fehler zu beheben</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Fehler erkannt. Klicken oder drücken Sie {0}, um den KI-Agenten zu bitten, den Fehler zu diagnostizieren und eine Lösung vorzuschlagen.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Korrektur bereit — {0} zum Anwenden</value>
     <comment>Tooltip, wenn eine Korrektur bereit ist. {0} ist das Tastenkürzel.</comment>
@@ -1130,5 +1138,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>{Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Automatische Fehlererkennung</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Erlauben Sie Intelligent Terminal, auf Ihre Shell zuzugreifen und Fehler automatisch zu erkennen.</value>
   </data>
 </root>

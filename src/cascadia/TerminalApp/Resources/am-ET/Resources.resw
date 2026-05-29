@@ -40,10 +40,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>አሁን ሚያቄሁትን ይምረጡ። በማንኛውም ግዜ መቀየር ይችላሉ </value>
+    <value>አሁን ምን ማዋቀር እንደሚፈልጉ ይምረጡ። እነዚህን በማንኛውም ጊዜ መቀየር ይችላሉ። </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>ቅንብሮች</value>
+    <value>ውሂብ እንዴት ጥቅም ላይ እንደሚውል ይረዱ</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>ኤጅንት</value>
@@ -58,10 +58,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>ለተሳኩ ትዕዛዞች ጥገናዎችን በራስ-ሰር ይጠቁሙ</value>
+    <value>ራስ-ሰር የስህተት ጥቆማ</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>ሲነቃ፣ AI ወኪሉ የተሳኩ ትዕዛዞችን በራስ-ሰር ይተነትናል እና ጥገና ያቀርባል። ሲጠፋ፣ የተሳኩ ትዕዛዞች በሁኔታ አሞሌ ላይ ሊጫን የሚችል ፍንጭ ያሳያሉ — ጥገና ለመጠየቅ Ctrl+Alt+. ይጫኑ ወይም ፍንጩን ጠቅ ያድርጉ።</value>
+    <value>Intelligent Terminal እርማቶችን ራስ-ሰር ለመጠቆም ስህተቶችን ወደ ወኪልዎ እንዲልክ ይፍቀዱ።</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -133,6 +133,14 @@
     <value>ስህተት ተገኝቷል፦ ለማስተካከል {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>{0}ን ጠቅ ያድርጉ ስህተቱን ለማስተካከል</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>ስህተት ተገኝቷል። ለመመርመር እና መፍትሄ ለመጠቆም AI ወኪልን ለመጠየቅ {0}ን ጠቅ ያድርጉ ወይም ይጫኑ።</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>ማስተካከያ ዝግጁ ነው — ለመተግበር {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -168,5 +176,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>ራስ-ሰር የስህተት ማወቅ</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Intelligent Terminal ወደ ሼልዎ መድረስ እና ስህተቶችን ራስ-ሰር እንዲያውቅ ይፍቀዱ።</value>
   </data>
 </root>

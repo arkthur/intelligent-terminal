@@ -45,6 +45,7 @@ auth.hint_footer: "  Presiona Enter para iniciar sesión, Esc para regresar"  # 
 chat.activity_thinking: "Pensando…"
 # {Locked="Intelligent Terminal"} - nombre del producto, no traducir
 chat.welcome_title: "¡Bienvenido a Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal usa IA. Compruebe si hay errores."
 chat.plan_header: "Plan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -105,8 +106,8 @@ agent.custom.auth_hint: "Asegúrate de que %{name} esté instalado y en el PATH.
 
 # ── Vista de agentes (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Cargando..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - combinaciones de teclas, no traducir
-agents.footer_hint: "(↑ ↓ navegar • Enter iniciar sesión en nueva pestaña • Shift+enter iniciar sesión en el panel del agente • Esc salir)"
+# {Locked="Enter","Esc","↑","↓"} - combinaciones de teclas, no traducir
+agents.footer_hint: "(↑ ↓ navegar • Enter iniciar sesión • Esc salir)"
 agents.status.active: "Activo"
 agents.status.waiting_for_input: "Esperando entrada"
 agents.status.error: "Error"
@@ -177,6 +178,6 @@ time.days_other: "hace %{count} días"
 commands.help.summary: "Mostrar esta lista de comandos"
 commands.clear.summary: "Borrar el historial del chat (mantiene la sesión)"
 commands.new.summary: "Iniciar una nueva sesión de ACP (descarta el historial)"
-commands.restart.summary: "Reconectar: detener el proceso del agente y reiniciarlo"
+commands.restart.summary: "Reiniciar agente"
 commands.stop.summary: "Cancelar la petición en curso"
 commands.sessions.summary: "Abrir el selector de sesiones anteriores (Ctrl+Shift+/)"

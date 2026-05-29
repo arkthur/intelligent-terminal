@@ -30,6 +30,12 @@ D2D
 # Compiler flags
 \s-D(?=[A-Z])
 
+# tools/wta/build.rs: external Microsoft privacy-tag constants
+\bPDT_[A-Z][A-Za-z0-9_]*\b
+
+# tools/wta/build.rs: Rust stdlib char predicate
+\bis_ascii_hexdigit\b
+
 # Automatically suggested patterns
 
 # hit-count: 26 file-count: 12

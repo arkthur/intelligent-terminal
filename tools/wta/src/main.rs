@@ -22,6 +22,7 @@ mod runtime_paths;
 mod session_mgmt;
 mod session_registry;
 mod shell;
+mod telemetry;
 #[cfg(test)]
 mod test_support;
 mod theme;
@@ -545,6 +546,12 @@ async fn main() -> Result<()> {
         .or_else(|| sys_locale::get_locale())
         .unwrap_or_else(|| "en-US".to_string());
     rust_i18n::set_locale(&normalize_locale(&locale));
+
+    // Register the WTA ETW TraceLogging provider once per process.
+    // WTA registers under the SAME provider GUID as the C++ side
+    // (`Microsoft.Windows.Terminal.App` / `g_hTerminalAppProvider`) so
+    // listeners see a single merged event stream. See tools/wta/src/telemetry.rs.
+    telemetry::register();
 
     // Legacy flags first (backward compat)
     if cli.test_pipe {
@@ -2063,11 +2070,13 @@ async fn run_acp_app(
                 let shell_mgr_for_pipe = Arc::clone(&shell_mgr);
                 let acp_model = cli.acp_model.clone();
                 let owner_tab = cli.owner_tab_id.clone();
+                let initial_load_sid = cli.initial_load_session_id.clone();
                 tokio::task::spawn_local(async move {
                     if let Err(e) = protocol::acp::client::run_acp_client_over_pipe(
                         pipe_name,
                         acp_model,
                         owner_tab,
+                        initial_load_sid,
                         event_tx_for_pipe.clone(),
                         prompt_rx,
                         cancel_rx,
@@ -2137,7 +2146,7 @@ async fn run_acp_app(
             ));
 
             let autofix_enabled = !cli.no_autofix;
-            let mut app_state = app::App::new(prompt_tx, recommendation_tx, permission_tx, cancel_tx, new_session_tx, load_session_tx, drop_session_tx, rename_session_tx, restart_tx, master_ext_tx, debug_capture_enabled, wt_connected, autofix_enabled);
+            let mut app_state = app::App::new(prompt_tx, recommendation_tx, permission_tx, cancel_tx, new_session_tx, load_session_tx, drop_session_tx, rename_session_tx, restart_tx, master_ext_tx, debug_capture_enabled, wt_connected, autofix_enabled, Arc::clone(&shell_mgr));
             if let Some(session_hook_tx) = session_hook_tx_opt {
                 app_state.set_session_hook_tx(session_hook_tx);
             }

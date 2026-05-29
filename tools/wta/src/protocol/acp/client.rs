@@ -317,6 +317,13 @@ struct ActivePromptTiming {
     received_at_unix_s: Option<f64>,
     context_ready_at_unix_s: Option<f64>,
     prompt_sent_at_unix_s: Option<f64>,
+    /// Monotonic counterpart of `prompt_sent_at_unix_s`. Captured at the
+    /// same instant in `mark_prompt_sent()`. Used by ETW telemetry to
+    /// compute `first_token_latency_ms` / `total_duration_ms` so the
+    /// emitted durations are immune to wall-clock jumps (NTP, DST,
+    /// manual time adjustments) — `SystemTime` deltas could otherwise go
+    /// negative or skew aggregates.
+    prompt_sent_at_mono: Option<std::time::Instant>,
     first_stdin_write_at_unix_s: Option<f64>,
     bytes_written_after_prompt: u64,
     first_stdout_byte_at_unix_s: Option<f64>,
@@ -356,6 +363,7 @@ impl PromptTimingState {
                 received_at_unix_s: Some(now),
                 context_ready_at_unix_s: None,
                 prompt_sent_at_unix_s: None,
+                prompt_sent_at_mono: None,
                 first_stdin_write_at_unix_s: None,
                 bytes_written_after_prompt: 0,
                 first_stdout_byte_at_unix_s: None,
@@ -406,6 +414,7 @@ impl PromptTimingState {
         let mut guard = self.active.lock().unwrap();
         if let Some(active) = guard.get_mut(session_id) {
             active.prompt_sent_at_unix_s = Some(now);
+            active.prompt_sent_at_mono = Some(std::time::Instant::now());
             let turn_id = active.id;
             let submitted_at_unix_s = active.submitted_at_unix_s;
             let details = format!(
@@ -467,6 +476,13 @@ impl PromptTimingState {
     }
 
     fn observe_stdout_read(&self, bytes: usize) {
+        // NOTE: in the (rare) case of multiple concurrent prompts on the
+        // same Client (= same agent CLI subprocess), this attributes every
+        // stdout read to every in-flight prompt. ACP's transport doesn't
+        // split stdout per session, so per-session `bytes_read_after_prompt`
+        // becomes an upper bound rather than an exact count when prompts
+        // overlap. The `AgentResponseComplete.TotalResponseBytes`
+        // telemetry field documents this caveat.
         let now = now_unix_s();
         let mut guard = self.active.lock().unwrap();
         let mut updates = Vec::new();
@@ -507,15 +523,34 @@ impl PromptTimingState {
                 );
                 let turn_id = active.id;
                 let submitted_at_unix_s = active.submitted_at_unix_s;
+                let prompt_sent_at = active.prompt_sent_at_unix_s;
+                let prompt_sent_at_mono = active.prompt_sent_at_mono;
                 let details = format!(
                     "text_len={} since_prompt_sent={} first_visible_text_gap={} gap_source={}",
                     text_len,
-                    format_elapsed(active.prompt_sent_at_unix_s, Some(now)),
+                    format_elapsed(prompt_sent_at, Some(now)),
                     visible_gap,
                     visible_gap_source
                 );
                 drop(guard);
                 prompt_timing_log(turn_id, submitted_at_unix_s, "first_text", &details);
+
+                // Telemetry: agent's first text chunk arrived. Time-to-first-token
+                // is the key responsiveness metric — emit only when we can
+                // compute it reliably (i.e. we observed `prompt_sent_at_mono`).
+                // Use the monotonic `Instant` captured at the same moment as
+                // `prompt_sent_at_unix_s` so the latency is immune to wall-clock
+                // jumps (NTP/DST) that could otherwise produce a negative delta
+                // we'd silently drop, skewing the aggregate.
+                if let Some(sent_mono) = prompt_sent_at_mono {
+                    let first_token_latency_ms =
+                        sent_mono.elapsed().as_secs_f64() * 1000.0;
+                    crate::telemetry::log_agent_response_first_token(
+                        session_id,
+                        first_token_latency_ms,
+                        u32::try_from(text_len).unwrap_or(u32::MAX),
+                    );
+                }
             }
         }
     }
@@ -711,6 +746,21 @@ impl PromptTimingState {
             "prompt_complete",
             &details.join(" "),
         );
+
+        // Telemetry: emit the prompt-complete signal with aggregate metrics.
+        // Use the monotonic `Instant` (captured alongside `prompt_sent_at_unix_s`
+        // in `mark_prompt_sent`) so `total_duration_ms` is wall-clock-jump-
+        // immune. Skip emission when the monotonic anchor is missing rather
+        // than reporting 0ms, mirroring the first-token guard.
+        if let Some(sent_mono) = active_prompt.prompt_sent_at_mono {
+            let total_duration_ms = sent_mono.elapsed().as_secs_f64() * 1000.0;
+            crate::telemetry::log_agent_response_complete(
+                session_id,
+                total_duration_ms,
+                active_prompt.bytes_read_after_prompt as u64,
+                success,
+            );
+        }
 
         Some(final_timing_note(
             active_prompt.submitted_at_unix_s,
@@ -1789,7 +1839,10 @@ impl acp::Client for WtaClient {
 ///
 /// Wires the same App-facing select-loop as `run_inner`, minus the
 /// restart-loop wrapper: helper mode doesn't own the agent CLI lifetime
-/// (master does), so `restart_rx` is drained but logged as unsupported.
+/// (master does). `/restart` is delegated to the C++ side via a
+/// `restart_agent_stack` `SendEvent`; that path tears down every agent
+/// pane, force-restarts master under the same stable pipe name, and
+/// re-toggles the active pane so the user lands on a fresh session.
 ///
 /// See doc/specs/Multi-window-agent-pane.md for the helper+master
 /// architecture, and `tools/wta/src/master/mod.rs` for the peer.
@@ -1814,18 +1867,137 @@ fn inject_wta_pane_meta(meta: &mut Option<acp::Meta>) {
     if wt_session.is_empty() {
         return;
     }
-    let pane_session_id = wt_session
+    let normalized = wt_session
         .trim_matches(|c| c == '{' || c == '}')
         .to_ascii_lowercase();
-    if pane_session_id.is_empty() {
+    if normalized.is_empty() {
         return;
     }
     crate::session_registry::inject_wta_meta(
         meta,
         &crate::session_registry::WtaMeta {
-            pane_session_id: Some(pane_session_id),
+            pane_session_id: Some(normalized),
         },
     );
+}
+
+/// Handle a `session/load` failure (Err or timeout) in the
+/// `load_session_rx` arm of `run_acp_client_over_pipe`.
+///
+/// Two cases:
+///   * `old_sid = Some` (mid-life F2 load failure): restore the prior
+///     binding so the pane keeps a usable session. The user sees a
+///     `TabError` and their existing session is still alive.
+///   * `old_sid = None` (boot-time load failure with no bootstrap):
+///     fall back to creating a fresh `new_session` so the pane is
+///     still usable. The user sees a `TabError` AND a working blank
+///     session, matching the pre-Plan-B UX where a bootstrap session
+///     was always created.
+async fn handle_load_failure(
+    old_sid: Option<&acp::SessionId>,
+    tab_id: String,
+    cwd: std::path::PathBuf,
+    conn: Arc<acp::ClientSideConnection>,
+    tab_to_session: Arc<tokio::sync::Mutex<HashMap<String, acp::SessionId>>>,
+    event_tx: mpsc::UnboundedSender<AppEvent>,
+    error_message: String,
+) {
+    if let Some(old) = old_sid {
+        // Mid-life F2 load failure path: restore prior binding.
+        let mut g = tab_to_session.lock().await;
+        g.insert(tab_id.clone(), old.clone());
+        drop(g);
+        let _ = event_tx.send(AppEvent::TabError {
+            tab_id,
+            message: error_message,
+        });
+        return;
+    }
+
+    // Boot-time load failure: helper has no prior session for this
+    // tab (we skipped the bootstrap when `--initial-load-session-id`
+    // was set). Create a fresh `new_session` so prompts have
+    // somewhere to land.
+    let _ = event_tx.send(AppEvent::TabError {
+        tab_id: tab_id.clone(),
+        message: format!("{} Starting a fresh session instead.", error_message),
+    });
+    let mut new_req = acp::NewSessionRequest::new(cwd);
+    inject_wta_pane_meta(&mut new_req.meta);
+    let fallback = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        conn.new_session(new_req),
+    )
+    .await;
+    match fallback {
+        Ok(Ok(resp)) => {
+            let new_sid = resp.session_id.clone();
+            tracing::info!(
+                target: "acp_load_session",
+                tab = %tab_id,
+                fallback_session_id = %new_sid,
+                "boot-time load fell back to new_session successfully"
+            );
+            {
+                let mut g = tab_to_session.lock().await;
+                g.insert(tab_id.clone(), new_sid.clone());
+            }
+            // Index the fallback session as an agent-pane origin so
+            // F2 can show it as a Historical row on next cold start
+            // (it is now a real, persistent session).
+            let pane_session_id = std::env::var("WT_SESSION").unwrap_or_default();
+            let pane_for_index = if pane_session_id.is_empty() {
+                None
+            } else {
+                Some(pane_session_id.as_str())
+            };
+            crate::agent_pane_origin::append_default(new_sid.0.as_ref(), pane_for_index);
+            let (available_models, current_model_id) = match &resp.models {
+                Some(state) => {
+                    let models: Vec<crate::app::AcpModelInfo> = state
+                        .available_models
+                        .iter()
+                        .map(|m| crate::app::AcpModelInfo {
+                            id: m.model_id.0.to_string(),
+                            name: m.name.clone(),
+                            description: m.description.clone(),
+                        })
+                        .collect();
+                    (models, Some(state.current_model_id.0.to_string()))
+                }
+                None => (Vec::new(), None),
+            };
+            let _ = event_tx.send(AppEvent::SessionAttached {
+                tab_id,
+                session_id: new_sid.to_string(),
+                available_models,
+                current_model_id,
+            });
+        }
+        Ok(Err(e)) => {
+            tracing::error!(
+                target: "acp_load_session",
+                tab = %tab_id,
+                error = ?e,
+                "boot-time load fallback new_session failed"
+            );
+            let _ = event_tx.send(AppEvent::TabError {
+                tab_id,
+                message: format!("Fallback new_session also failed: {}", e),
+            });
+        }
+        Err(_) => {
+            tracing::error!(
+                target: "acp_load_session",
+                tab = %tab_id,
+                "boot-time load fallback new_session timed out after 30s"
+            );
+            let _ = event_tx.send(AppEvent::TabError {
+                tab_id,
+                message: "Fallback new_session timed out after 30s.".to_string(),
+            });
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1833,6 +2005,7 @@ pub async fn run_acp_client_over_pipe(
     pipe_name: String,
     acp_model_override: Option<String>,
     owner_tab_id: Option<String>,
+    initial_load_session_id: Option<String>,
     event_tx: mpsc::UnboundedSender<AppEvent>,
     mut prompt_rx: mpsc::UnboundedReceiver<PromptSubmission>,
     mut cancel_rx: mpsc::UnboundedReceiver<CancelRequest>,
@@ -2038,83 +2211,123 @@ pub async fn run_acp_client_over_pipe(
         }
     }
 
-    // Create the initial session bound to the owner tab.
-    let _ = event_tx.send(AppEvent::ConnectionStage("Creating session...".to_string()));
-    startup_probe.log("Creating session (over pipe)");
+    // Create the initial session bound to the owner tab — unless this
+    // helper was spawned with `--initial-load-session-id`, in which case
+    // we skip the bootstrap entirely and let the boot-time `load_session`
+    // (queued by main.rs as an `AppEvent::WtEvent`) be the helper's
+    // first session. Skipping the bootstrap avoids the F2 duplicate-row
+    // bug: master used to register both the bootstrap and the loaded
+    // sid (both bound to the same WT pane) and the F2 view showed two
+    // Live rows for the same agent pane.
     let cwd = std::env::current_dir().unwrap_or_default();
-    let mut new_session_req = acp::NewSessionRequest::new(cwd);
-    inject_wta_pane_meta(&mut new_session_req.meta);
-    let session_future = conn.new_session(new_session_req);
-    let session = tokio::time::timeout(std::time::Duration::from_secs(30), session_future)
-        .await
-        .map_err(|_| anyhow::anyhow!("new_session over master pipe timed out after 30s"))?
-        .map_err(|e| anyhow::anyhow!("new_session over master pipe failed: {}", e))?;
-
-    let session_id = session.session_id.clone();
-    startup_probe.log(&format!("Session created (over pipe): {}", session_id));
-    if is_agent_pane {
-        // Carry the WT pane-session GUID alongside the ACP session id so
-        // agent-pane origin tracking can recover the owning pane later
-        // (matches origin/main's `append_default` signature after #66).
-        let pane_session_id = std::env::var("WT_SESSION").unwrap_or_default();
-        let pane_for_index = if pane_session_id.is_empty() {
-            None
-        } else {
-            Some(pane_session_id.as_str())
-        };
-        tracing::info!(
-            target: "agent_pane_origin",
-            session_id = %session_id,
-            pane_session_id = %pane_session_id,
-            "recording agent-pane session origin (startup over pipe)",
-        );
-        crate::agent_pane_origin::append_default(session_id.0.as_ref(), pane_for_index);
-    }
-
-    let (available_models, current_model_id) = match &session.models {
-        Some(state) => {
-            let models: Vec<crate::app::AcpModelInfo> = state
-                .available_models
-                .iter()
-                .map(|m| crate::app::AcpModelInfo {
-                    id: m.model_id.0.to_string(),
-                    name: m.name.clone(),
-                    description: m.description.clone(),
-                })
-                .collect();
-            (models, Some(state.current_model_id.0.to_string()))
-        }
-        None => (Vec::new(), None),
-    };
-
-    // Apply --acp-model if requested. No `--agent` cmdline to parse in
-    // helper mode (master owns the agent CLI), so this is the only
-    // model-selection input.
-    if let Some(requested_model) = acp_model_override.filter(|s| !s.trim().is_empty()) {
-        let _ = event_tx.send(AppEvent::ConnectionStage(format!(
-            "Selecting model {}...",
-            requested_model
-        )));
-        startup_probe.log(&format!(
-            "Setting ACP session model to {} (over pipe)",
-            requested_model
-        ));
-        conn.set_session_model(acp::SetSessionModelRequest::new(
-            session_id.clone(),
-            requested_model.clone(),
-        ))
-        .await
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "set_session_model failed for requested model {}: {}",
-                requested_model,
-                e
+    let (session_id, available_models, current_model_id, has_bootstrap) =
+        if let Some(load_sid) = initial_load_session_id.as_deref() {
+            // No bootstrap. AgentConnected fires with the to-be-loaded
+            // sid as a placeholder so the App flips to Connected (and
+            // binds session_id → owner_tab in `session_to_tab` early,
+            // so any session/update chunks arriving before the
+            // load_session response route to the right tab). The
+            // actual `load_session` is driven by the App after it
+            // processes the queued WtEvent — see `load_session_rx`
+            // arm below for success/failure handling, including the
+            // fallback-to-new-session on boot-time load failure.
+            startup_probe.log(&format!(
+                "skipping bootstrap session/new (initial_load_session_id={} set)",
+                load_sid,
+            ));
+            let _ = event_tx.send(AppEvent::ConnectionStage(format!(
+                "Resuming session {}...",
+                load_sid
+            )));
+            (
+                acp::SessionId::new(load_sid.to_string()),
+                Vec::<crate::app::AcpModelInfo>::new(),
+                None,
+                false,
             )
-        })?;
-        startup_probe.log(&format!(
-            "ACP session model set to {} (over pipe)",
-            requested_model
-        ));
+        } else {
+            let _ = event_tx.send(AppEvent::ConnectionStage("Creating session...".to_string()));
+            startup_probe.log("Creating session (over pipe)");
+            let mut new_session_req = acp::NewSessionRequest::new(cwd.clone());
+            inject_wta_pane_meta(&mut new_session_req.meta);
+            let session_future = conn.new_session(new_session_req);
+            let session =
+                tokio::time::timeout(std::time::Duration::from_secs(30), session_future)
+                    .await
+                    .map_err(|_| {
+                        anyhow::anyhow!("new_session over master pipe timed out after 30s")
+                    })?
+                    .map_err(|e| {
+                        anyhow::anyhow!("new_session over master pipe failed: {}", e)
+                    })?;
+
+            let session_id = session.session_id.clone();
+            startup_probe.log(&format!("Session created (over pipe): {}", session_id));
+            if is_agent_pane {
+                let pane_session_id = std::env::var("WT_SESSION").unwrap_or_default();
+                let pane_for_index = if pane_session_id.is_empty() {
+                    None
+                } else {
+                    Some(pane_session_id.as_str())
+                };
+                tracing::info!(
+                    target: "agent_pane_origin",
+                    session_id = %session_id,
+                    pane_session_id = %pane_session_id,
+                    "recording agent-pane session origin (startup over pipe)",
+                );
+                crate::agent_pane_origin::append_default(session_id.0.as_ref(), pane_for_index);
+            }
+
+            let (available_models, current_model_id) = match &session.models {
+                Some(state) => {
+                    let models: Vec<crate::app::AcpModelInfo> = state
+                        .available_models
+                        .iter()
+                        .map(|m| crate::app::AcpModelInfo {
+                            id: m.model_id.0.to_string(),
+                            name: m.name.clone(),
+                            description: m.description.clone(),
+                        })
+                        .collect();
+                    (models, Some(state.current_model_id.0.to_string()))
+                }
+                None => (Vec::new(), None),
+            };
+            (session_id, available_models, current_model_id, true)
+        };
+
+    // Apply --acp-model if requested. Only valid when we actually have
+    // a bootstrap session to mutate; for the initial-load path the
+    // loaded session's model is whatever the agent stored — overriding
+    // it before the load completes would race the load itself.
+    if has_bootstrap {
+        if let Some(requested_model) = acp_model_override.filter(|s| !s.trim().is_empty()) {
+            let _ = event_tx.send(AppEvent::ConnectionStage(format!(
+                "Selecting model {}...",
+                requested_model
+            )));
+            startup_probe.log(&format!(
+                "Setting ACP session model to {} (over pipe)",
+                requested_model
+            ));
+            conn.set_session_model(acp::SetSessionModelRequest::new(
+                session_id.clone(),
+                requested_model.clone(),
+            ))
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "set_session_model failed for requested model {}: {}",
+                    requested_model,
+                    e
+                )
+            })?;
+            startup_probe.log(&format!(
+                "ACP session model set to {} (over pipe)",
+                requested_model
+            ));
+        }
     }
 
     // Notify app of connection. No raw `program/args` to summarise in
@@ -2145,10 +2358,16 @@ pub async fn run_acp_client_over_pipe(
         load_session_supported,
     });
 
-    // Per-tab session cache. Same semantics as in `run_inner`.
+    // Per-tab session cache. Same semantics as in `run_inner`. Only
+    // prepopulate the owner-tab binding when we actually have a
+    // bootstrap session — otherwise the `load_session_rx` arm would
+    // see the placeholder sid as a prior session, try to `cancel` it,
+    // and the agent CLI would reject the cancel for an unknown sid.
+    // With no entry, the load arm sees `old_sid = None` and loads
+    // cleanly.
     let tab_to_session: Arc<tokio::sync::Mutex<HashMap<String, acp::SessionId>>> =
         Arc::new(tokio::sync::Mutex::new(HashMap::new()));
-    {
+    if has_bootstrap {
         let mut g = tab_to_session.lock().await;
         let initial_tab_key = owner_tab_id.clone().unwrap_or_else(|| "0".to_string());
         g.insert(initial_tab_key, session_id.clone());
@@ -2173,10 +2392,11 @@ pub async fn run_acp_client_over_pipe(
     periodic_refetch.tick().await;
 
     // Main event loop. Mirrors `run_inner`'s select arms, minus the
-    // restart-loop wrapper (helper mode can't restart — master owns
-    // the agent CLI). A `/restart` signal is logged and reported back
-    // to the user as a no-op; deeper restart support is a Phase 3+
-    // concern (the master itself would need a "respawn" path).
+    // restart-loop wrapper (helper mode can't restart in-process — master
+    // owns the agent CLI). `/restart` fires a `restart_agent_stack`
+    // `SendEvent` to the C++ side; that path force-restarts the whole
+    // agent stack (tear down panes → `SharedWta::Restart()` → respawn on
+    // the same stable pipe name → re-toggle active pane).
     loop {
         tokio::select! {
             biased;
@@ -2207,19 +2427,31 @@ pub async fn run_acp_client_over_pipe(
                 dispatch_master_ext_request(req, &conn, &event_tx);
             }
             Some(req) = restart_rx.recv() => {
-                tracing::warn!(
+                // Helper can't restart the agent CLI in-process — master owns
+                // its lifetime, and master itself is a singleton owned by
+                // `SharedWta` on the C++ side. Ask the C++ side to do a full
+                // force-restart of the agent stack: tear down every agent
+                // pane, kill master via `SharedWta::Restart()` (bypassing
+                // refcount), respawn master under the same stable pipe name,
+                // and re-toggle the active tab's pane. The new wta-helper
+                // that gets spawned will reconnect to the new master and
+                // the user sees a fresh session.
+                //
+                // Signal travels: helper → `wtcli publish` (see
+                // `app::send_wt_protocol_event`) → `IProtocolServer::SendEvent`
+                // (route `RestartAgentStack`) →
+                // `TerminalPage::OnRestartAgentStackRequested`.
+                tracing::info!(
                     target: "helper",
                     new_agent = ?req.agent_cmd,
-                    "restart requested in helper mode — not supported \
-                     (master owns the agent CLI lifetime); reporting to user"
+                    "restart requested — asking WT to force-restart the agent stack"
                 );
-                let _ = event_tx.send(AppEvent::AgentError {
-                    session_id: None,
-                    message: "/restart is not available in this agent pane \
-                              — restart is owned by the shared wta-master \
-                              process. Close and reopen the pane to recover."
-                        .to_string(),
+                let evt = serde_json::json!({
+                    "type": "event",
+                    "method": "restart_agent_stack",
+                    "params": {},
                 });
+                crate::app::send_wt_protocol_event(evt.to_string());
             }
             Some(req) = cancel_rx.recv() => {
                 let session_id_str = req.session_id.clone();
@@ -2381,7 +2613,7 @@ pub async fn run_acp_client_over_pipe(
                     }
 
                     let session_id = acp::SessionId::new(req.session_id.clone());
-                    let mut load_req = acp::LoadSessionRequest::new(session_id.clone(), cwd);
+                    let mut load_req = acp::LoadSessionRequest::new(session_id.clone(), cwd.clone());
                     // Tell master which WT pane owns the session we're
                     // about to rehydrate, so the registry row for the
                     // resumed sid carries `pane_session_id = <this
@@ -2433,16 +2665,22 @@ pub async fn run_acp_client_over_pipe(
                                 error = ?e,
                                 "load_session failed (helper)"
                             );
-                            let _ = event_tx_for_load.send(AppEvent::TabError {
-                                tab_id: req.tab_id.clone(),
-                                message: format!(
+                            handle_load_failure(
+                                old_sid.as_ref(),
+                                req.tab_id.clone(),
+                                cwd.clone(),
+                                Arc::clone(&conn_for_load),
+                                Arc::clone(&tab_to_session_for_load),
+                                event_tx_for_load.clone(),
+                                format!(
                                     "Failed to resume session in agent pane: {}. \
                                      The connected agent may not recognize this \
                                      session id (CLI mismatch), or `session/load` \
                                      is unsupported.",
                                     e
                                 ),
-                            });
+                            )
+                            .await;
                         }
                         Err(_) => {
                             tracing::warn!(
@@ -2451,13 +2689,18 @@ pub async fn run_acp_client_over_pipe(
                                 session_id = %req.session_id,
                                 "load_session timed out after 60s (helper)"
                             );
-                            let _ = event_tx_for_load.send(AppEvent::TabError {
-                                tab_id: req.tab_id.clone(),
-                                message:
-                                    "Resume timed out after 60s — the agent \
-                                     did not respond to `session/load`."
-                                        .to_string(),
-                            });
+                            handle_load_failure(
+                                old_sid.as_ref(),
+                                req.tab_id.clone(),
+                                cwd.clone(),
+                                Arc::clone(&conn_for_load),
+                                Arc::clone(&tab_to_session_for_load),
+                                event_tx_for_load.clone(),
+                                "Resume timed out after 60s — the agent \
+                                 did not respond to `session/load`."
+                                    .to_string(),
+                            )
+                            .await;
                         }
                     }
                 });
@@ -3622,6 +3865,20 @@ async fn dispatch_prompt_body(
         status: "Thinking...".to_string(),
     });
     prompt_timing_task.mark_prompt_sent(&prompt_session_id_str);
+
+    // Telemetry: prompt dispatched over ACP. WTA emits `AgentPromptSent`
+    // for the agent-pane prompt-entry route; the C++ side emits
+    // `CommandPaletteDispatchedAgentPrompt` for the `?<prompt>` delegation
+    // route under the same provider.
+    crate::telemetry::log_agent_prompt_sent(
+        &prompt_session_id_str,
+        u32::try_from(text.len()).unwrap_or(u32::MAX),
+        prompt.is_autofix,
+        match kind {
+            TemplateKind::Autofix => "Autofix",
+            TemplateKind::Planner => "Planner",
+        },
+    );
 
     // Register a cancel oneshot for this prompt. The cancel
     // listener picks the sender out by session_id and signals it

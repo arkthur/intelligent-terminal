@@ -40,10 +40,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Tagh dè a shuidhicheas tu a-nis. 'S urrainn dhut iad seo atharrachadh uair sam bith ann an </value>
+    <value>Tagh dè a tha thu airson a shuidheachadh an-dràsta. 'S urrainn dhut na roghainnean seo atharrachadh aig àm sam bith. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Roghainnean</value>
+    <value>Ionnsaich mu mar a thèid dàta a chleachdadh</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Neach-gnìomha</value>
@@ -58,10 +58,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Mol càraidhean gu fèin-obrachail airson àitheantan a dh'fhàillig</value>
+    <value>Moladh mhearachdan fèin-obrachail</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Nuair a tha e an comas, bidh an riochdaire IF a' mion-sgrùdadh àitheantan a dh'fhàillig gu fèin-obrachail agus a' moladh càradh. Nuair a tha e à comas, seallaidh àitheantan a dh'fhàillig sanas as urrainn briogadh air sa bhàr-staid — brùth Ctrl+Alt+. no briog air an t-sanas gus càradh iarraidh.</value>
+    <value>Thoir cead do Intelligent Terminal mearachdan a chur gun àidseant agad gus fuasglaidhean a mholadh gu fèin-obrachail.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -133,6 +133,14 @@
     <value>Mearachd air a lorg: {0} gus a chàradh</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Briog {0} gus a’ mhearachd a chàradh</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Chaidh mearachd a lorg. Briog no brùth {0} gus iarraidh air a’ ghnìomhaire AI breithneachadh a dhèanamh agus càradh a mholadh.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Càradh deiseil — {0} gus a chur an sàs</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -168,5 +176,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Lorg mhearachdan fèin-obrachail</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Thoir cead do Intelligent Terminal cothrom fhaighinn air an t-slige agad agus mearachdan a lorg gu fèin-obrachail.</value>
   </data>
 </root>

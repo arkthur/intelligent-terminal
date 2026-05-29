@@ -2754,6 +2754,14 @@
   </data>
   <data name="Nav_AIAgents.Content" xml:space="preserve"><value>Agenti AI</value></data>
   <data name="AIAgents_PageSubtitle.Text" xml:space="preserve"><value>Configura il funzionamento degli agenti nel terminale</value></data>
+  <data name="AIAgents_PageSubtitlePrefix" xml:space="preserve">
+    <value>Configura il funzionamento degli agenti nel terminale.</value>
+    <comment>Subtitle shown beneath the page title on the AI Agents settings page. The hyperlink in AIAgents_PageSubtitlePrivacyLink follows this sentence inline; the trailing period belongs to this prefix.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrivacyLink" xml:space="preserve">
+    <value>Scopri come vengono utilizzati i dati.</value>
+    <comment>Inline hyperlink text that follows the AI Agents page subtitle and navigates to the privacy policy page. Includes a trailing period.</comment>
+  </data>
   <data name="AIAgents_AcpGroupHeader.Text" xml:space="preserve"><value>Riquadro agente</value></data>
   <data name="AIAgents_DelegateGroupHeader.Text" xml:space="preserve"><value>Riquadro comandi</value></data>
   <data name="AIAgents_AcpAgent.Header" xml:space="preserve"><value>Agente</value></data>
@@ -2833,5 +2841,17 @@
   <data name="AIAgents_HooksInstallationFailedSummary" xml:space="preserve">
     <value>Installazione di Hooks non riuscita. Controllare %LOCALAPPDATA%\IntelligentTerminal\logs\wta-install-hooks.log per i dettagli.</value>
     <comment>Failure summary shown when installing agent session tracking hooks fails. {Locked="Hooks","%LOCALAPPDATA%","IntelligentTerminal","logs","wta-install-hooks.log"}</comment>
+  </data>
+  <data name="AIAgents_AutoErrorDetectionTitle.Text" xml:space="preserve">
+    <value>Rilevamento automatico degli errori</value>
+  </data>
+  <data name="AIAgents_AutoErrorDetectionCaption.Text" xml:space="preserve">
+    <value>Consenti a Intelligent Terminal di accedere alla shell e rilevare automaticamente gli errori. Disponibile in PowerShell e Windows PowerShell.</value>
+  </data>
+  <data name="AIAgents_AutoErrorSuggestionTitle.Text" xml:space="preserve">
+    <value>Suggerimento automatico degli errori</value>
+  </data>
+  <data name="AIAgents_AutoErrorSuggestionCaption.Text" xml:space="preserve">
+    <value>Consenti a Intelligent Terminal di inviare gli errori all'agente per suggerire automaticamente le correzioni.</value>
   </data>
 </root>

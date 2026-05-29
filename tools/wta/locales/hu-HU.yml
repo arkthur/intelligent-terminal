@@ -45,6 +45,7 @@ auth.hint_footer: "  Nyomja meg az Entert a bejelentkezéshez, az Esc-et a vissz
 chat.activity_thinking: "Gondolkodás..."
 # {Locked="Intelligent Terminal"} - product name, do not translate
 chat.welcome_title: "Üdvözli az Intelligent Terminal!"
+chat.welcome_disclaimer: "Az Intelligent Terminal AI-t használ. Ellenőrizze a hibákat."
 chat.plan_header: "Terv:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -105,8 +106,8 @@ agent.custom.auth_hint: "Győződjön meg róla, hogy a(z) %{name} telepítve va
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Betöltés..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ navigáláshoz • Enter munkamenet indításához új lapon • Shift+enter munkamenet indításához az ügynök panelen • Esc kilépéshez)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ navigáláshoz • Enter munkamenet indításához • Esc kilépéshez)"
 agents.status.active: "Aktív"
 agents.status.waiting_for_input: "Bemenetre vár"
 agents.status.error: "Hiba"

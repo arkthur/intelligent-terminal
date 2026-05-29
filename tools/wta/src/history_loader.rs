@@ -110,11 +110,24 @@ pub fn load_all() -> Vec<AgentSession> {
 /// on disk (caller keeps whatever synthetic title it had).
 pub fn lookup_title_for_session(cli: CliSource, key: &str) -> Option<String> {
     let home = home_dir()?;
+    lookup_title_for_session_in(&home, cli, key)
+}
+
+/// Testable variant of [`lookup_title_for_session`] that accepts a
+/// caller-supplied `home` directory. Production code uses the
+/// `USERPROFILE` / `HOME` env var via `home_dir()`; tests pin a tmp
+/// dir without racing on env mutation. Returns `None` for CLIs whose
+/// titles aren't sourced from on-disk artefacts (`Unknown`).
+pub fn lookup_title_for_session_in(
+    home: &Path,
+    cli: CliSource,
+    key: &str,
+) -> Option<String> {
     match cli {
-        CliSource::Copilot => copilot_title_for_key(&home, key),
-        CliSource::Claude  => claude_title_for_key(&home, key),
-        CliSource::Gemini  => gemini_title_for_key(&home, key),
-        CliSource::Codex   => codex_title_for_key(&home, key),
+        CliSource::Copilot => copilot_title_for_key(home, key),
+        CliSource::Claude  => claude_title_for_key(home, key),
+        CliSource::Gemini  => gemini_title_for_key(home, key),
+        CliSource::Codex   => codex_title_for_key(home, key),
         CliSource::Unknown(_) => None,
     }
 }

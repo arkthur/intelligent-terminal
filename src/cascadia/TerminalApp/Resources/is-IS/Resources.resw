@@ -153,10 +153,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Veldu hvað þú vilt setja upp núna. Þú getur breytt þessu hvenær sem er í </value>
+    <value>Veldu hvað á að setja upp núna. Þú getur breytt þessu hvenær sem er. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Stillingar</value>
+    <value>Fræðist um hvernig gögn eru notuð</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Agent</value>
@@ -171,10 +171,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Stinga sjálfkrafa upp á lagfæringum fyrir misheppnaðar skipanir</value>
+    <value>Sjálfvirk villutillaga</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Þegar þetta er virkjað greinir gervigreindarumboðsmaðurinn sjálfkrafa misheppnaðar skipanir og leggur til lagfæringu. Þegar þetta er óvirkt sýna misheppnaðar skipanir smelltanlega vísbendingu á stöðustikunni — ýttu á Ctrl+Alt+. eða smelltu á vísbendinguna til að biðja um lagfæringu.</value>
+    <value>Veittu Intelligent Terminal heimild til að senda villur til umboðsmannsins þíns til að stinga sjálfkrafa upp á lagfæringum.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -247,6 +247,14 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>Villa fannst: {0} til að laga</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Smelltu á {0} til að laga villuna</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Villa fannst. Smelltu eða ýttu á {0} til að biðja gervigreindarvélina að greina og leggja til lagfæringu.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Lagfæring tilbúin — {0} til að beita</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -282,5 +290,11 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Sjálfvirk villugreining</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Veittu Intelligent Terminal heimild til að fá aðgang að skelinni þinni og greina villur sjálfkrafa.</value>
   </data>
 </root>

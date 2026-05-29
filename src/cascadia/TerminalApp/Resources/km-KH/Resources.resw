@@ -40,10 +40,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>ជ្រើសរើសអ្វីដែលត្រូវដំឡើងឥឡូវ។ អ្នកអាចផ្លាស់ប្តូរនៅពេលណាក្នុង </value>
+    <value>ជ្រើសរើសអ្វីដែលត្រូវដំឡើងឥឡូវនេះ។ អ្នកអាចផ្លាស់ប្តូរទាំងនេះបានគ្រប់ពេល។ </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>ការកំណត់</value>
+    <value>ស្វែងយល់អំពីរបៀបប្រើប្រាស់ទិន្នន័យ</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>ភ្នាក់ងារ</value>
@@ -58,10 +58,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>ស្នើការជួសជុលដោយស្វ័យប្រវត្តិសម្រាប់ពាក្យបញ្ជាដែលបរាជ័យ</value>
+    <value>ការណែនាំកំហុសដោយស្វ័យប្រវត្តិ</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>នៅពេលបើក ភ្នាក់ងារ AI វិភាគពាក្យបញ្ជាដែលបរាជ័យដោយស្វ័យប្រវត្តិ និងស្នើការជួសជុល។ នៅពេលបិទ ពាក្យបញ្ជាដែលបរាជ័យបង្ហាញការណែនាំដែលអាចចុចបាននៅរបារស្ថានភាព — ចុច Ctrl+Alt+. ឬចុចលើការណែនាំដើម្បីស្នើសុំការជួសជុល។</value>
+    <value>ផ្តល់សិទ្ធិឱ្យ Intelligent Terminal ផ្ញើកំហុសទៅភ្នាក់ងាររបស់អ្នក ដើម្បីណែនាំការកែតម្រូវដោយស្វ័យប្រវត្តិ។</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -121,5 +121,11 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   </data>
   <data name="FreOverlay_ToggleOff" xml:space="preserve">
     <value>បិទ</value>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>ការរកឃើញកំហុសដោយស្វ័យប្រវត្តិ</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>ផ្តល់សិទ្ធិឱ្យ Intelligent Terminal ចូលប្រើសែលរបស់អ្នក និងរកឃើញកំហុសដោយស្វ័យប្រវត្តិ។</value>
   </data>
 </root>

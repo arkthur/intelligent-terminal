@@ -45,6 +45,7 @@ auth.hint_footer: "  Нажмите Enter для входа, Esc для возв
 chat.activity_thinking: "Думаю…"
 # {Locked="Intelligent Terminal"} - название продукта, не переводить
 chat.welcome_title: "Добро пожаловать в Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal использует AI. Проверяйте ошибки."
 chat.plan_header: "План:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -70,7 +71,7 @@ commands.help_close_hint: "  Esc        Закрыть эту справку"  #
 commands.help.summary: "Показать этот список команд"
 commands.clear.summary: "Очистить историю чата (сеанс сохраняется)"
 commands.new.summary: "Начать новый сеанс ACP (история будет удалена)"  # {Locked="ACP"}
-commands.restart.summary: "Переподключиться: завершить процесс агента и запустить снова"
+commands.restart.summary: "Перезапустить агент"
 commands.stop.summary: "Отменить выполняющийся запрос"
 commands.sessions.summary: "Открыть выбор прошлых сеансов (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Панель рекомендаций (src/ui/recommendations.rs) ───────────────────────────────────
@@ -112,8 +113,8 @@ agent.custom.auth_hint: "Убедитесь, что %{name} установлен
 
 # ── Представление агентов (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Загрузка..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - комбинации клавиш, не переводить
-agents.footer_hint: "(↑ ↓ навигация • Enter запустить сеанс в новой вкладке • Shift+enter запустить сеанс в панели агента • Esc выход)"
+# {Locked="Enter","Esc","↑","↓"} - комбинации клавиш, не переводить
+agents.footer_hint: "(↑ ↓ навигация • Enter запустить сеанс • Esc выход)"
 agents.status.active: "Активен"
 agents.status.waiting_for_input: "Ожидание ввода"
 agents.status.error: "Ошибка"

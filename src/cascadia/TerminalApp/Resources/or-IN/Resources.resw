@@ -154,10 +154,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>ବର୍ତ୍ତମାନ କ'ଣ ସେଟଅପ୍ କରିବେ ତାହା ବାଛନ୍ତୁ। ଆପଣ ଏଗୁଡ଼ିକୁ ଯେ କୌଣସି ସମୟରେ ବଦଳାଇ ପାରିବେ </value>
+    <value>ବର୍ତ୍ତମାନ କ'ଣ ସେଟଅପ୍ କରିବେ ତାହା ବାଛନ୍ତୁ। ଆପଣ ଏଗୁଡ଼ିକୁ ଯେକୌଣସି ସମୟରେ ପରିବର୍ତ୍ତନ କରିପାରିବେ। </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>ସେଟିଂସ୍</value>
+    <value>ଡାଟା କିପରି ବ୍ୟବହୃତ ହୁଏ ତାହା ଜାଣନ୍ତୁ</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>ଏଜେଣ୍ଟ</value>
@@ -172,10 +172,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>ବିଫଳ କମାଣ୍ଡଗୁଡ଼ିକ ପାଇଁ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମାଧାନ ପ୍ରସ୍ତାବ ଦିଅନ୍ତୁ</value>
+    <value>ସ୍ୱୟଂଚାଳିତ ତ୍ରୁଟି ପରାମର୍ଶ</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>ସକ୍ଷମ ହେଲେ, AI ଏଜେଣ୍ଟ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ବିଫଳ କମାଣ୍ଡଗୁଡ଼ିକୁ ବିଶ୍ଳେଷଣ କରେ ଏବଂ ଏକ ସମାଧାନ ପ୍ରସ୍ତାବ ଦିଏ। ଅକ୍ଷମ ହେଲେ, ବିଫଳ କମାଣ୍ଡଗୁଡ଼ିକ ସ୍ଥିତି ବାରରେ ଏକ କ୍ଲିକଯୋଗ୍ୟ ସୂଚନା ଦେଖାଏ — ସମାଧାନ ଅନୁରୋଧ କରିବାକୁ Ctrl+Alt+. ଦବାନ୍ତୁ କିମ୍ବା ସୂଚନା ଉପରେ କ୍ଲିକ କରନ୍ତୁ।</value>
+    <value>Intelligent Terminal କୁ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ସମାଧାନ ପରାମର୍ଶ ଦେବାକୁ ଆପଣଙ୍କ ଏଜେଣ୍ଟକୁ ତ୍ରୁଟି ପଠାଇବାକୁ ଅନୁମତି ଦିଅନ୍ତୁ।</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -248,6 +248,14 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>ତ୍ରୁଟି ଚିହ୍ନଟ ହେଲା: ସମାଧାନ କରିବାକୁ {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>ତ୍ରୁଟି ଠିକ୍ କରିବାକୁ {0} କ୍ଲିକ୍ କରନ୍ତୁ</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>ତ୍ରୁଟି ଚିହ୍ନଟ ହେଲା। AI ଏଜେଣ୍ଟକୁ ନିଦାନ କରି ସମାଧାନ ପ୍ରସ୍ତାବ କରିବାକୁ {0} କ୍ଲିକ୍ କରନ୍ତୁ କିମ୍ବା ଦବାନ୍ତୁ।</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>ସମାଧାନ ପ୍ରସ୍ତୁତ — ପ୍ରୟୋଗ କରିବାକୁ {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -283,5 +291,11 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>ସ୍ୱୟଂଚାଳିତ ତ୍ରୁଟି ଚିହ୍ନଟ</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Intelligent Terminal କୁ ଆପଣଙ୍କ ଶେଲ୍ ଆକ୍ସେସ୍ କରିବାକୁ ଏବଂ ତ୍ରୁଟିଗୁଡ଼ିକୁ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ଚିହ୍ନଟ କରିବାକୁ ଅନୁମତି ଦିଅନ୍ତୁ।</value>
   </data>
 </root>

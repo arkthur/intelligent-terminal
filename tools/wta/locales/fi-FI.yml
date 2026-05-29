@@ -45,6 +45,7 @@ auth.hint_footer: "  Paina Enter kirjautuaksesi sisään, Esc palataksesi takais
 chat.activity_thinking: "Ajattelee..."
 # {Locked="Intelligent Terminal"} - product name, do not translate
 chat.welcome_title: "Tervetuloa Intelligent Terminaliin!"
+chat.welcome_disclaimer: "Intelligent Terminal käyttää tekoälyä. Tarkista virheet."
 chat.plan_header: "Suunnitelma:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -105,8 +106,8 @@ agent.custom.auth_hint: "Varmista, että %{name} on asennettu ja PATH-muuttujass
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Ladataan..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ navigoidaksesi • Enter käynnistääksesi istunnon uudessa välilehdessä • Shift+enter käynnistääksesi istunnon agenttipaneelissa • Esc poistuaksesi)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ navigoidaksesi • Enter käynnistääksesi istunnon • Esc poistuaksesi)"
 agents.status.active: "Aktiivinen"
 agents.status.waiting_for_input: "Odottaa syötettä"
 agents.status.error: "Virhe"

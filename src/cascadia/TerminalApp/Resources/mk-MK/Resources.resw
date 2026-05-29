@@ -153,10 +153,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Изберете што сакате да поставите сега. Можете да ги промените овие во секое време во </value>
+    <value>Изберете што сакате да поставите сега. Можете да ги промените овие поставки во секое време. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Поставки</value>
+    <value>Дознајте како се користат податоците</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Агент</value>
@@ -171,10 +171,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Автоматски предложи поправки за неуспешни команди</value>
+    <value>Автоматски предлог за грешки</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Кога е овозможено, агентот за вештачка интелигенција автоматски ги анализира неуспешните команди и предлага поправка. Кога е оневозможено, неуспешните команди прикажуваат совет на кој може да се кликне во статусната лента — притиснете Ctrl+Alt+. или кликнете на советот за да побарате поправка.</value>
+    <value>Дозволете му на Intelligent Terminal да испраќа грешки до вашиот агент за автоматско предлагање поправки.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -246,6 +246,14 @@
     <value>Откриена е грешка: {0} за поправка</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Кликнете на {0} за да ја поправите грешката</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Откриена е грешка. Кликнете или притиснете {0} за да побарате од AI агентот да ја дијагностицира и предложи поправка.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Поправката е подготвена — {0} за примена</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -281,5 +289,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Автоматско откривање грешки</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Дозволете му на Intelligent Terminal да пристапи до вашата обвивка и автоматски да открива грешки.</value>
   </data>
 </root>

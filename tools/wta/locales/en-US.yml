@@ -51,6 +51,7 @@ auth.hint_footer: "  Press Enter to sign in, Esc to go back"  # {Locked="Enter",
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Thinking…"
 chat.welcome_title: "Welcome to Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal uses AI. Check for mistakes."
 # Header label for the AI agent's step-by-step plan section
 chat.plan_header: "Plan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
@@ -87,7 +88,7 @@ commands.help_close_hint: "  Esc        Close this help"  # {Locked="Esc"}
 commands.help.summary: "Show this command list"
 commands.clear.summary: "Clear the chat scrollback (keeps session)"
 commands.new.summary: "Start a fresh ACP session (drops history)"  # {Locked="ACP"}
-commands.restart.summary: "Reconnect: kill agent process and respawn"
+commands.restart.summary: "Restart agent"
 commands.stop.summary: "Cancel the in-flight prompt"
 commands.sessions.summary: "Open the historical sessions picker (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
@@ -140,8 +141,8 @@ agent.custom.auth_hint: "Make sure %{name} is installed and on your PATH."  # {L
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Loading..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ to navigate • Enter to launch session in new tab • Shift+enter to launch session in agent pane • Esc to exit)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ to navigate • Enter to launch session • Esc to exit)"
 # Status badge when agent session is actively processing
 agents.status.active: "Active"
 agents.status.waiting_for_input: "Waiting for input"

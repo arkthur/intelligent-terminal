@@ -40,10 +40,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Ընտրեք, թե ինչ կարգավորել հիմա։ Կարող եք փոխել ցանկացադ պահին </value>
+    <value>Ընտրեք, թdelays delays delays delays delays ի՛նdelays delays delays delays delays delays </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Կարգավորումներ</value>
+    <value>Իմացեք, թե ինչպես են օգտագործվում տվdelays delays delays delays resses</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Գործակալ</value>
@@ -58,10 +58,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Ինքնաբերաբար առաջարկել շտկումներ ձախողված հրամանների համար</value>
+    <value>Սխալների ավտոմատ առաջարկ</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Միացված լինելու դեպքում AI գործակալը ինքնաբերաբար վերլուծում է ձախողված հրամանները և առաջարկում շտկում: Անջատված լինելու դեպքում ձախողված հրամանները կարգավիճակի տողում ցույց են տալիս սեղմելի ակնարկ — սեղմեք Ctrl+Alt+. կամ սեղմեք ակնարկի վրա շտկում խնդրելու համար:</value>
+    <value>Թույլ տվեք Intelligent Terminal-ին սխալներ ուղարկել ձեր գործակալին՝ ավտոմատ կերպով ուղղումներ առաջարկելու համար։</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -133,6 +133,14 @@
     <value>Հայտնաբերվել է սխալ. {0}՝ շտկելու համար</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Սեղմեք {0}՝ սխալը շտկելու համար</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Սխալ է հայտնաբերվել։ Սեղմեք կամ հպեք {0}-ին, որպեսզի AI գործակալը ախտորոշի և առաջարկի լուծում։</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Շտկումը պատրաստ է — {0}՝ կիրառելու համար</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -168,5 +176,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Սխալների ավտոմատ հայտնաբերում</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Թույլ տվեք Intelligent Terminal-ին մուտք գործել ձեր թաղանթ և ավտոմատ կերպով հայտնաբերել սխալները։</value>
   </data>
 </root>

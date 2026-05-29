@@ -45,6 +45,7 @@ auth.hint_footer: "  Pritisnite Enter za prijavo, Esc za vrnitev"  # {Locked="En
 chat.activity_thinking: "Razmišljam..."
 # {Locked="Intelligent Terminal"} - product name, do not translate
 chat.welcome_title: "Dobrodošli v Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal uporablja AI. Preverite napake."
 chat.plan_header: "Načrt:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -70,7 +71,7 @@ commands.help_close_hint: "  Esc        Zapri to pomoč"  # {Locked="Esc"}
 commands.help.summary: "Prikaži ta seznam ukazov"
 commands.clear.summary: "Počisti zgodovino klepeta (seja se ohrani)"
 commands.new.summary: "Začni novo sejo ACP (zavrže zgodovino)"  # {Locked="ACP"}
-commands.restart.summary: "Ponovno poveži: končaj proces agenta in ga znova zaženi"
+commands.restart.summary: "Ponovno zaženi agenta"
 commands.stop.summary: "Prekliči poziv v teku"
 commands.sessions.summary: "Odpri izbirnik preteklih sej (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
@@ -112,8 +113,8 @@ agent.custom.auth_hint: "Prepričajte se, da je %{name} nameščen in v PATH."  
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Nalaganje..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ za krmarjenje • Enter za zagon seje v novem zavihku • Shift+enter za zagon seje v podoknu agenta • Esc za izhod)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ za krmarjenje • Enter za zagon seje • Esc za izhod)"
 agents.status.active: "Aktivno"
 agents.status.waiting_for_input: "Čaka na vnos"
 agents.status.error: "Napaka"

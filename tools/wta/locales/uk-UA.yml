@@ -45,6 +45,7 @@ auth.hint_footer: "  Натисніть Enter для входу, Esc для по
 chat.activity_thinking: "Думаю…"
 # {Locked="Intelligent Terminal"} - назва продукту, не перекладати
 chat.welcome_title: "Ласкаво просимо до Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal використовує AI. Перевіряйте помилки."
 chat.plan_header: "План:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -70,7 +71,7 @@ commands.help_close_hint: "  Esc        Закрити цю довідку"  # {
 commands.help.summary: "Показати цей список команд"
 commands.clear.summary: "Очистити історію чату (сеанс зберігається)"
 commands.new.summary: "Розпочати новий сеанс ACP (історію буде скинуто)"  # {Locked="ACP"}
-commands.restart.summary: "Повторно підключитися: завершити процес агента й запустити його знову"
+commands.restart.summary: "Перезапустити агента"
 commands.stop.summary: "Скасувати поточний запит"
 commands.sessions.summary: "Відкрити вибір історичних сеансів (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Панель рекомендацій (src/ui/recommendations.rs) ───────────────────────────────────
@@ -112,8 +113,8 @@ agent.custom.auth_hint: "Переконайтеся, що %{name} встанов
 
 # ── Перегляд агентів (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Завантаження..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - комбінації клавіш, не перекладати
-agents.footer_hint: "(↑ ↓ навігація • Enter запустити сеанс у новій вкладці • Shift+enter запустити сеанс у панелі агента • Esc вихід)"
+# {Locked="Enter","Esc","↑","↓"} - комбінації клавіш, не перекладати
+agents.footer_hint: "(↑ ↓ навігація • Enter запустити сеанс • Esc вихід)"
 agents.status.active: "Активний"
 agents.status.waiting_for_input: "Очікування введення"
 agents.status.error: "Помилка"

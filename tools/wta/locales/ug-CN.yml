@@ -45,6 +45,7 @@ auth.hint_footer: "  Enter كىرىش ئۈچۈن, Esc قايتىش ئۈچۈن ب
 chat.activity_thinking: "ئويلىنىۋاتىدۇ…"
 # {Locked="Intelligent Terminal"} - product name, do not translate
 chat.welcome_title: "Intelligent Terminal ھە خوش كەلدىڭىز!"
+chat.welcome_disclaimer: "Intelligent Terminal AI ئىشلىتىدۇ. خاتالىقلارنى تەكشۈرۈڭ."
 chat.plan_header: "پىلان:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -76,7 +77,7 @@ commands.help_close_hint: "  Esc        بۇ ياردەمنى تاقاش"  # {Lo
 commands.help.summary: "بۇ بۇيرۇق تىزىملىكىنى كۆرسىتىش"
 commands.clear.summary: "سۆھبەتنىڭ سىيرىلىش تارىخىنى تازىلاش (سېسىيەنى ساقلايدۇ)"
 commands.new.summary: "يېڭى ACP سېسىيەسىنى باشلاش (تارىخنى تاشلايدۇ)"  # {Locked="ACP"}
-commands.restart.summary: "قايتا باغلىنىش: ئاگېنت جەريانىنى توختىتىپ قايتا قوزغىتىش"
+commands.restart.summary: "AI ئاگېنتىنى قايتا قوزغات"
 commands.stop.summary: "ئىجرا قىلىنىۋاتقان سوراقنى بىكار قىلىش"
 commands.sessions.summary: "تارىخىي سېسىيەلەر تاللىغۇچىنى ئېچىش (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
@@ -121,8 +122,8 @@ agent.custom.auth_hint: "%{name} نىڭ ئورنىتىلغانلىقى ۋە PATH
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────────────────────────────────
 agents.loading: "يۈكلەنۋاتىدۇ..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ يۆتكەش • Enter يېڭى بەتكۈچتە ئوتتۇرا ئېچىش • Shift+enter AI ئاگېنتى تاختىسىدا ئوتتۇرا ئېچىش • Esc چىقىش)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ يۆتكەش • Enter ئوتتۇرا ئېچىش • Esc چىقىش)"
 agents.status.active: "ئاكتىۋ"
 agents.status.waiting_for_input: "كىرگۈزۈش كۈتۈلۈۋاتىدۇ"
 # Status badge when agent session encountered an error

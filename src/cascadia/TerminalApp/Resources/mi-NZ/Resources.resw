@@ -40,10 +40,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Kōwhiria he aha hei whakarite ināianei. Ka taea e koe te huri i ēnei āhuatanga i ngā wā katoa i </value>
+    <value>Kōwhiria he aha hei whakarite ināianei. Ka taea e koe te huri i ēnei i ngā wā katoa. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Ngā tautuhinga</value>
+    <value>Akona me pēhea te whakamahi raraunga</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Kaitiaki</value>
@@ -58,10 +58,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Whakaaroaroa whakatika aunoa mō ngā whakahau kīhai i angitu</value>
+    <value>Te tono hapa aunoa</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Ina whakaahei, ka tātari aunoa te kaihoko AI i ngā whakahau kīhai i angitu, ka tūtohu whakatika. Ina whakakorea, ka whakaaturia e ngā whakahau kīhai i angitu he tohu pāwhiri ki te paewhiri tūnga — pēhi Ctrl+Alt+. mā te pāwhiri rānei i te tohu kia tono whakatika.</value>
+    <value>Tukua a Intelligent Terminal kia tuku hapa ki tō kaihoko hei tono whakatika aunoa.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -133,6 +133,14 @@
     <value>Kua kitea he hapa: {0} hei whakatika</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Pāwhiritia {0} hei whakatika i te hapa</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Kua kitea he hapa. Pāwhiri, pēhia rānei i {0} kia tono ai i te kaihoko AI ki te tātari me te taunaki whakatikatika.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Kua rite te whakatika — {0} hei hoatu</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -168,5 +176,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Te kimi hapa aunoa</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Tukua a Intelligent Terminal kia uru ki tō anga me te kimi hapa aunoa.</value>
   </data>
 </root>

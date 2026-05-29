@@ -154,10 +154,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>انتخاب کنید چه چیزی را اکنون تنظیم کنید. می‌توانید اینها را هر زمان در </value>
+    <value>انتخاب کنید که الان چه چیزی را تنظیم کنید. می‌توانید اینها را در هر زمان تغییر دهید. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>تنظیمات</value>
+    <value>درباره نحوه استفاده از داده‌ها بیاموزید</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>عامل</value>
@@ -172,10 +172,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>پیشنهاد خودکار رفع‌ها برای فرمان‌های ناموفق</value>
+    <value>پیشنهاد خودکار خطا</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>هنگام فعال بودن، عامل هوش مصنوعی به طور خودکار فرمان‌های ناموفق را تحلیل می‌کند و یک رفع پیشنهاد می‌دهد. هنگام غیرفعال بودن، فرمان‌های ناموفق یک راهنمای قابل کلیک در نوار وضعیت نمایش می‌دهند — برای درخواست رفع، Ctrl+Alt+. را فشار دهید یا روی راهنما کلیک کنید.</value>
+    <value>به Intelligent Terminal اجازه دهید خطاها را برای پیشنهاد خودکار راه‌حل به عامل شما ارسال کند.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -247,6 +247,14 @@
     <value>خطا شناسایی شد: {0} برای رفع</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>برای رفع خطا روی {0} کلیک کنید</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>خطا شناسایی شد. برای اینکه عامل هوش مصنوعی خطا را بررسی کند و راه‌حلی پیشنهاد دهد، روی {0} کلیک کنید یا آن را فشار دهید.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>رفع آماده است — {0} برای اعمال</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -282,5 +290,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>تشخیص خودکار خطا</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>به Intelligent Terminal اجازه دهید به پوسته شما دسترسی پیدا کند و خطاها را به طور خودکار تشخیص دهد.</value>
   </data>
 </root>

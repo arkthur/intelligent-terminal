@@ -2754,6 +2754,14 @@
   </data>
   <data name="Nav_AIAgents.Content" xml:space="preserve"><value>Agentes</value><comment>Header for the "Agents" menu item. This navigates to a page that lets you configure AI agent integration settings.</comment></data>
   <data name="AIAgents_PageSubtitle.Text" xml:space="preserve"><value>Configura cómo funcionan los agentes en todo el terminal</value><comment>Subtitle shown beneath the page title on the AI Agents settings page.</comment></data>
+  <data name="AIAgents_PageSubtitlePrefix" xml:space="preserve">
+    <value>Configura cómo funcionan los agentes en todo el terminal.</value>
+    <comment>Subtitle shown beneath the page title on the AI Agents settings page. The hyperlink in AIAgents_PageSubtitlePrivacyLink follows this sentence inline; the trailing period belongs to this prefix.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrivacyLink" xml:space="preserve">
+    <value>Más información sobre cómo se utilizan los datos.</value>
+    <comment>Inline hyperlink text that follows the AI Agents page subtitle and navigates to the privacy policy page. Includes a trailing period.</comment>
+  </data>
   <data name="AIAgents_AcpGroupHeader.Text" xml:space="preserve"><value>Panel del agente</value><comment>Section header for the agent pane settings group.</comment></data>
   <data name="AIAgents_DelegateGroupHeader.Text" xml:space="preserve"><value>Paleta de comandos</value><comment>Section header for the command palette agent settings group.</comment></data>
   <data name="AIAgents_AcpAgent.Header" xml:space="preserve"><value>Agente</value><comment>Header for the setting that specifies which AI agent CLI powers the agent pane.</comment></data>
@@ -2833,5 +2841,17 @@
   <data name="AIAgents_HooksInstallationFailedSummary" xml:space="preserve">
     <value>Error de instalación de Hooks. Consulte %LOCALAPPDATA%\IntelligentTerminal\logs\wta-install-hooks.log para obtener detalles.</value>
     <comment>Failure summary shown when installing agent session tracking hooks fails. {Locked="Hooks","%LOCALAPPDATA%","IntelligentTerminal","logs","wta-install-hooks.log"}</comment>
+  </data>
+  <data name="AIAgents_AutoErrorDetectionTitle.Text" xml:space="preserve">
+    <value>Detección automática de errores</value>
+  </data>
+  <data name="AIAgents_AutoErrorDetectionCaption.Text" xml:space="preserve">
+    <value>Permita que Intelligent Terminal acceda a su shell y detecte errores automáticamente. Disponible en PowerShell y Windows PowerShell.</value>
+  </data>
+  <data name="AIAgents_AutoErrorSuggestionTitle.Text" xml:space="preserve">
+    <value>Sugerencia automática de errores</value>
+  </data>
+  <data name="AIAgents_AutoErrorSuggestionCaption.Text" xml:space="preserve">
+    <value>Permita que Intelligent Terminal envíe errores a su agente para sugerir correcciones automáticamente.</value>
   </data>
 </root>

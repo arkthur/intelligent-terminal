@@ -40,10 +40,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>ھازىر نېمە تەڭشەيدىغاننى تاللاڭ. بۇلارنى ئىختىيارى ۋاقتتا ئۆزگەرتەلەيسىز </value>
+    <value>ھازىر نېمىنى تەڭشەشنى تاللاڭ. بۇلارنى ھەر ۋاقىتتا ئۆزگەرتەلەيسىز. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>تەڭشەكلەر</value>
+    <value>سانلىق مەلۇماتلارنىڭ قانداق ئىشلىتىلىدىغانلىقىنى ئۆگىنىڭ</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>ۋەكىل</value>
@@ -58,10 +58,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>مەغلۇپ بولغان بۇيرۇقلار ئۈچۈن تۈزىتىشلەرنى ئاپتوماتىك تەۋسىيە قىلىش</value>
+    <value>ئاپتوماتىك خاتالىق تەكلىپى</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>قوزغىتىلغاندا، AI ۋاكالەتچىسى مەغلۇپ بولغان بۇيرۇقلارنى ئاپتوماتىك تەھلىل قىلىپ، بىر تۈزىتىش تەكلىپ قىلىدۇ. چەكلەنگەندە، مەغلۇپ بولغان بۇيرۇقلار ھالەت بالداقتا چېكىشكە بولىدىغان كۆرسەتمە كۆرسىتىدۇ — تۈزىتىش تەلەپ قىلىش ئۈچۈن Ctrl+Alt+. نى بېسىڭ ياكى كۆرسەتمىنى چېكىڭ.</value>
+    <value>Intelligent Terminal غا خاتالىقلارنى ۋاكالەتچىڭىزگە ئەۋەتىپ، تۈزىتىشلەرنى ئاپتوماتىك تەكلىپ قىلىشقا رۇخسەت بېرىڭ.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -133,6 +133,14 @@
     <value>خاتالىق بايقالدى: تۈزىتىش ئۈچۈن {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>خاتانى تۈزىتىش ئۈچۈن {0} نى چېكىڭ</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>خاتالىق بايقالدى. سۈنئىي ئەقىل ۋاكالەتچىسىگە دىياگنوز قويۇپ، تۈزىتىش تەكلىپ قىلىشىنى سوراش ئۈچۈن {0} نى چېكىڭ ياكى بېسىڭ.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>تۈزىتىش تەييار — قوللىنىش ئۈچۈن {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -168,5 +176,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>ئاپتوماتىك خاتالىق بايقاش</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Intelligent Terminal غا شېلىڭىزنى زىيارەت قىلىش ۋە خاتالىقلارنى ئاپتوماتىك بايقاشقا رۇخسەت بېرىڭ.</value>
   </data>
 </root>

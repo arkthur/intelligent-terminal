@@ -45,6 +45,7 @@ auth.hint_footer: "  Prema Intro para iniciar sesión, Esc para volver atrás"  
 chat.activity_thinking: "Pensando…"
 # {Locked="Intelligent Terminal"} - nome do produto, non traducir
 chat.welcome_title: "Benvido a Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal usa IA. Comprobe se hai erros."
 chat.plan_header: "Plan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -105,8 +106,8 @@ agent.custom.auth_hint: "Asegúrese de que %{name} estea instalado e no seu PATH
 
 # ── Vista de axentes (src/ui/agents_view.rs) ─────────────────────────────────
 agents.loading: "Cargando..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - combinacións de teclas, non traducir
-agents.footer_hint: "(↑ ↓ para navegar • Enter para iniciar sesión nunha pestana nova • Shift+enter para iniciar sesión no panel de axente • Esc para saír)"
+# {Locked="Enter","Esc","↑","↓"} - combinacións de teclas, non traducir
+agents.footer_hint: "(↑ ↓ para navegar • Enter para iniciar sesión • Esc para saír)"
 agents.status.active: "Activo"
 agents.status.waiting_for_input: "Agardando entrada"
 agents.status.error: "Erro"

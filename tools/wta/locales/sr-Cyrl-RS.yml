@@ -45,6 +45,7 @@ auth.hint_footer: "  Притисните Enter за пријаву, Esc за п
 chat.activity_thinking: "Размишљам…"
 # {Locked="Intelligent Terminal"} - product name, do not translate
 chat.welcome_title: "Добродошли у Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal користи AI. Проверите грешке."
 chat.plan_header: "План:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -70,7 +71,7 @@ commands.help_close_hint: "  Esc        Затвори ову помоћ"  # {Lo
 commands.help.summary: "Прикажи ову листу команди"
 commands.clear.summary: "Обриши историју ћаскања (задржава сесију)"
 commands.new.summary: "Покрени нову сесију ACP (одбацује историју)"  # {Locked="ACP"}
-commands.restart.summary: "Поново се повежи: заустави процес агента и поново га покрени"
+commands.restart.summary: "Поново покрени агента"
 commands.stop.summary: "Откажи упит у току"
 commands.sessions.summary: "Отвори бирач претходних сесија (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 # ── Recommendations panel (src/ui/recommendations.rs) ───────────────────────
@@ -112,8 +113,8 @@ agent.custom.auth_hint: "Проверите да је %{name} инсталира
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Учитавање..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ за навигацију • Enter за отварање сесије у новој картици • Shift+enter за отварање сесије у панелу агента • Esc за излаз)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ за навигацију • Enter за отварање сесије • Esc за излаз)"
 agents.status.active: "Активан"
 agents.status.waiting_for_input: "Чека на унос"
 agents.status.error: "Грешка"

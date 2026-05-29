@@ -48,6 +48,7 @@ auth.hint_footer: "  Սեղմեք Enter մուտք գործելու համար, 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────────────────────────────
 chat.activity_thinking: "Մտածում եմ…"
 chat.welcome_title: "Բարի գալուստ Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal-ը օգտագործում է AI: Ստուգեք սխալները."
 # Header label for the AI agent's step-by-step plan section
 chat.plan_header: "Պլան՝"
 chat.plan_marker_completed: "[x]"  # {Locked}
@@ -80,7 +81,7 @@ commands.help_close_hint: "  Esc        Փակել օգնությունը"  # {L
 commands.help.summary: "Ցուցադրել այս հրամանների ցանկը"
 commands.clear.summary: "Մաքրել զրույցի ոլորման պատմությունը (նիստը պահպանվում է)"
 commands.new.summary: "Սկսել նոր ACP նիստ (ջնջել պատմությունը)"  # {Locked="ACP"}
-commands.restart.summary: "Վերամիացում․ ավարտել ագենտի գործընթացը և նորից գործարկել"
+commands.restart.summary: "Վերագործարկել ագենտը"
 commands.stop.summary: "Չեղարկել ընթացիկ հարցումը"
 commands.sessions.summary: "Բացել պատմական նիստերի ընտրիչը (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
@@ -127,8 +128,8 @@ agent.custom.auth_hint: "Համոզվեք, որ %{name}-ը տեղադրված է
 
 # ── Agents view (src/ui/agents_view.rs) ───────────────────────────────────────────────────────────────
 agents.loading: "Բեռնվում է..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ նավիգացիա • Enter նոր ներդիրում նիստ գործարկելու համար • Shift+enter ագենտի վահանակում նիստ գործարկելու համար • Esc դուրս գալու համար)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ նավիգացիա • Enter նիստ գործարկելու համար • Esc դուրս գալու համար)"
 # Status badge when agent session is actively processing
 agents.status.active: "Ակտիվ"
 agents.status.waiting_for_input: "Սպասում է մուտքի"

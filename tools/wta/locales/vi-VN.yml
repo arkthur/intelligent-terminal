@@ -45,6 +45,7 @@ auth.hint_footer: "  Nhấn Enter để đăng nhập, Esc để quay lại"  # 
 chat.activity_thinking: "Đang suy nghĩ…"
 # {Locked="Intelligent Terminal"} - tên sản phẩm, không dịch
 chat.welcome_title: "Chào mừng bạn đến Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal sử dụng AI. Hãy kiểm tra lỗi."
 chat.plan_header: "Kế hoạch:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -105,8 +106,8 @@ agent.custom.auth_hint: "Hãy đảm bảo %{name} đã được cài đặt và
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Đang tải..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ để di chuyển • Enter để mở phiên trong tab mới • Shift+enter để mở phiên trong bảng tác nhân AI • Esc để thoát)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ để di chuyển • Enter để mở phiên • Esc để thoát)"
 agents.status.active: "Đang hoạt động"
 agents.status.waiting_for_input: "Đang chờ nhập liệu"
 agents.status.error: "Lỗi"

@@ -41,6 +41,7 @@ auth.hint_footer: "  按 Enter 登入，按 Esc 返回"  # {Locked="Enter","Esc"
 # ── 聊天檢視 (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "思考中…"
 chat.welcome_title: "歡迎使用智慧型終端機！"
+chat.welcome_disclaimer: "Intelligent Terminal 使用 AI。請檢查是否有誤。"
 chat.plan_header: "計畫："
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -101,8 +102,8 @@ agent.custom.auth_hint: "請確認 %{name} 已安裝並位於 PATH 上。"  # {L
 
 # ── 智慧代理檢視 (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "載入中..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - 組合鍵，請勿翻譯
-agents.footer_hint: "(↑ ↓ 瀏覽 • Enter 在新索引標籤中啟動工作階段 • Shift+enter 在智慧代理窗格中啟動工作階段 • Esc 結束)"
+# {Locked="Enter","Esc","↑","↓"} - 組合鍵，請勿翻譯
+agents.footer_hint: "(↑ ↓ 瀏覽 • Enter 啟動工作階段 • Esc 結束)"
 agents.status.active: "使用中"
 agents.status.waiting_for_input: "等待輸入"
 agents.status.error: "錯誤"
@@ -172,6 +173,6 @@ time.days_other: "%{count} 天前"
 commands.help.summary: "顯示此命令清單"
 commands.clear.summary: "清除聊天記錄（保留工作階段）"
 commands.new.summary: "啟動新的 ACP 工作階段（清空歷史記錄）"
-commands.restart.summary: "重新連線：終止智能體處理程序並重新啟動"
+commands.restart.summary: "重新啟動智慧代理"
 commands.stop.summary: "取消進行中的提示"
 commands.sessions.summary: "開啟歷史工作階段選擇器（Ctrl+Shift+/）"

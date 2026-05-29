@@ -40,10 +40,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Agħżel x'se tissettja issa. Tista' tibdel dawn fi kwalunkwe ħin fi </value>
+    <value>Agħżel x'trid tissettja issa. Tista' tibdel dawn fi kwalunkwe ħin. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Settings</value>
+    <value>Tgħallem kif tintuża d-data</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Aġent</value>
@@ -58,10 +58,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Issuġġerixxi awtomatikament tiswijiet għal kmandi li jfallu</value>
+    <value>Suġġeriment awtomatiku tal-iżbalji</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Meta tkun attivata, l-aġent tal-IA janalizza awtomatikament il-kmandi li jfallu u jipproponi tiswija. Meta tkun diżattivata, il-kmandi li jfallu juru ħjiel li tista' tikklikkja fil-bar tal-istat — agħfas Ctrl+Alt+. jew ikklikkja l-ħjiel biex titlob tiswija.</value>
+    <value>Agħti permess lil Intelligent Terminal biex jibgħat l-iżbalji lill-aġent tiegħek biex jissuġġerixxi soluzzjonijiet awtomatikament.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -133,6 +133,14 @@
     <value>Instab żball: {0} biex tirranġa</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Ikklikkja {0} biex tirranġa l-iżball</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Instab żball. Ikklikkja jew agħfas {0} biex titlob lill-aġent tal-IA jiddijanjostika u jissuġġerixxi soluzzjoni.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Soluzzjoni lesta — {0} biex tapplika</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -168,5 +176,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Identifikazzjoni awtomatika tal-iżbalji</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Agħti permess lil Intelligent Terminal biex jaċċessa l-qoxra tiegħek u jidentifika l-iżbalji awtomatikament.</value>
   </data>
 </root>

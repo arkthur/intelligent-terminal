@@ -153,10 +153,10 @@
     <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Alegeți ce doriți să configurați acum. Puteți modifica oricând aceste setări din </value>
+    <value>Alegeți ce doriți să configurați acum. Puteți modifica aceste setări oricând. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Setări</value>
+    <value>Aflați cum sunt utilizate datele</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Agent</value>
@@ -171,10 +171,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Sugerează automat remedieri pentru comenzile eșuate</value>
+    <value>Sugerarea automată a erorilor</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Când este activat, agentul IA analizează automat comenzile eșuate și propune o remediere. Când este dezactivat, comenzile eșuate afișează un indiciu pe care se poate face clic în bara de stare — apăsați Ctrl+Alt+. sau faceți clic pe indiciu pentru a solicita o remediere.</value>
+    <value>Permiteți Intelligent Terminal să trimită erorile către agent pentru a sugera automat remedieri.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -246,6 +246,14 @@
     <value>Eroare detectată: {0} pentru remediere</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Apasă pe {0} pentru a remedia eroarea</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Eroare detectată. Fă clic sau apasă {0} pentru a cere agentului AI să diagnosticheze și să sugereze o remediere.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Remediere gata — {0} pentru aplicare</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -281,5 +289,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Detectarea automată a erorilor</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Permiteți Intelligent Terminal să acceseze shell-ul și să detecteze automat erorile.</value>
   </data>
 </root>

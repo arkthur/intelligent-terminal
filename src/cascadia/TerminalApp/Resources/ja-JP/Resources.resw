@@ -998,10 +998,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>今すぐ設定する項目を選択してください。これらはいつでも</value>
+    <value>今すぐ設定する項目を選択してください。これらはいつでも変更できます。</value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>設定</value>
+    <value>データの使用方法について確認する</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>エージェント</value>
@@ -1018,10 +1018,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>失敗したコマンドの修正候補を自動的に提案する</value>
+    <value>エラーの自動提案</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>有効にすると、AI エージェントが失敗したコマンドを自動的に分析し、修正案を提案します。無効にすると、失敗したコマンドはステータス バーにクリック可能なヒントを表示します — Ctrl+Alt+. を押すか、ヒントをクリックすると修正をリクエストできます。</value>
+    <value>Intelligent Terminal がエラーをエージェントに送信して、修正を自動的に提案することを許可します。</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -1102,6 +1102,14 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>エラーを検出しました: {0} で修正</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>エラーを修正するには {0} をクリック</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>エラーが検出されました。クリックするか、{0} を押して AI エージェントに診断と修正案の提案を依頼してください。</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>修正の準備ができました — {0} で適用</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -1137,5 +1145,11 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>エラーの自動検出</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Intelligent Terminal にシェルへのアクセスを許可し、エラーを自動的に検出します。</value>
   </data>
 </root>

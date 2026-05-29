@@ -153,10 +153,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Şimdi neleri ayarlamak istediğinizi seçin. Bunları istediğiniz zaman </value>
+    <value>Şimdi neyi ayarlamak istediğinizi seçin. Bunları istediğiniz zaman değiştirebilirsiniz. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Ayarlar</value>
+    <value>Verilerin nasıl kullanıldığını öğrenin</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Aracı</value>
@@ -171,10 +171,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Başarısız komutlar için otomatik olarak düzeltmeler öner</value>
+    <value>Otomatik hata önerisi</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Etkinleştirildiğinde, AI aracısı başarısız komutları otomatik olarak analiz eder ve bir düzeltme önerir. Devre dışı bırakıldığında, başarısız komutlar durum çubuğunda tıklanabilir bir ipucu gösterir — bir düzeltme istemek için Ctrl+Alt+. tuşlarına basın veya ipucuna tıklayın.</value>
+    <value>Intelligent Terminal uygulamasının düzeltmeleri otomatik olarak önermek için hataları aracınıza göndermesine izin verin.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -246,6 +246,14 @@
     <value>Hata algılandı: düzeltmek için {0}</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Hatanın düzeltilmesi için {0} öğesine tıklayın</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Hata algılandı. AI aracısının tanılaması ve bir düzeltme önermesi için {0} öğesine tıklayın veya basın.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Düzeltme hazır — uygulamak için {0}</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -281,5 +289,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Otomatik hata algılama</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Intelligent Terminal uygulamasının kabuğunuza erişmesine ve hataları otomatik olarak algılamasına izin verin.</value>
   </data>
 </root>

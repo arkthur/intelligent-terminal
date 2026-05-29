@@ -45,6 +45,7 @@ auth.hint_footer: "  Tryck Enter för att logga in, Esc för att gå tillbaka"  
 chat.activity_thinking: "Tänker..."
 # {Locked="Intelligent Terminal"} - product name, do not translate
 chat.welcome_title: "Välkommen till Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal använder AI. Kontrollera om det finns fel."
 chat.plan_header: "Plan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -105,8 +106,8 @@ agent.custom.auth_hint: "Se till att %{name} är installerat och finns i din PAT
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Laddar..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ för att navigera • Enter för att starta session i ny flik • Shift+enter för att starta session i agentpanelen • Esc för att avsluta)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ för att navigera • Enter för att starta session • Esc för att avsluta)"
 agents.status.active: "Aktiv"
 agents.status.waiting_for_input: "Väntar på inmatning"
 agents.status.error: "Fel"

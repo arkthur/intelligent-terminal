@@ -45,6 +45,7 @@ auth.hint_footer: "  לחץ Enter כדי להיכנס, Esc כדי לחזור"  #
 chat.activity_thinking: "חושב…"
 # {Locked="Intelligent Terminal"} - שם המוצר, אין לתרגם
 chat.welcome_title: "ברוכים הבאים ל-Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal משתמש ב-AI. בדוק אם יש שגיאות."
 chat.plan_header: "תוכנית:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -73,7 +74,7 @@ commands.help_close_hint: "  Esc        סגור עזרה זו"  # {Locked="Esc"
 commands.help.summary: "הצג את רשימת הפקודות הזו"
 commands.clear.summary: "נקה את היסטוריית הגלילה של הצ׳אט (משאיר את ההפעלה)"
 commands.new.summary: "התחל הפעלת ACP חדשה (מוחק היסטוריה)"  # {Locked="ACP"}
-commands.restart.summary: "התחבר מחדש: סיים את תהליך הסוכן והפעל מחדש"
+commands.restart.summary: "הפעל מחדש את הסוכן"
 commands.stop.summary: "בטל את הבקשה שמתבצעת"
 commands.sessions.summary: "פתח את בורר ההפעלות ההיסטוריות (Ctrl+Shift+/)"  # {Locked="Ctrl+Shift+/"}
 
@@ -116,8 +117,8 @@ agent.custom.auth_hint: "ודא ש-%{name} מותקן ונמצא ב-PATH שלך.
 
 # ── תצוגת סוכנים (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "טוען..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - צירופי מקשים, אין לתרגם
-agents.footer_hint: "(↑ ↓ לניווט • Enter להפעלת הפעלה בכרטיסייה חדשה • Shift+enter להפעלת הפעלה בחלונית הסוכן • Esc ליציאה)"
+# {Locked="Enter","Esc","↑","↓"} - צירופי מקשים, אין לתרגם
+agents.footer_hint: "(↑ ↓ לניווט • Enter להפעלת הפעלה • Esc ליציאה)"
 agents.status.active: "פעיל"
 agents.status.waiting_for_input: "ממתין לקלט"
 agents.status.error: "שגיאה"

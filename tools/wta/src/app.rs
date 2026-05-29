@@ -269,6 +269,11 @@ pub enum ChatMessage {
     /// codes, OSC sequences). Distinct from `Error` so we can theme it
     /// differently and skip autofix wiring.
     AgentEvent(String),
+    /// "Intelligent Terminal uses AI. Check for mistakes" disclaimer.
+    /// Pushed on every agent-pane startup,
+    /// no persistence gating — getting cleared by the next turn is fine,
+    /// the next pane startup re-pushes it.
+    Disclaimer,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -286,6 +291,42 @@ pub struct CompletedTurn {
     /// cancels a mid-stream turn — `None` for normal chat turns.
     #[serde(default)]
     pub trailing_marker: Option<String>,
+}
+
+/// Maximum displayed characters for a collapsed turn header preview.
+/// Picked so the `▶ > <preview>…` row stays well under a typical 120-col
+/// wrap width even after the chevron + prompt prefix; longer prompts get
+/// truncated with a trailing ellipsis. The full original text is always
+/// preserved in the turn's first `details` entry.
+const COLLAPSED_PROMPT_PREVIEW_CHARS: usize = 80;
+
+/// Build the single-line preview shown in a collapsed `CompletedTurn`
+/// header. Takes the first non-blank line of the prompt and clips it to
+/// `COLLAPSED_PROMPT_PREVIEW_CHARS`. Multi-line prompts (system prompts,
+/// pasted blocks, etc.) collapse to one row instead of wrapping over
+/// dozens of lines in the chat scrollback.
+pub fn collapsed_prompt_preview(text: &str) -> String {
+    let first_line = text
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("");
+    let mut iter = first_line.chars();
+    let mut out: String = (&mut iter).take(COLLAPSED_PROMPT_PREVIEW_CHARS).collect();
+    // Append ellipsis if the prompt has more content than the preview
+    // covered — either the first line itself was longer, or there are
+    // additional non-empty lines below.
+    let truncated = iter.next().is_some()
+        || text
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .nth(1)
+            .is_some();
+    if truncated {
+        out.push('…');
+    }
+    out
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -399,7 +440,60 @@ where
         .get("agent_session_id")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let key = reg.resolve_or_synthesize_key(asid, pane_session_id);
+    let mut key = reg.resolve_or_synthesize_key(asid, pane_session_id);
+    // Some agent CLIs fire hooks
+    // without populating either `agent_session_id` (in the JSON
+    // payload) or `WT_SESSION` (in the env of the hook subprocess).
+    // The reproducible case is Copilot CLI's `Notification` hook,
+    // which fires when the agent needs user input (e.g. "approve this
+    // command?"). Without both inputs, `resolve_or_synthesize_key`
+    // hands back `pane:<focused-pane-guid>` — a key that no real
+    // session row owns. The reducer then no-ops, AND the synthetic
+    // key gates the event out of the master publish path (see
+    // `key_is_synthetic` below), so master never learns the row is
+    // now waiting for input. Net effect: the F2 row stays at
+    // `Working` ("Active") from the prior `tool.starting` and never
+    // flips to `Attention` ("Waiting for input").
+    //
+    // The fallback is intentionally narrow:
+    //   * Only triggers when the resolved key is synthetic AND the
+    //     event carried no agent_session_id at all (so we don't paper
+    //     over genuinely unknown session ids the agent DID provide).
+    //   * Only triggers for the events that observably exhibit the
+    //     missing-id problem in the wild — limiting blast radius if a
+    //     CLI starts emitting hooks for sessions WTA truly doesn't
+    //     know about.
+    //   * Filters by `cli_source` so a sessionless Copilot event can't
+    //     accidentally land on the user's Claude row.
+    //   * `most_recent_live_session_for_cli` rejects `Unknown` cli
+    //     hints, so any event without a trustworthy CLI label still
+    //     falls through to the synthetic key.
+    let mut key_is_synthetic = key.starts_with("pane:");
+    if key_is_synthetic && asid.is_empty() {
+        let needs_fallback = matches!(
+            event,
+            "agent.notification"
+                | "agent.tool.starting"
+                | "agent.tool.completed"
+                | "agent.tool.finished"
+                | "agent.tool.failed"
+        );
+        if needs_fallback {
+            if let Some(fallback) = reg.most_recent_live_session_for_cli(&cli_source) {
+                tracing::info!(
+                    target: "agent_route",
+                    event = %event,
+                    cli_source = ?cli_source,
+                    pane_session_id = %pane_session_id,
+                    from = %key,
+                    to = %fallback,
+                    "sessionless hook: falling back to most-recently-active live session for cli",
+                );
+                key = fallback;
+                key_is_synthetic = false;
+            }
+        }
+    }
     let key_for_refresh = key.clone();
     tracing::info!(
         target: "agent_route",
@@ -434,15 +528,16 @@ where
     };
     // A `pane:<guid>` key means we couldn't resolve a real ACP session id
     // from the event payload (broken hook, race between hook arrival and
-    // `new_session` reaching master, etc.). Keep the local placeholder for
-    // helper bookkeeping (so `is_agent_pane(pane_id)` works for the OSC
-    // 133;A handler) but DO NOT publish these to master — master only ever
+    // `new_session` reaching master, etc.) AND the cli-source fallback
+    // above (`most_recent_live_session_for_cli`) didn't find a live
+    // session to attach to. Keep the local placeholder for helper
+    // bookkeeping (so `is_agent_pane(pane_id)` works for the OSC 133;A
+    // handler) but DO NOT publish these to master — master only ever
     // learns about real ACP sessions via `new_session`/`load_session`,
     // and feeding it synthetic rows produces duplicate F2 entries that
     // shadow the real session (one with the real sid, one with `pane:`
     // key, both pointing at the same agent — see PR B debug session log
     // around 2026-05-28T00:30 for the user-visible repro).
-    let key_is_synthetic = key.starts_with("pane:");
     let needs_synthetic_start = event != "agent.session.started" && !session_known;
     if needs_synthetic_start {
         let synthetic_event = SessionEvent::SessionStarted {
@@ -1134,8 +1229,11 @@ pub struct TabAutofixState {
     /// (Esc), the error resolves (exit 0 on the same pane), or the fix
     /// is executed.
     pub pane_id: Option<String>,
+    /// Monotonic timestamp captured when `pane_id` is armed, used for
+    /// ErrorFixResolved telemetry elapsed time.
+    pub armed_at: Option<std::time::Instant>,
     /// Failing pane for the Suggested terminal state (a non-actionable
-    /// explanation in chat — distinct from autofix_pane_id so the two
+    /// explanation in chat — distinct from `pane_id` so the two
     /// kinds of "the bar is showing something" can be reasoned about
     /// independently).
     pub suggested_pane_id: Option<String>,
@@ -1147,6 +1245,14 @@ pub struct TabAutofixState {
     /// tab wasn't active). Used to re-emit on tab_changed so the bar
     /// shows the right state when the user comes back to this tab.
     pub bar_snapshot: AutofixBarSnapshot,
+    /// PaneID where the most recent D-synchronous state set happened
+    /// (Detected or Pending — both fire ~1ms before PowerShell emits the
+    /// next `osc:133;A`). The next prompt-start in that pane is consumed
+    /// as the trigger's echo rather than as a "user moved on" dismiss,
+    /// otherwise the state we just set would be cleared before reaching
+    /// the user. Cleared when the echo A arrives, or when the state
+    /// transitions out (set_bar_snapshot → Idle).
+    pub trigger_echo_pane: Option<String>,
 }
 
 /// Snapshot of the bottom-bar autofix state for one tab. Mirrors the
@@ -1399,6 +1505,67 @@ impl TabSession {
         }
     }
 
+    /// Compact replayed history into collapsed `CompletedTurn` rows so a
+    /// long resumed session doesn't dump the entire transcript inline.
+    /// Called at session/load completion (after `flush_load_replay_pending`)
+    /// from the `SessionAttached` handler.
+    ///
+    /// Algorithm: walk `self.messages` left-to-right; each `User` opens a
+    /// new turn. The turn's `prompt` is a SHORT single-line preview of
+    /// the user text (so the collapsed `▶ > <preview>` row stays at one
+    /// visual line even for huge system-prompt-as-user dumps); the full
+    /// original `User(text)` is stored as the first entry of `details`,
+    /// followed by subsequent non-User messages. Messages that come
+    /// BEFORE the first User (e.g. the `System("Resuming session …")`
+    /// marker, or a stray Agent dump) stay in `messages` as-is — only
+    /// User-anchored turns get packed. Each packed turn has `expanded:
+    /// false` so history is collapsed by default. Tab + Enter toggles
+    /// individual rows.
+    pub fn pack_replayed_messages_into_turns(&mut self) {
+        if self.messages.is_empty() {
+            return;
+        }
+        let drained: Vec<ChatMessage> = std::mem::take(&mut self.messages);
+        let mut kept: Vec<ChatMessage> = Vec::new();
+        // `details` always opens with the full original ChatMessage::User
+        // so expanding the turn shows the entire prompt text. `prompt`
+        // is the short preview used in the collapsed header row.
+        let mut current: Option<(String, Vec<ChatMessage>)> = None;
+        for msg in drained {
+            match msg {
+                ChatMessage::User(text) => {
+                    if let Some((prompt, details)) = current.take() {
+                        self.completed_turns.push(CompletedTurn {
+                            prompt,
+                            details,
+                            expanded: false,
+                            trailing_marker: None,
+                        });
+                    }
+                    let preview = collapsed_prompt_preview(&text);
+                    let details = vec![ChatMessage::User(text)];
+                    current = Some((preview, details));
+                }
+                other => {
+                    if let Some((_, details)) = current.as_mut() {
+                        details.push(other);
+                    } else {
+                        kept.push(other);
+                    }
+                }
+            }
+        }
+        if let Some((prompt, details)) = current.take() {
+            self.completed_turns.push(CompletedTurn {
+                prompt,
+                details,
+                expanded: false,
+                trailing_marker: None,
+            });
+        }
+        self.messages = kept;
+    }
+
     /// Cycle the past-turn selection toward older entries.
     /// `None → last (most recent) → ... → 0 → None`. No-op when there are
     /// no completed turns.
@@ -1633,6 +1800,8 @@ pub struct App {
     restart_tx: mpsc::UnboundedSender<RestartRequest>,
     master_request_tx: mpsc::UnboundedSender<crate::protocol::acp::client::MasterExtRequest>,
     debug_capture_enabled: Arc<AtomicBool>,
+    /// Cached for creating DeferredAcpParams after auth-error recovery.
+    shell_mgr: Arc<crate::shell::ShellManager>,
     // Slash-command UI state. The /help overlay is global — it covers
     // the chat area regardless of which tab is active. Per-tab popup
     // state (the command-completion candidates as the user types `/he…`)
@@ -1658,7 +1827,8 @@ pub struct App {
     pub wt_notifications: std::collections::VecDeque<WtNotification>,
     pub show_notification_banner: bool,
     // Auto-fix global on/off. Per-tab autofix machinery (pane_id,
-    // generation, suggested_pane_id, bar_snapshot) lives on `TabSession.autofix`.
+    // generation, suggested_pane_id, armed_at, bar_snapshot) lives on
+    // `TabSession.autofix`.
     pub autofix_enabled: bool,
     // Per-tab conversation sessions. Keyed by the stable tab GUID WT mints
     // at tab construction. The active tab is `tab_id` — seeded from the
@@ -1863,6 +2033,7 @@ impl App {
         debug_capture_enabled: Arc<AtomicBool>,
         wt_connected: bool,
         autofix_enabled: bool,
+        shell_mgr: Arc<crate::shell::ShellManager>,
     ) -> Self {
         let mut tab_sessions = HashMap::new();
         tab_sessions.insert(DEFAULT_TAB_ID.to_string(), TabSession::default());
@@ -1930,6 +2101,7 @@ impl App {
             transient_hint: None,
             alive: crate::session_registry::InMemoryRegistry::shared(),
             alive_loaded: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            shell_mgr,
         }
     }
 
@@ -1978,17 +2150,24 @@ impl App {
 
         if let (Some(ref tx), Some(ref mut params)) = (&self.event_tx, &mut self.deferred_acp) {
             // If channels were consumed by a previous (failed) attempt, create fresh ones.
-            // Also update self.prompt_tx so the App sends prompts to the new ACP client.
+            // Also update all sender fields on self so the App routes to the new ACP client.
             if params.prompt_rx.is_none() {
                 let (ptx, prx) = mpsc::unbounded_channel();
-                let (_ctx, crx) = mpsc::unbounded_channel();
-                let (_ntx, nrx) = mpsc::unbounded_channel();
-                let (_ltx, lrx) = mpsc::unbounded_channel();
-                let (_dtx, drx) = mpsc::unbounded_channel();
-                let (_rntx, rnrx) = mpsc::unbounded_channel();
-                let (_rtx, rrx) = mpsc::unbounded_channel();
-                let (_mtx, mrx) = mpsc::unbounded_channel();
+                let (ctx, crx) = mpsc::unbounded_channel();
+                let (ntx, nrx) = mpsc::unbounded_channel();
+                let (ltx, lrx) = mpsc::unbounded_channel();
+                let (dtx, drx) = mpsc::unbounded_channel();
+                let (rntx, rnrx) = mpsc::unbounded_channel();
+                let (rtx, rrx) = mpsc::unbounded_channel();
+                let (mtx, mrx) = mpsc::unbounded_channel();
                 self.prompt_tx = ptx;
+                self.cancel_tx = ctx;
+                self.new_session_tx = ntx;
+                self.load_session_tx = ltx;
+                self.drop_session_tx = dtx;
+                self.rename_session_tx = rntx;
+                self.restart_tx = rtx;
+                self.master_request_tx = mtx;
                 params.prompt_rx = Some(prx);
                 params.cancel_rx = Some(crx);
                 params.new_session_rx = Some(nrx);
@@ -3058,13 +3237,27 @@ impl App {
                         }
                     }
 
+                    if found_success {
+                        // Stdout confirmed login succeeded — return
+                        // immediately. Don't wait for stderr or the
+                        // child process; copilot login may have spawned
+                        // sub-processes that keep pipes open.
+                        tracing::info!("login: stdout success detected, returning immediately");
+                        let _ = child.kill();
+                        // Don't call child.wait() — it can block if
+                        // sub-processes are still running.
+                        drop(stderr_handle);
+                        return true;
+                    }
+
                     let stderr_success = stderr_handle.join().unwrap_or(false);
-                    found_success = found_success || stderr_success;
+                    found_success = stderr_success;
 
                     if !found_success {
                         // Wait for process and check exit code
                         found_success = child.wait().map(|s| s.success()).unwrap_or(false);
                     } else {
+                        let _ = child.kill();
                         let _ = child.wait();
                     }
                     found_success
@@ -3072,10 +3265,12 @@ impl App {
                 .await;
 
                 let success = result.unwrap_or(false);
-                let _ = tx.send(AppEvent::LoginComplete {
+                tracing::info!("login: spawn_blocking returned, sending LoginComplete success={}", success);
+                let send_result = tx.send(AppEvent::LoginComplete {
                     agent_id: id,
                     success,
                 });
+                tracing::info!("login: LoginComplete send result={:?}", send_result.is_ok());
             });
         }
     }
@@ -3714,7 +3909,13 @@ impl App {
                     self.mode = AppMode::Chat;
                     self.setup = None;
                 }
-                // Show welcome hint on first-ever connect (persisted in state.json)
+                // Show welcome hint on first-ever connect (persisted in state.json).
+                // The disclaimer card is pushed as a `ChatMessage::Disclaimer`
+                // on every agent-pane startup that lands on an empty chat (no
+                // prior completed turns and no other in-flight messages), so
+                // a session restored with history doesn't get a disclaimer
+                // injected on top. Once shown it's allowed to be cleared by
+                // a subsequent turn — the next startup re-pushes it.
                 if !welcome_shown_in_state() {
                     self.show_welcome_hint = true;
                 }
@@ -3727,6 +3928,19 @@ impl App {
                     .insert(session_id.clone(), bind_tab.clone());
                 let tab = self.tab_mut(&bind_tab);
                 tab.session_id = Some(session_id);
+                let has_real_content = !tab.completed_turns.is_empty()
+                    || tab
+                        .messages
+                        .iter()
+                        .any(|m| !matches!(m, ChatMessage::Disclaimer));
+                if !has_real_content
+                    && !tab
+                        .messages
+                        .iter()
+                        .any(|m| matches!(m, ChatMessage::Disclaimer))
+                {
+                    tab.messages.insert(0, ChatMessage::Disclaimer);
+                }
                 self.publish_agent_status();
             }
             AppEvent::SessionAttached {
@@ -3756,6 +3970,7 @@ impl App {
                     .unwrap_or(false);
                 if tab.loading_session && is_load_target {
                     tab.flush_load_replay_pending();
+                    tab.pack_replayed_messages_into_turns();
                     tab.loading_session = false;
                     tab.loading_target_session_id = None;
                     tab.scroll_to_bottom();
@@ -4889,6 +5104,24 @@ impl App {
                     }
                 }
 
+                // Telemetry: emit ErrorDetected for any non-acknowledged
+                // critical/actionable classification. Acknowledged events are
+                // the auto-silenced "unknown"/"connected"/success cases.
+                if !notification.acknowledged {
+                    let severity_str = match notification.severity {
+                        WtEventSeverity::Critical => Some("Critical"),
+                        WtEventSeverity::Actionable => Some("Actionable"),
+                        WtEventSeverity::Informational => None,
+                    };
+                    if let Some(severity_str) = severity_str {
+                        crate::telemetry::log_error_detected(
+                            severity_str,
+                            &method,
+                            &pane_id,
+                        );
+                    }
+                }
+
                 // Surface rule: WT events (connection_state, vt_sequence)
                 // surface via the bottom bar / `wt_notifications` queue ONLY.
                 // Chat is the agent dialogue surface — only user input and
@@ -4905,13 +5138,18 @@ impl App {
                         }
                     }
                     WtEventSeverity::Informational => {
-                        // A successful command (exit 0) in the armed/pending pane
-                        // means the error was resolved. Cancel any in-flight fix and dismiss.
-                        //
-                        // Suggested has weaker semantics: any prompt activity in any
-                        // pane (osc:133;A start of a new prompt, OR osc:133;D;0
-                        // exit-zero) signals the user is moving on. Suggested is a
-                        // global UI state, not pane-local.
+                        // "User moved past this prompt" = dismiss. Two signals
+                        // both count as "moved on":
+                        //   * exit-zero (D;0): the user ran any successful
+                        //     command in the failing pane.
+                        //   * prompt-start (A): the shell drew a fresh prompt
+                        //     line (user pressed Enter, switched away, etc.).
+                        // For Pending/Armed/Detected we gate prompt-start on
+                        // `trigger_echo_pane` so the immediate A that
+                        // PowerShell emits ~1ms after every D doesn't
+                        // dismiss the state we just established. Suggested
+                        // fires asynchronously (after the LLM returns), so
+                        // it has no echo to skip and dismisses on any A.
                         if method == "vt_sequence" {
                             let seq = params
                                 .get("sequence")
@@ -4928,17 +5166,60 @@ impl App {
                             // Older events without tab_id can't be cleanly
                             // routed; skip the per-tab clear for them.
                             let event_tab = tab_id.clone();
+                            // Consume the trigger-echo flag if this A is the
+                            // one PowerShell emits immediately after the
+                            // triggering D. `effective_prompt_start` is the
+                            // "user actually moved on" signal for D-synchronous
+                            // states (Pending / Detected). Suggested uses raw
+                            // `is_prompt_start` since it fires post-LLM.
+                            let effective_prompt_start = if is_prompt_start {
+                                if let Some(t) = event_tab.as_deref() {
+                                    let echo = self
+                                        .tab_mut(&t.to_string())
+                                        .autofix
+                                        .trigger_echo_pane
+                                        .clone();
+                                    if echo.as_deref() == Some(pane_id.as_str()) {
+                                        self.tab_mut(&t.to_string())
+                                            .autofix
+                                            .trigger_echo_pane = None;
+                                        false
+                                    } else {
+                                        true
+                                    }
+                                } else {
+                                    true
+                                }
+                            } else {
+                                false
+                            };
                             let armed_in_event_tab = event_tab
                                 .as_deref()
                                 .and_then(|t| self.tab_sessions.get(t))
                                 .and_then(|t| t.autofix.pane_id.as_deref())
                                 .map(str::to_string);
-                            if is_exit_zero
+                            if (is_exit_zero || effective_prompt_start)
                                 && armed_in_event_tab.as_deref() == Some(pane_id.as_str())
                             {
                                 let target_tab = event_tab
                                     .clone()
                                     .expect("armed_in_event_tab requires tab_id present");
+                                // Telemetry: a fix was armed for this pane and the next
+                                // command exited cleanly — the user's problem resolved.
+                                // Elapsed is monotonic (`Instant::elapsed`) from arm to
+                                // clean exit, not wall-clock.
+                                if let Some(armed) = self
+                                    .tab_mut(&target_tab)
+                                    .autofix
+                                    .armed_at
+                                    .take()
+                                {
+                                    let elapsed_ms = armed.elapsed().as_secs_f64() * 1000.0;
+                                    crate::telemetry::log_error_fix_resolved(
+                                        pane_id.as_str(),
+                                        elapsed_ms,
+                                    );
+                                }
                                 // `turn_cancel` owns the full cleanup: bumps
                                 // the tab's autofix_generation, emits cleared
                                 // (resolving the pane from AutofixContext, or
@@ -4980,12 +5261,13 @@ impl App {
                                     }
                                 }
                             }
-                            // Detected (suggest-mode pill): dismiss when
-                            // the user makes a fresh successful run in
-                            // the same pane. The Detected snapshot has
-                            // no in-flight turn to cancel — just clear
-                            // the bar.
-                            if is_exit_zero {
+                            // Detected (suggest-mode pill): dismiss when the
+                            // user moves on in the same pane — either a
+                            // successful command (exit-zero) or a fresh
+                            // prompt-start that isn't the trigger's echo.
+                            // The Detected snapshot has no in-flight turn
+                            // to cancel — just clear the bar.
+                            if is_exit_zero || effective_prompt_start {
                                 if let Some(t) = event_tab.as_deref() {
                                     let t_owned = t.to_string();
                                     let detected_matches = matches!(
@@ -5103,6 +5385,7 @@ impl App {
                 }
             }
             AppEvent::LoginComplete { success, .. } => {
+                tracing::info!("LoginComplete received: success={} deferred_acp={}", success, self.deferred_acp.is_some());
                 if success {
                     // Login succeeded → transition to Chat and start ACP
                     self.mode = AppMode::Chat;
@@ -5115,14 +5398,29 @@ impl App {
                         .map(|a| a.agent_id.clone())
                         .unwrap_or_default();
                     self.update_deferred_acp_agent(&agent_id);
-                    if self.deferred_acp.is_some() {
-                        self.pending_acp_start = true;
-                    } else {
+                    // If deferred_acp is None (helper mode — the initial
+                    // ACP client already exited with auth error and dropped
+                    // its channels), create a fresh DeferredAcpParams so
+                    // try_start_acp can spawn a new ACP client.
+                    if self.deferred_acp.is_none() {
                         let new_cmd = self.build_agent_cmd(&agent_id);
-                        let _ = self.restart_tx.send(RestartRequest {
-                            agent_cmd: Some(new_cmd),
+                        tracing::info!("LoginComplete: creating deferred_acp for reconnect cmd={}", new_cmd);
+                        self.deferred_acp = Some(DeferredAcpParams {
+                            agent_cmd: new_cmd,
+                            acp_model: None,
+                            prompt_rx: None, // try_start_acp will create fresh channels
+                            cancel_rx: None,
+                            new_session_rx: None,
+                            load_session_rx: None,
+                            drop_session_rx: None,
+                            rename_session_rx: None,
+                            restart_rx: None,
+                            master_ext_rx: None,
+                            shell_mgr: Arc::clone(&self.shell_mgr),
+                            wt_connected: self.wt_connected,
                         });
                     }
+                    self.pending_acp_start = true;
                     self.auth = None;
                 } else {
                     // Login failed — show auth screen again
@@ -5638,6 +5936,7 @@ impl App {
                     let pane_to_clear = {
                         let tab = self.current_tab_mut();
                         tab.autofix.generation = tab.autofix.generation.wrapping_add(1);
+                        tab.autofix.armed_at = None;
                         tab.autofix.pane_id.take()
                     };
                     if pane_to_clear.is_some() {
@@ -6017,11 +6316,25 @@ impl App {
                 self.project_active_tab_state();
             }
             CommandKind::Restart => {
-                // Full reconnect. Reset every tab: drop session_id (the
-                // old SessionIds are about to become invalid), clear
-                // streaming state, wipe scrollback. The ACP client side
-                // will kill the agent child and respawn it; subsequent
-                // prompts on each tab will lazily get a fresh session.
+                // Behavior depends on which transport this App is running on:
+                //
+                // * Standalone mode: the ACP client owns the agent CLI child.
+                //   `restart_tx` triggers an in-process tear-down + respawn;
+                //   subsequent prompts get a fresh session on each tab. The
+                //   `Connecting("Restarting agent...")` state lasts until the
+                //   new `initialize` round-trip lands.
+                //
+                // * Helper mode: master owns the agent CLI lifetime, so a
+                //   single helper cannot restart it in-process. The helper's
+                //   `restart_rx` arm asks the C++ side to force-restart the
+                //   whole agent stack (`restart_agent_stack` SendEvent →
+                //   TerminalPage tears down every agent pane,
+                //   `SharedWta::Restart` respawns master on the same stable
+                //   pipe name, then the active tab's pane is re-opened). The
+                //   user briefly sees the agent pane flash closed and reopen
+                //   with a clean session. The `Connecting("Restarting...")`
+                //   state set below is short-lived — this helper process is
+                //   on its way out as part of the pane teardown.
                 self.state = ConnectionState::Connecting("Restarting agent...".to_string());
                 self.session_to_tab.clear();
                 self.session_id.clear();
@@ -6550,6 +6863,11 @@ impl App {
                 tab_id = %target_tab_id,
                 "auto-suggest off — surfacing Detected pill, no LLM call",
             );
+            // D-driven: PowerShell will emit an immediate echo A within
+            // ~1ms. Arm the gate so it gets consumed rather than
+            // dismissing the pill we just set.
+            self.tab_mut(&target_tab_id).autofix.trigger_echo_pane =
+                Some(notification.pane_id.clone());
             self.emit_autofix_state_detected(
                 &target_tab_id,
                 &notification.pane_id,
@@ -6588,6 +6906,10 @@ impl App {
                     tab_id = %target_tab_id,
                     "autofix re-trigger same pane while pending — re-emit only",
                 );
+                // This branch is only reached on a fresh D event (the
+                // dispatcher routes vt_sequence here); arm the echo gate.
+                self.tab_mut(&target_tab_id).autofix.trigger_echo_pane =
+                    Some(notification.pane_id.clone());
                 self.emit_autofix_state_pending(
                     &target_tab_id,
                     &notification.pane_id,
@@ -6643,8 +6965,12 @@ impl App {
 
         // Store the failing pane ID on the target tab so the Esc dismiss
         // path can find it (legacy; the new state machine carries it via
-        // AutofixContext).
-        self.tab_mut(&target_tab_id).autofix.pane_id = Some(notification.pane_id.clone());
+        // AutofixContext), and arm telemetry timing for resolution.
+        {
+            let tab = self.tab_mut(&target_tab_id);
+            tab.autofix.pane_id = Some(notification.pane_id.clone());
+            tab.autofix.armed_at = Some(std::time::Instant::now());
+        }
 
         let prompt = PromptSubmission::new_autofix(prompt_text, Some(pane_context));
         let submitted = SubmittedPrompt {
@@ -6666,6 +6992,16 @@ impl App {
 
         // Light up the bottom-bar diagnostic icon in "Pending" state — the
         // user knows something went wrong even before the agent responds.
+        // Arm the echo gate ONLY for D-driven entries (forced=false).
+        // The `execute_from_detected` path (forced=true) fires this on a
+        // stable prompt — no echo A is in flight, and arming would eat
+        // the user's first Enter as a fake echo. Bug repro: typo →
+        // Detected pill → click pill → Pending → Armed → press Enter
+        // (consumed as echo) → press Enter again (finally dismisses).
+        if !forced {
+            self.tab_mut(&target_tab_id).autofix.trigger_echo_pane =
+                Some(notification.pane_id.clone());
+        }
         self.emit_autofix_state_pending(
             &target_tab_id,
             &notification.pane_id,
@@ -6690,6 +7026,11 @@ impl App {
             pane_id: pane_id.to_string(),
             summary: summary.to_string(),
         };
+        // NOTE: `trigger_echo_pane` is armed by the *caller*, not here —
+        // only D-driven calls expect an immediate echo A. The
+        // `execute_from_detected` path also funnels through Pending but
+        // runs on a stable prompt (no D), so arming inside this helper
+        // would consume the user's first real Enter as a fake echo.
         self.set_bar_snapshot(target_tab_id, snapshot);
     }
 
@@ -6703,6 +7044,8 @@ impl App {
             summary: summary.to_string(),
             hotkey_hint: "Ctrl+Alt+.".to_string(),
         };
+        // See note in `emit_autofix_state_pending`: caller arms the echo
+        // gate when (and only when) a D-driven trigger is in progress.
         self.set_bar_snapshot(target_tab_id, snapshot);
     }
 
@@ -6771,7 +7114,9 @@ impl App {
             Some(r) => r,
             None => {
                 self.emit_autofix_state_cleared(&active_tab);
-                self.current_tab_mut().autofix.pane_id = None;
+                let autofix = &mut self.current_tab_mut().autofix;
+                autofix.pane_id = None;
+                autofix.armed_at = None;
                 return;
             }
         };
@@ -6781,7 +7126,9 @@ impl App {
             .min(rec.choices.len().saturating_sub(1));
         let Some(mut choice) = rec.choices.get(idx).cloned() else {
             self.emit_autofix_state_cleared(&active_tab);
-            self.current_tab_mut().autofix.pane_id = None;
+            let autofix = &mut self.current_tab_mut().autofix;
+            autofix.pane_id = None;
+            autofix.armed_at = None;
             return;
         };
         // Auto-fill parent for Send actions, same as Enter path.
@@ -6816,7 +7163,9 @@ impl App {
         };
         let choice_label = choice.choice;
         if !routed {
-            self.current_tab_mut().autofix.pane_id = None;
+            let autofix = &mut self.current_tab_mut().autofix;
+            autofix.pane_id = None;
+            autofix.armed_at = None;
             self.clear_recommendations();
             let _ = self
                 .recommendation_tx
@@ -6838,6 +7187,10 @@ impl App {
         // `lastErrorSessionId` based on the state alone. Reusing the
         // `Idle` snapshot means a subsequent tab switch re-emits a
         // clean state rather than something stale.
+        // Also drop any pending trigger-echo gate: once we're back to
+        // Idle there's no state to protect, and leaving the pane
+        // armed would silently swallow the next real prompt-start.
+        self.tab_mut(target_tab_id).autofix.trigger_echo_pane = None;
         self.set_bar_snapshot(target_tab_id, AutofixBarSnapshot::Idle);
     }
 
@@ -7246,7 +7599,9 @@ impl App {
         };
         if autofix_pane.is_some() {
             self.emit_autofix_state_cleared(&target_tab);
-            self.session_tab_mut(session_id).autofix.pane_id = None;
+            let autofix = &mut self.session_tab_mut(session_id).autofix;
+            autofix.pane_id = None;
+            autofix.armed_at = None;
         }
         self.turn_release_end_pending(session_id);
         self.turn_clear_agent_progress(session_id);
@@ -7275,7 +7630,9 @@ impl App {
                 if pane_id.is_some() {
                     self.emit_autofix_state_cleared(&target_tab);
                 }
-                self.session_tab_mut(session_id).autofix.pane_id = None;
+                let autofix = &mut self.session_tab_mut(session_id).autofix;
+                autofix.pane_id = None;
+                autofix.armed_at = None;
                 let tab = self.session_tab_mut(session_id);
                 let prompt = tab.turn.prompt().cloned().expect("prompt set");
                 // Preserve only what the user actually saw streaming (prose
@@ -7438,7 +7795,9 @@ impl App {
         if armed_pane.is_some() {
             self.emit_autofix_state_cleared(&target_tab);
         }
-        self.session_tab_mut(session_id).autofix.pane_id = None;
+        let autofix = &mut self.session_tab_mut(session_id).autofix;
+        autofix.pane_id = None;
+        autofix.armed_at = None;
         let tab = self.session_tab_mut(session_id);
         let TurnState::Surfaced {
             prompt,
@@ -7488,6 +7847,7 @@ impl App {
             self.emit_autofix_state_cleared(&target_tab);
         }
         let tab = self.session_tab_mut(session_id);
+        tab.autofix.armed_at = None;
         let canceled_marker = t!("chat.turn_canceled").into_owned();
         // Three paths into cancel:
         //   - Submitted / Streaming → commit a fresh completed_turn (prompt +
@@ -7721,6 +8081,7 @@ impl App {
             let tab = self.session_tab_mut(session_id);
             tab.autofix.suggested_pane_id = Some(pane_id.clone());
             tab.autofix.pane_id = None;
+            tab.autofix.armed_at = None;
         }
 
         let tab = self.session_tab_mut(session_id);
@@ -8463,7 +8824,177 @@ mod tests {
             debug_capture,
             true,
             false,
+            Arc::new(crate::shell::ShellManager::new()),
         )
+    }
+
+    /// Bug-1 fix (PR #73 follow-up): an `agent.notification` hook event
+    /// arrives with neither `agent_session_id` nor a `pane_session_id`
+    /// resolving to a live session — exactly the shape Copilot CLI's
+    /// `Notification` hook emits (no `session_id` field in the JSON
+    /// payload AND no `WT_SESSION` inherited by the hook subprocess).
+    ///
+    /// Before the fix, `resolve_or_synthesize_key` produces `pane:<x>`,
+    /// the reducer no-ops (synthetic session unknown) AND the synthetic
+    /// key gates the event out of the master publish path, so the row
+    /// stays at `Working` from the prior `tool.starting`.
+    ///
+    /// After the fix, the routing layer falls back to the most-recently-
+    /// active live session for the same `cli_source` — the row flips to
+    /// `Attention` locally AND a real-key event is published to master.
+    #[test]
+    fn sessionless_notification_falls_back_to_recent_live_cli_session() {
+        use crate::agent_sessions::{
+            AgentSessionRegistry, AgentStatus, CliSource, SessionEvent,
+        };
+        let mut reg = AgentSessionRegistry::new();
+        // One live Copilot session bound to a known pane.
+        reg.apply(SessionEvent::SessionStarted {
+            key: "real-copilot-sid".into(),
+            cli_source: CliSource::Copilot,
+            pane_session_id: "11111111-1111-1111-1111-111111111111".into(),
+            cwd: std::path::PathBuf::from("/work"),
+            title: "live copilot".into(),
+        });
+        reg.take_dirty();
+
+        // Notification arrives with an UNRELATED active-pane GUID
+        // (user focused on a different pane) and no agent_session_id —
+        // mirrors the WT_SESSION-less Copilot hook trace.
+        let unrelated_pane = "99999999-9999-9999-9999-999999999999";
+        let params = json!({
+            "event": "agent.notification",
+            "cli_source": "copilot",
+            "agent_session_id": "",  // missing — the bug shape
+            "payload": { "message": "approve: rm -rf foo" }
+        });
+
+        let mut published: Vec<SessionEvent> = Vec::new();
+        route_agent_event_to_registry_with_hook_sink(
+            &mut reg,
+            unrelated_pane,
+            &params,
+            |ev| published.push(ev),
+        );
+
+        // Local reducer flipped the real row to Attention.
+        let s = reg.get(&"real-copilot-sid".to_string()).expect("row preserved");
+        assert_eq!(
+            s.status,
+            AgentStatus::Attention,
+            "fallback must route the Notification to the live Copilot row",
+        );
+        assert_eq!(s.attention_reason.as_deref(), Some("approve: rm -rf foo"));
+
+        // Master got a real-key (not synthetic `pane:`) Notification.
+        let notif_to_master = published.iter().find_map(|ev| match ev {
+            SessionEvent::Notification { key, .. } => Some(key.clone()),
+            _ => None,
+        });
+        assert_eq!(
+            notif_to_master.as_deref(),
+            Some("real-copilot-sid"),
+            "Notification must be published to master keyed by the real session id; \
+             synthetic `pane:` keys are dropped from the publish path",
+        );
+        assert!(
+            !published.iter().any(|ev| matches!(
+                ev,
+                SessionEvent::Notification { key, .. } if key.starts_with("pane:")
+            )),
+            "no synthetic-key Notification should leak to master",
+        );
+    }
+
+    /// Counterpart guard: when the event carries a real `agent_session_id`,
+    /// the fallback must NOT replace it — the explicit session id always
+    /// wins over the heuristic.
+    #[test]
+    fn notification_with_real_session_id_skips_fallback() {
+        use crate::agent_sessions::{
+            AgentSessionRegistry, AgentStatus, CliSource, SessionEvent,
+        };
+        let mut reg = AgentSessionRegistry::new();
+        // Two Copilot sessions; `target` is the explicit one in the hook,
+        // `other` is the most-recently-active and would win the fallback.
+        reg.apply(SessionEvent::SessionStarted {
+            key: "target".into(),
+            cli_source: CliSource::Copilot,
+            pane_session_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa".into(),
+            cwd: std::path::PathBuf::from("/work"),
+            title: "target".into(),
+        });
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        reg.apply(SessionEvent::SessionStarted {
+            key: "other".into(),
+            cli_source: CliSource::Copilot,
+            pane_session_id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb".into(),
+            cwd: std::path::PathBuf::from("/work"),
+            title: "other".into(),
+        });
+        reg.take_dirty();
+
+        let params = json!({
+            "event": "agent.notification",
+            "cli_source": "copilot",
+            "agent_session_id": "target",
+            "payload": { "message": "explicit" }
+        });
+        let unrelated_pane = "99999999-9999-9999-9999-999999999999";
+        route_agent_event_to_registry_with_hook_sink(
+            &mut reg, unrelated_pane, &params, |_| {},
+        );
+
+        assert_eq!(
+            reg.get(&"target".to_string()).unwrap().status,
+            AgentStatus::Attention,
+            "explicit session id must win over the fallback heuristic",
+        );
+        assert_ne!(
+            reg.get(&"other".to_string()).unwrap().status,
+            AgentStatus::Attention,
+            "fallback target must NOT be touched when explicit sid was supplied",
+        );
+    }
+
+    /// The fallback must refuse to act when `cli_source` is `Unknown`
+    /// (no trustworthy CLI hint); otherwise a sessionless event from an
+    /// unknown source could land on whichever live session happened to be
+    /// the most recent across ALL CLIs.
+    #[test]
+    fn sessionless_notification_with_unknown_cli_does_not_fall_back() {
+        use crate::agent_sessions::{
+            AgentSessionRegistry, AgentStatus, CliSource, SessionEvent,
+        };
+        let mut reg = AgentSessionRegistry::new();
+        reg.apply(SessionEvent::SessionStarted {
+            key: "copilot".into(),
+            cli_source: CliSource::Copilot,
+            pane_session_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa".into(),
+            cwd: std::path::PathBuf::from("/work"),
+            title: "live".into(),
+        });
+
+        // No cli_source field at all → CliSource::Unknown — fallback
+        // must NOT pick the only live row.
+        let params = json!({
+            "event": "agent.notification",
+            "agent_session_id": "",
+            "payload": { "message": "approve?" }
+        });
+        let _ = route_agent_event_to_registry_with_hook_sink(
+            &mut reg,
+            "99999999-9999-9999-9999-999999999999",
+            &params,
+            |_| {},
+        );
+
+        assert_ne!(
+            reg.get(&"copilot".to_string()).unwrap().status,
+            AgentStatus::Attention,
+            "fallback must require a trustworthy cli_source hint to avoid \
+             routing sessionless events into unrelated CLIs",
+        );
     }
 
     #[test]
@@ -8700,6 +9231,7 @@ mod tests {
             debug_capture,
             true,
             false,
+            Arc::new(crate::shell::ShellManager::new()),
         );
         (app, master_rx)
     }
@@ -8931,6 +9463,7 @@ mod tests {
             debug_capture,
             true,
             false,
+            Arc::new(crate::shell::ShellManager::new()),
         );
 
         app.tab_id = Some("AAAA".to_string());
@@ -8988,6 +9521,7 @@ mod tests {
             debug_capture,
             true,
             false,
+            Arc::new(crate::shell::ShellManager::new()),
         );
 
         app.tab_id = Some("AAAA".to_string());
@@ -9077,6 +9611,7 @@ mod tests {
             debug_capture,
             true,
             false,
+            Arc::new(crate::shell::ShellManager::new()),
         );
         (app, load_session_rx)
     }
@@ -9290,6 +9825,159 @@ mod tests {
         assert!(app.tab_sessions["OWNER-TAB"]
             .loading_target_session_id
             .is_none());
+    }
+
+    /// Replayed history must be packed into collapsed CompletedTurn rows
+    /// after session/load completes. Each User message opens a new turn;
+    /// the prompt header is a short preview (the full original User text
+    /// is kept as the first details entry so expanding shows everything).
+    /// Subsequent non-User messages become later details. Default
+    /// `expanded: false` so the resumed transcript doesn't dump as one
+    /// long wall.
+    #[test]
+    fn pack_replayed_messages_groups_into_collapsed_turns() {
+        let mut tab = TabSession::default();
+        tab.messages = vec![
+            ChatMessage::System("Resuming session abc...".to_string()),
+            ChatMessage::User("# Terminal Agent\nYou are...".to_string()),
+            ChatMessage::Agent("Hello, I am ready.".to_string()),
+            ChatMessage::User("list files".to_string()),
+            ChatMessage::ToolCall {
+                id: "t1".to_string(),
+                title: "ls".to_string(),
+                status: "done".to_string(),
+            },
+            ChatMessage::Agent("Here are the files...".to_string()),
+        ];
+
+        tab.pack_replayed_messages_into_turns();
+
+        // System marker stays — it's not anchored to a User.
+        assert_eq!(tab.messages.len(), 1);
+        assert!(matches!(&tab.messages[0], ChatMessage::System(s) if s.starts_with("Resuming")));
+
+        // Two turns: one per User prompt.
+        assert_eq!(tab.completed_turns.len(), 2);
+
+        let t0 = &tab.completed_turns[0];
+        // Preview shows first non-empty line + ellipsis (extra lines below).
+        assert_eq!(t0.prompt, "# Terminal Agent…");
+        // details = [original full User, Agent reply].
+        assert_eq!(t0.details.len(), 2);
+        assert!(matches!(&t0.details[0], ChatMessage::User(s) if s.starts_with("# Terminal Agent\nYou are")));
+        assert!(matches!(&t0.details[1], ChatMessage::Agent(_)));
+        assert!(!t0.expanded, "replayed turn must default to collapsed");
+        assert!(t0.trailing_marker.is_none());
+
+        let t1 = &tab.completed_turns[1];
+        // Short single-line prompt — no ellipsis.
+        assert_eq!(t1.prompt, "list files");
+        // details = [original User, ToolCall, Agent].
+        assert_eq!(t1.details.len(), 3);
+        assert!(matches!(&t1.details[0], ChatMessage::User(s) if s == "list files"));
+        assert!(matches!(&t1.details[1], ChatMessage::ToolCall { .. }));
+        assert!(matches!(&t1.details[2], ChatMessage::Agent(_)));
+        assert!(!t1.expanded);
+    }
+
+    /// Preview logic: huge single-line prompt must clip to the cap with
+    /// a trailing ellipsis; short single-line prompts stay verbatim.
+    #[test]
+    fn collapsed_prompt_preview_clips_long_single_line() {
+        let long = "a".repeat(500);
+        let preview = collapsed_prompt_preview(&long);
+        // 80 chars + ellipsis.
+        assert_eq!(preview.chars().count(), 81);
+        assert!(preview.ends_with('…'));
+
+        let short = "hello world";
+        assert_eq!(collapsed_prompt_preview(short), "hello world");
+        assert!(!collapsed_prompt_preview(short).ends_with('…'));
+    }
+
+    /// Edge: messages that come BEFORE the first User must NOT be lost —
+    /// they stay in `tab.messages`. Pre-User stray Agent dumps (rare but
+    /// possible) should remain visible rather than being silently dropped.
+    #[test]
+    fn pack_replayed_messages_preserves_pre_user_orphans() {
+        let mut tab = TabSession::default();
+        tab.messages = vec![
+            ChatMessage::System("Resuming...".to_string()),
+            ChatMessage::Agent("stray context dump".to_string()),
+            ChatMessage::User("hi".to_string()),
+            ChatMessage::Agent("hello".to_string()),
+        ];
+
+        tab.pack_replayed_messages_into_turns();
+
+        assert_eq!(tab.messages.len(), 2);
+        assert!(matches!(&tab.messages[0], ChatMessage::System(_)));
+        assert!(matches!(&tab.messages[1], ChatMessage::Agent(s) if s == "stray context dump"));
+        assert_eq!(tab.completed_turns.len(), 1);
+        assert_eq!(tab.completed_turns[0].prompt, "hi");
+        assert!(!tab.completed_turns[0].expanded);
+    }
+
+    /// Empty messages must no-op (no panic, no spurious turn).
+    #[test]
+    fn pack_replayed_messages_empty_is_noop() {
+        let mut tab = TabSession::default();
+        tab.pack_replayed_messages_into_turns();
+        assert!(tab.messages.is_empty());
+        assert!(tab.completed_turns.is_empty());
+    }
+
+    /// Integration: SessionAttached for the load target must trigger
+    /// packing — replayed User/Agent rows must end up as collapsed
+    /// CompletedTurn entries, not loose ChatMessage rows.
+    #[test]
+    fn session_attached_for_load_target_packs_replayed_history() {
+        let (mut app, _load_session_rx) = make_app_with_load_session_channel();
+        app.owner_tab_id = Some("OWNER-TAB".to_string());
+        app.tab_sessions
+            .insert("OWNER-TAB".to_string(), TabSession::default());
+
+        app.handle_event(AppEvent::WtEvent {
+            method: "load_session".to_string(),
+            pane_id: String::new(),
+            tab_id: None,
+            params: json!({
+                "tab_id": "OWNER-TAB",
+                "session_id": "sess-target",
+                "cwd": "",
+            }),
+        });
+        // Simulate replay chunks landing in messages.
+        let tab = app.tab_sessions.get_mut("OWNER-TAB").unwrap();
+        tab.messages.push(ChatMessage::User("first prompt".to_string()));
+        tab.messages.push(ChatMessage::Agent("first reply".to_string()));
+        tab.messages.push(ChatMessage::User("second prompt".to_string()));
+        tab.messages.push(ChatMessage::Agent("second reply".to_string()));
+
+        app.handle_event(AppEvent::SessionAttached {
+            tab_id: "OWNER-TAB".to_string(),
+            session_id: "sess-target".to_string(),
+            available_models: vec![],
+            current_model_id: None,
+        });
+
+        let tab = &app.tab_sessions["OWNER-TAB"];
+        assert!(!tab.loading_session);
+        assert_eq!(
+            tab.completed_turns.len(),
+            2,
+            "both replayed user prompts must become collapsed CompletedTurn rows"
+        );
+        for turn in &tab.completed_turns {
+            assert!(!turn.expanded, "replayed turns default collapsed");
+        }
+        // The leading System("Resuming session ...") marker stays in
+        // messages — it's not anchored to a User so packing leaves it
+        // alone.
+        assert!(tab
+            .messages
+            .iter()
+            .all(|m| matches!(m, ChatMessage::System(_))));
     }
 
     // ─── WtNotification auto-dismiss ────────────────────────────────────────
@@ -10749,6 +11437,188 @@ mod tests {
             app.tab_mut("test-tab").autofix.pane_id.as_deref(),
             Some(pane),
             "vt_sequence osc:133;D;<non-zero> in a normal pane must still arm autofix"
+        );
+    }
+
+    fn vt_event(pane: &str, tab: &str, seq: &str) -> AppEvent {
+        AppEvent::WtEvent {
+            method: "vt_sequence".to_string(),
+            pane_id: pane.to_string(),
+            tab_id: Some(tab.to_string()),
+            params: serde_json::json!({ "session_id": pane, "sequence": seq }),
+        }
+    }
+
+    /// Detected state must survive the `osc:133;A` that PowerShell emits
+    /// ~1ms after the triggering `osc:133;D` — that A is the trigger's
+    /// echo, not the user moving on. The NEXT prompt-start (after the
+    /// user actually does something) is what dismisses.
+    #[test]
+    fn detected_survives_trigger_echo_dismisses_on_next_prompt_start() {
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+        app.autofix_enabled = false; // suggest-mode → produces Detected
+        let pane = "11111111-2222-3333-4444-555555555555";
+        let tab = "tab-A";
+
+        // D;1 → Detected pill armed.
+        app.handle_event(vt_event(pane, tab, "osc:133;D;1"));
+        assert!(
+            matches!(
+                app.tab_mut(tab).autofix.bar_snapshot,
+                AutofixBarSnapshot::Detected { .. }
+            ),
+            "D;1 must establish Detected"
+        );
+        assert_eq!(
+            app.tab_mut(tab).autofix.trigger_echo_pane.as_deref(),
+            Some(pane),
+            "trigger_echo_pane must be armed at Detected set so the immediate A is consumed"
+        );
+
+        // Immediate A (PowerShell redrawing the prompt) — must NOT dismiss.
+        app.handle_event(vt_event(pane, tab, "osc:133;A"));
+        assert!(
+            matches!(
+                app.tab_mut(tab).autofix.bar_snapshot,
+                AutofixBarSnapshot::Detected { .. }
+            ),
+            "the trigger-echo A must not dismiss Detected"
+        );
+        assert!(
+            app.tab_mut(tab).autofix.trigger_echo_pane.is_none(),
+            "trigger_echo_pane must be consumed by the echo A"
+        );
+
+        // A second A (user actually moved on) — must dismiss.
+        app.handle_event(vt_event(pane, tab, "osc:133;A"));
+        assert!(
+            matches!(
+                app.tab_mut(tab).autofix.bar_snapshot,
+                AutofixBarSnapshot::Idle
+            ),
+            "a subsequent A (user moved on) must dismiss Detected"
+        );
+    }
+
+    /// Pending state (auto-suggest on path: D arms `autofix.pane_id` and
+    /// emits Pending) must also survive the trigger-echo A and dismiss on
+    /// the next user-driven prompt-start. The Pending/Armed dismiss path
+    /// goes through `turn_cancel` (or its manual fallback when no ACP
+    /// session is bound).
+    #[test]
+    fn pending_survives_trigger_echo_dismisses_on_next_prompt_start() {
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+        app.autofix_enabled = true; // LLM-call path → produces Pending
+        let pane = "22222222-3333-4444-5555-666666666666";
+        let tab = "tab-B";
+
+        app.handle_event(vt_event(pane, tab, "osc:133;D;1"));
+        assert_eq!(
+            app.tab_mut(tab).autofix.pane_id.as_deref(),
+            Some(pane),
+            "D;1 must arm Pending (autofix.pane_id set)"
+        );
+        assert_eq!(
+            app.tab_mut(tab).autofix.trigger_echo_pane.as_deref(),
+            Some(pane),
+        );
+
+        // Echo A — Pending stays.
+        app.handle_event(vt_event(pane, tab, "osc:133;A"));
+        assert_eq!(
+            app.tab_mut(tab).autofix.pane_id.as_deref(),
+            Some(pane),
+            "trigger-echo A must not cancel Pending"
+        );
+
+        // Real A — turn_cancel (or manual fallback) clears pane_id and bar.
+        app.handle_event(vt_event(pane, tab, "osc:133;A"));
+        assert!(
+            app.tab_mut(tab).autofix.pane_id.is_none(),
+            "subsequent A must cancel Pending"
+        );
+        assert!(
+            matches!(
+                app.tab_mut(tab).autofix.bar_snapshot,
+                AutofixBarSnapshot::Idle
+            ),
+            "bar must return to Idle after Pending cancel"
+        );
+    }
+
+    /// User clicks the Detected pill on a stable prompt → autofix
+    /// transitions Detected → Pending → Armed via the LLM call. No D
+    /// event is in flight during this transition, so no echo A is
+    /// coming. The next prompt-start the user produces must dismiss on
+    /// the FIRST Enter, not be eaten as a fake echo.
+    ///
+    /// Bug repro before this fix: emit_autofix_state_pending used to
+    /// arm `trigger_echo_pane` unconditionally, so the forced-from-
+    /// Detected path planted a gate with no echo to consume. The
+    /// gate then ate the user's first real Enter.
+    #[test]
+    fn force_from_detected_does_not_arm_echo_gate() {
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+        app.autofix_enabled = false; // suggest-mode produces Detected first
+        let pane = "44444444-5555-6666-7777-888888888888";
+        let tab = "tab-D";
+
+        // D;1 → Detected (gate armed, echo A consumed below).
+        app.handle_event(vt_event(pane, tab, "osc:133;D;1"));
+        app.handle_event(vt_event(pane, tab, "osc:133;A")); // echo
+        assert!(
+            app.tab_mut(tab).autofix.trigger_echo_pane.is_none(),
+            "echo A must consume the gate"
+        );
+
+        // User clicks the pill → forced trigger → Pending. This is on a
+        // stable prompt with no D in flight — gate must NOT re-arm.
+        let synth = WtNotification {
+            severity: WtEventSeverity::Actionable,
+            pane_id: pane.to_string(),
+            tab_id: Some(tab.to_string()),
+            summary: "Command failed (exit 1)".to_string(),
+            acknowledged: false,
+            age_ticks: 0,
+        };
+        app.trigger_autofix_inner(&synth, /*forced*/ true);
+        assert!(
+            app.tab_mut(tab).autofix.trigger_echo_pane.is_none(),
+            "force-from-Detected path must not arm trigger_echo_pane — \
+             no D is in flight, no echo A is coming, and arming would eat \
+             the user's first dismiss Enter"
+        );
+    }
+
+    /// Returning to Idle clears the echo guard. Otherwise, a stale
+    /// `trigger_echo_pane` could swallow a real prompt-start that arrives
+    /// long after the state has already been cleared by other means
+    /// (e.g. the user clicked the Suggested pill, then the autofix
+    /// re-fires later in the same pane).
+    #[test]
+    fn trigger_echo_pane_clears_when_state_returns_to_idle() {
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+        app.autofix_enabled = false;
+        let pane = "33333333-4444-5555-6666-777777777777";
+        let tab = "tab-C";
+
+        app.handle_event(vt_event(pane, tab, "osc:133;D;1"));
+        assert_eq!(
+            app.tab_mut(tab).autofix.trigger_echo_pane.as_deref(),
+            Some(pane)
+        );
+
+        // Externally clear the bar (e.g. user dismissed via Esc / pill).
+        let tab_owned = tab.to_string();
+        app.emit_autofix_state_cleared(&tab_owned);
+        assert!(
+            app.tab_mut(tab).autofix.trigger_echo_pane.is_none(),
+            "trigger_echo_pane must be released when bar transitions to Idle, \
+             otherwise the next real prompt-start would be silently swallowed"
         );
     }
 

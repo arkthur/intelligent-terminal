@@ -45,6 +45,7 @@ auth.hint_footer: "  Press Enter to sign in, Esc to go back"  # {Locked="Enter",
 chat.activity_thinking: "Thinking…"
 # {Locked="Intelligent Terminal"} - product name, do not translate
 chat.welcome_title: "Welcome to Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal uses AI. Check for mistakes."
 chat.plan_header: "Plan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -105,8 +106,8 @@ agent.custom.auth_hint: "Make sure %{name} is installed and on your PATH."  # {L
 
 # ── Agents view (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Loading..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - key combinations, do not translate
-agents.footer_hint: "(↑ ↓ to navigate • Enter to launch session in new tab • Shift+enter to launch session in agent pane • Esc to exit)"
+# {Locked="Enter","Esc","↑","↓"} - key combinations, do not translate
+agents.footer_hint: "(↑ ↓ to navigate • Enter to launch session • Esc to exit)"
 agents.status.active: "Active"
 agents.status.waiting_for_input: "Waiting for input"
 agents.status.error: "Error"

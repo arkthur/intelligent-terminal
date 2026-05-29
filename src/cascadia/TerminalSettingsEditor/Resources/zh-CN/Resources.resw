@@ -2760,6 +2760,14 @@
     <value>配置智能体在整个终端中的工作方式</value>
     <comment>Subtitle shown beneath the page title on the AI Agents settings page.</comment>
   </data>
+  <data name="AIAgents_PageSubtitlePrefix" xml:space="preserve">
+    <value>配置智能体在整个终端中的工作方式。</value>
+    <comment>Subtitle shown beneath the page title on the AI Agents settings page. The hyperlink in AIAgents_PageSubtitlePrivacyLink follows this sentence inline; the trailing period belongs to this prefix.</comment>
+  </data>
+  <data name="AIAgents_PageSubtitlePrivacyLink" xml:space="preserve">
+    <value>了解数据的使用方式。</value>
+    <comment>Inline hyperlink text that follows the AI Agents page subtitle and navigates to the privacy policy page. Includes a trailing period.</comment>
+  </data>
   <data name="AIAgents_AcpGroupHeader.Text" xml:space="preserve">
     <value>智能体窗格</value>
     <comment>Section header for the agent pane settings group.</comment>
@@ -2910,5 +2918,17 @@
   <data name="AIAgents_HooksInstallationFailedSummary" xml:space="preserve">
     <value>Hooks 安装失败。请查看 %LOCALAPPDATA%\IntelligentTerminal\logs\wta-install-hooks.log 获取详细信息。</value>
     <comment>Failure summary shown when installing agent session tracking hooks fails. {Locked="Hooks","%LOCALAPPDATA%","IntelligentTerminal","logs","wta-install-hooks.log"}</comment>
+  </data>
+  <data name="AIAgents_AutoErrorDetectionTitle.Text" xml:space="preserve">
+    <value>自动错误检测</value>
+  </data>
+  <data name="AIAgents_AutoErrorDetectionCaption.Text" xml:space="preserve">
+    <value>允许 Intelligent Terminal 访问你的 shell 并自动检测错误。适用于 PowerShell 和 Windows PowerShell。</value>
+  </data>
+  <data name="AIAgents_AutoErrorSuggestionTitle.Text" xml:space="preserve">
+    <value>自动错误建议</value>
+  </data>
+  <data name="AIAgents_AutoErrorSuggestionCaption.Text" xml:space="preserve">
+    <value>允许 Intelligent Terminal 将错误发送给你的代理以自动建议修复。</value>
   </data>
 </root>

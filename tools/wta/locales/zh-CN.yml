@@ -41,6 +41,7 @@ auth.hint_footer: "  按 Enter 登录，按 Esc 返回"  # {Locked="Enter","Esc"
 # ── 聊天视图 (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "思考中…"
 chat.welcome_title: "欢迎使用智能终端！"
+chat.welcome_disclaimer: "Intelligent Terminal 使用 AI。请检查是否有误。"
 chat.plan_header: "计划："
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -101,8 +102,8 @@ agent.custom.auth_hint: "请确保 %{name} 已安装并位于 PATH 上。"  # {L
 
 # ── 智能体视图 (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "加载中..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - 组合键，不翻译
-agents.footer_hint: "(↑ ↓ 导航 • Enter 在新标签页中启动会话 • Shift+enter 在智能体窗格中启动会话 • Esc 退出)"
+# {Locked="Enter","Esc","↑","↓"} - 组合键，不翻译
+agents.footer_hint: "(↑ ↓ 导航 • Enter 启动会话 • Esc 退出)"
 agents.status.active: "活动"
 agents.status.waiting_for_input: "等待输入"
 agents.status.error: "错误"
@@ -172,6 +173,6 @@ time.days_other: "%{count} 天前"
 commands.help.summary: "显示此命令列表"
 commands.clear.summary: "清除聊天记录（保留会话）"
 commands.new.summary: "启动新的 ACP 会话（清空历史记录）"
-commands.restart.summary: "重新连接：终止智能体进程并重新启动"
+commands.restart.summary: "重启智能体"
 commands.stop.summary: "取消进行中的提示"
 commands.sessions.summary: "打开历史会话选择器（Ctrl+Shift+/）"

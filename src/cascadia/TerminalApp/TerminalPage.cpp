@@ -959,10 +959,32 @@ namespace winrt::TerminalApp::implementation
             LOG_CAUGHT_EXCEPTION();
         }
 
-        // Now create the agent pane — settings are already configured.
-        // No --setup first-run needed; WTA starts in normal mode.
-        // After FRE the pane should be visible so the user sees the
-        // welcome hint immediately.
+        // Execute deferred startup actions — tab creation was postponed
+        // until FRE completed so that the ConptyConnection picks up any
+        // PATH changes from winget installs (see _OnFirstLayout deferral).
+        if (_deferredStartupConnection)
+        {
+            CreateTabFromConnection(std::move(_deferredStartupConnection));
+        }
+        else if (!_deferredStartupActions.empty())
+        {
+            ProcessStartupActions(std::move(_deferredStartupActions));
+        }
+        else
+        {
+            // No deferred actions — open a default tab.
+            _OpenNewTab(nullptr);
+        }
+
+        // If no tabs were created (e.g. deferred actions only launched an
+        // elevated profile), close the window.
+        if (_tabs.Size() == 0)
+        {
+            CloseWindowRequested.raise(*this, nullptr);
+            return;
+        }
+
+        // Now create the agent pane on the freshly-created tab.
         if (const auto tab = _GetFocusedTabImpl())
         {
             _OpenOrReuseAgentPane(false, L"FirstRunExperience");
@@ -1466,6 +1488,47 @@ namespace winrt::TerminalApp::implementation
             winrt::to_hstring(Json::writeString(wb, evt)));
     }
 
+    // Builds the per-process flag/value pairs that wta-master inherits
+    // at spawn time. Single source of truth so the first-acquire path
+    // (`_AutoCreateHiddenAgentPaneShared`) and the settings-change-
+    // driven respawn path (`_RebuildAgentStack` → `SharedWta::Restart`)
+    // stay in sync. Each pair is pushed as two separate vector elements
+    // so SharedWta can apply its own Windows command-line quoting.
+    std::vector<std::wstring> TerminalPage::_BuildSharedWtaExtraArgs()
+    {
+        const auto& globals = _settings.GlobalSettings();
+        // Resolved here (not on the caller side) so the Restart path
+        // doesn't have to duplicate the lookup. `agentCliPath` may be
+        // empty when no agent CLI is detected but policy doesn't actively
+        // block — pass through anyway; wta will surface the failure to
+        // spawn the child as an ACP error.
+        const auto agentCliPath = _ResolveEffectiveAgentCliPath(globals, [this]() { return _DetectAgentCli(); });
+
+        std::vector<std::wstring> extraArgs;
+        const auto pushFlagValue = [&extraArgs](const std::wstring_view flag, const std::wstring_view value) {
+            if (value.empty())
+            {
+                return;
+            }
+            extraArgs.emplace_back(flag);
+            extraArgs.emplace_back(value);
+        };
+        pushFlagValue(L"--agent", agentCliPath);
+        pushFlagValue(L"--agent-id", globals.EffectiveAcpAgent());
+        if (!globals.EffectiveAutoFixEnabled())
+        {
+            extraArgs.emplace_back(L"--no-autofix");
+        }
+        if (const auto lang = _ResolveEffectiveLanguage(globals); !lang.empty())
+        {
+            pushFlagValue(L"--language", lang);
+        }
+        pushFlagValue(L"--acp-model", globals.AcpModel());
+        pushFlagValue(L"--delegate-agent", _ResolveEffectiveDelegateAgent(globals));
+        pushFlagValue(L"--delegate-model", globals.DelegateModel());
+        return extraArgs;
+    }
+
     // Helper+master agent-pane creation. The C++ side spawns one wta-helper as
     // a regular conpty child per agent pane; SharedWta owns the singleton
     // wta-master process that the helpers connect to over a named pipe (helper
@@ -1510,38 +1573,12 @@ namespace winrt::TerminalApp::implementation
 
         // Build the per-process settings the master will inherit.
         // These are baked at first-spawn time only; subsequent acquires
-        // reuse the same master. Runtime changes flow over event channels
-        // (`autofix_enabled_changed` is the existing one).
-        //
-        // Push as tokenized flag/value pairs; SharedWta handles all
-        // Windows command-line quoting via QuoteAndEscapeCommandlineArg.
-        std::vector<std::wstring> extraArgs;
-        const auto pushFlagValue = [&extraArgs](const std::wstring_view flag, const std::wstring_view value) {
-            if (value.empty())
-            {
-                return;
-            }
-            extraArgs.emplace_back(flag);
-            extraArgs.emplace_back(value);
-        };
-        // `agentCliPath` was resolved above for the GPO policy check.
-        // It may be empty when no agent CLI is detected but policy
-        // doesn't actively block (e.g. fresh install with no agents
-        // installed) — pass through anyway; wta will surface the
-        // failure to spawn the child as an ACP error.
-        pushFlagValue(L"--agent", agentCliPath);
-        pushFlagValue(L"--agent-id", globals.EffectiveAcpAgent());
-        if (!globals.EffectiveAutoFixEnabled())
-        {
-            extraArgs.emplace_back(L"--no-autofix");
-        }
-        if (const auto lang = _ResolveEffectiveLanguage(globals); !lang.empty())
-        {
-            pushFlagValue(L"--language", lang);
-        }
-        pushFlagValue(L"--acp-model", globals.AcpModel());
-        pushFlagValue(L"--delegate-agent", _ResolveEffectiveDelegateAgent(globals));
-        pushFlagValue(L"--delegate-model", globals.DelegateModel());
+        // reuse the same master (settings changes route through
+        // `_RebuildAgentStack` → `SharedWta::Restart` instead). Runtime
+        // changes flow over event channels (`autofix_enabled_changed`
+        // is the existing one). See `_BuildSharedWtaExtraArgs` for the
+        // shared arg layout.
+        auto extraArgs = _BuildSharedWtaExtraArgs();
 
         auto& shared = winrt::TerminalApp::implementation::SharedWta::Instance();
         if (!shared.AcquirePane(std::wstring_view{ wtaPath }, extraArgs))
@@ -2266,7 +2303,7 @@ namespace winrt::TerminalApp::implementation
                 const auto hotkey = hotkeyHint.empty()
                                         ? std::wstring{ L"Ctrl+Alt+." }
                                         : std::wstring{ hotkeyHint };
-                std::wstring labelText = L"Click " + hotkey + L" to fix error";
+                std::wstring labelText = RS_fmt(L"Diagnostics_ErrorDetectedLabelFormat", hotkey);
                 const auto accent = winrt::Windows::UI::Xaml::Media::SolidColorBrush{
                     winrt::Windows::UI::ColorHelper::FromArgb(255, 0xFF, 0xD7, 0x00)
                 };
@@ -2280,8 +2317,7 @@ namespace winrt::TerminalApp::implementation
                     label.Foreground(accent);
                     label.Visibility(Visibility::Visible);
                 }
-                std::wstring tooltip = L"Error detected. Click or press " + hotkey +
-                                       L" to ask the AI agent to diagnose and suggest a fix.";
+                std::wstring tooltip = RS_fmt(L"Diagnostics_ErrorDetectedTooltipFormat", hotkey);
                 if (!detectedSummary.empty())
                 {
                     tooltip += L"\n\n";
@@ -2396,6 +2432,46 @@ namespace winrt::TerminalApp::implementation
             }
         }
 
+        // Tear down every tab's agent pane first. The user must reopen
+        // each (per-tab toggle) — there's no longer a "shared pane" to
+        // reposition. Tear down is async: the pane's `Closed` handlers
+        // (which call `SharedWta::ReleasePane`) typically haven't fired
+        // yet when control returns to us.
+        for (const auto& tabImpl : tabsThatHadAgentPane)
+        {
+            _TeardownAgentPane(tabImpl);
+        }
+
+        // Force-respawn the master with the NEW per-process settings
+        // before reopening. Without this, the pending teardowns above
+        // leave the refcount > 0 when `_OpenOrReuseAgentPane` calls
+        // `AcquirePane`, so AcquirePane sees a live master and reuses
+        // it — silently ignoring the freshly-built --agent / --agent-id /
+        // --acp-model args, leaving the OLD agent CLI behind the pipe.
+        //
+        // `SharedWta::Restart(wtaPath, extraArgs)` does
+        // `_CleanupLocked` + `_SpawnLocked(newArgs)` while leaving the
+        // refcount alone (outgoing ReleasePane / incoming AcquirePane
+        // balance out). When the master isn't running (e.g. settings
+        // changed while no pane was open in *any* window), it no-ops
+        // — the next AcquirePane will spawn fresh with the caller's
+        // new args.
+        //
+        // This call is also why we don't gate it behind `hadAny`: even
+        // when no pane is open in *this* window, the master may still
+        // be alive serving another window. Respawning here keeps every
+        // window in sync with the new settings.
+        if (const auto wtaPath = _DetectWtaPath(); !wtaPath.empty())
+        {
+            const auto restartArgs = _BuildSharedWtaExtraArgs();
+            auto& shared = winrt::TerminalApp::implementation::SharedWta::Instance();
+            if (!shared.Restart(std::wstring_view{ wtaPath }, restartArgs))
+            {
+                _agentPaneLog("_RebuildAgentStack: SharedWta::Restart returned false");
+                // Fall through — the reopen path will retry via AcquirePane.
+            }
+        }
+
         if (!hadAny)
         {
             _lastAgentSettings = current;
@@ -2403,16 +2479,15 @@ namespace winrt::TerminalApp::implementation
             return;
         }
 
-        for (const auto& tabImpl : tabsThatHadAgentPane)
-        {
-            _TeardownAgentPane(tabImpl);
-        }
-        _lastAgentSettings = current;
-
         // Recreate on the active terminal tab so the user sees something
         // immediately. Other tabs that had an agent pane will need to be
         // re-toggled by the user.
         _OpenOrReuseAgentPane(false, L"SettingsReload");
+
+        // Snapshot update at the very end of the change-handling block
+        // so any early-failure path above leaves the snapshot stale and
+        // the next entry re-triggers a rebuild attempt.
+        _lastAgentSettings = current;
     }
 
     void TerminalPage::_FlushPendingAgentRebuild()
@@ -2658,13 +2733,29 @@ namespace winrt::TerminalApp::implementation
         {
             _startupState = StartupState::InStartup;
 
-            if (_startupConnection)
+            // When FRE is required, defer tab creation until after FRE
+            // completes. This ensures the first tab's ConptyConnection
+            // is created AFTER winget installs any agent CLIs, so the
+            // shell process inherits an environment with the updated
+            // registry PATH (including WinGet\Links).  Without this
+            // deferral, the first tab's ConptyConnection captures a
+            // stale PATH at launch time, and child processes can't
+            // find freshly-installed executables in the same session.
+            if (_IsFreRequired())
             {
-                CreateTabFromConnection(std::move(_startupConnection));
+                _deferredStartupActions = std::move(_startupActions);
+                _deferredStartupConnection = std::move(_startupConnection);
             }
-            else if (!_startupActions.empty())
+            else
             {
-                ProcessStartupActions(std::move(_startupActions));
+                if (_startupConnection)
+                {
+                    CreateTabFromConnection(std::move(_startupConnection));
+                }
+                else if (!_startupActions.empty())
+                {
+                    ProcessStartupActions(std::move(_startupActions));
+                }
             }
 
             _CompleteInitialization();
@@ -2809,7 +2900,7 @@ namespace winrt::TerminalApp::implementation
         // GH#12267: Make sure that we don't instantly close ourselves when
         // we're readying to accept a defterm connection. In that case, we don't
         // have a tab yet, but will once we're initialized.
-        if (_tabs.Size() == 0)
+        if (_tabs.Size() == 0 && !_IsFreRequired())
         {
             CloseWindowRequested.raise(*this, nullptr);
             co_return;
@@ -4218,6 +4309,83 @@ namespace winrt::TerminalApp::implementation
         _TeardownAgentPane(ownerTab);
     }
 
+    // `/restart` from any agent pane's TUI lands here via the
+    // `restart_agent_stack` SendEvent route. The single window receiving
+    // the dispatch owns the user-visible side of the restart for itself;
+    // other windows' panes (if any) are torn down implicitly when the
+    // shared master they were attached to dies under `SharedWta::Restart()`
+    // (helper pipes go EOF → helpers exit → ConPty death → those tabs
+    // show "process exited" panes until the user toggles them open again).
+    //
+    // Designed as a near-clone of the `_RebuildAgentStack` settings-change
+    // path: tear down every agent pane in this window, then re-toggle the
+    // active tab's pane. The new wta-helper that gets spawned by the
+    // re-toggle calls `SharedWta::AcquirePane`, which (because Restart
+    // already respawned the master) sees a valid `_process` and just
+    // bumps the refcount — connecting the new helper to the freshly-spawned
+    // master under the same stable pipe name.
+    void TerminalPage::OnRestartAgentStackRequested(hstring /*eventJson*/)
+    {
+        _agentPaneLog("OnRestartAgentStackRequested: /restart received from wta");
+
+        // Reentrancy guard — share the flag with the settings-driven
+        // `_RebuildAgentStack` path. If a settings reload is racing this
+        // request, skip; the reload will pick up where we'd leave off.
+        if (_agentRebuilding)
+        {
+            _agentPaneLog("OnRestartAgentStackRequested: already rebuilding, skipping");
+            return;
+        }
+        _agentRebuilding = true;
+        auto guard = wil::scope_exit([this]() noexcept { _agentRebuilding = false; });
+
+        // Mirror _RebuildAgentStack's "find every tab that has an agent
+        // pane right now" scan; teardown is per-tab so we have to enumerate
+        // before mutating.
+        std::vector<winrt::com_ptr<Tab>> tabsThatHadAgentPane;
+        for (const auto& t : _tabs)
+        {
+            if (auto tabImpl = _GetTabImpl(t))
+            {
+                if (tabImpl->FindAgentPane())
+                {
+                    tabsThatHadAgentPane.push_back(tabImpl);
+                }
+            }
+        }
+
+        if (tabsThatHadAgentPane.empty())
+        {
+            _agentPaneLog("OnRestartAgentStackRequested: no agent pane in this window, nothing to tear down");
+            // Still kick the master restart — another window may have
+            // panes that need master reset. SharedWta::Restart no-ops if
+            // master isn't running, so this is safe either way.
+            winrt::TerminalApp::implementation::SharedWta::Instance().Restart();
+            return;
+        }
+
+        for (const auto& tabImpl : tabsThatHadAgentPane)
+        {
+            _TeardownAgentPane(tabImpl);
+        }
+
+        // Force-respawn master with the cached spawn args (same agent CLI,
+        // same per-process settings). Bypasses AcquirePane's refcount so
+        // we don't have to wait for the just-issued teardowns' async
+        // Closed handlers to fire and drive refcount to zero.
+        if (!winrt::TerminalApp::implementation::SharedWta::Instance().Restart())
+        {
+            _agentPaneLog("OnRestartAgentStackRequested: SharedWta::Restart returned false");
+            // Fall through anyway — the reopen below will retry via
+            // AcquirePane, which lazily spawns when _process is invalid.
+        }
+
+        // Reopen the active tab's pane immediately so the user sees
+        // continuity. Tabs that had a pane but aren't active need to be
+        // toggled open again by the user — same UX as _RebuildAgentStack.
+        _OpenOrReuseAgentPane(false, L"RestartAgent");
+    }
+
     // Send {method:"autofix_execute",params:{pane_id}} over the outbound
     // protocol bus. The agent pane on `ownerTab` must be in the Armed state.
     void TerminalPage::_TriggerAutofix(const winrt::com_ptr<Tab>& ownerTab, const wchar_t* triggerSource)
@@ -4860,6 +5028,18 @@ namespace winrt::TerminalApp::implementation
                             }
 
                             // isOsc133 path — forward as vt_sequence.
+                            // Detection gate: when the user turned error
+                            // detection off ("don't access my shell"), drop
+                            // the OSC 133 command marks here — no Detected
+                            // pill, no forwarding to WTA, no background
+                            // analysis. (Scoped to OSC 133 so AgentEvents,
+                            // a separate channel, keep flowing.) Unlike the
+                            // auto-suggest pref — which still wants the
+                            // Detected pill — detection off means we observe
+                            // nothing.
+                            if (!page->_settings.GlobalSettings().EffectiveAutoErrorDetectionEnabled())
+                                return;
+
                             Json::Value evt;
                             evt["type"] = "event";
                             evt["method"] = "vt_sequence";
@@ -5322,6 +5502,10 @@ namespace winrt::TerminalApp::implementation
             return true;
         case ConfirmOnClose::Automatic:
         {
+            if (_tabs.Size() == 0)
+            {
+                return false;
+            }
             // Warn if there's more than one tab, or the one tab has more than one pane.
             return _HasMultipleTabs() || _GetTabImpl(_tabs.GetAt(0))->GetLeafPaneCount() > 1;
         }
@@ -5359,6 +5543,14 @@ namespace winrt::TerminalApp::implementation
     //   warn for the current window state, show a warning dialog.
     safe_void_coroutine TerminalPage::CloseWindow()
     {
+        // During FRE, tabs are deferred (zero tabs). No warning needed;
+        // just close the window immediately.
+        if (_tabs.Size() == 0)
+        {
+            CloseWindowRequested.raise(*this, nullptr);
+            co_return;
+        }
+
         if (_ShouldWarnOnClose() &&
             !_displayingCloseDialog)
         {

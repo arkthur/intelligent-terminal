@@ -153,10 +153,10 @@
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
-    <value>Vyberte, čo chcete teraz nastaviť. Kedykoľvek to môžete zmeniť v </value>
+    <value>Vyberte, čo chcete teraz nastaviť. Tieto nastavenia môžete kedykoľvek zmeniť. </value>
   </data>
   <data name="FreOverlay_SettingsSubtitleLink" xml:space="preserve">
-    <value>Nastavenia</value>
+    <value>Zistite, ako sa údaje používajú</value>
   </data>
   <data name="FreOverlay_AgentLabel.Text" xml:space="preserve">
     <value>Agent</value>
@@ -171,10 +171,10 @@
     <comment>{Locked="Node.js","NPX"} In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_AutoErrorLabel.Text" xml:space="preserve">
-    <value>Automaticky navrhovať opravy pre neúspešné príkazy</value>
+    <value>Automatický návrh opráv chýb</value>
   </data>
   <data name="FreOverlay_AutoErrorDescription.Text" xml:space="preserve">
-    <value>Keď je povolené, agent UI automaticky analyzuje neúspešné príkazy a navrhuje opravu. Keď je zakázané, neúspešné príkazy zobrazujú kliknutelnú radu v stavovom riadku — stlačením Ctrl+Alt+. alebo kliknutím na radu si vyžiadate opravu.</value>
+    <value>Povoľte aplikácii Intelligent Terminal odosielať chyby agentovi na automatické navrhovanie opráv.</value>
     <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionLabel.Text" xml:space="preserve">
@@ -246,6 +246,14 @@
     <value>Zistená chyba: {0} na opravu</value>
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
+  <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
+    <value>Kliknite na {0} a opravte chybu</value>
+    <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
+    <value>Zistená chyba. Kliknite alebo stlačte {0}, aby ste požiadali agenta AI o diagnostikovanie a návrh opravy.</value>
+    <comment>Tooltip for the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
   <data name="Diagnostics_FixReadyTooltipFormat" xml:space="preserve">
     <value>Oprava je pripravená — {0} na použitie</value>
     <comment>Tooltip for the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
@@ -281,5 +289,11 @@
   <data name="TerminalProtocolTeachingTipTitle" xml:space="preserve">
     <value>Terminal Protocol</value>
     <comment>Title for the teaching tip that displays Terminal Protocol connection information. {Locked="Terminal Protocol"}</comment>
+  </data>
+  <data name="FreOverlay_AutoDetectLabel.Text" xml:space="preserve">
+    <value>Automatická detekcia chýb</value>
+  </data>
+  <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
+    <value>Povoľte aplikácii Intelligent Terminal prístup k prostrediu shell a automatickú detekciu chýb.</value>
   </data>
 </root>

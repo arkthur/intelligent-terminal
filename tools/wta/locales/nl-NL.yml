@@ -45,6 +45,7 @@ auth.hint_footer: "  Druk op Enter om aan te melden, Esc om terug te gaan"  # {L
 chat.activity_thinking: "Bezig met nadenken…"
 # {Locked="Intelligent Terminal"} - productnaam, niet vertalen
 chat.welcome_title: "Welkom bij Intelligent Terminal!"
+chat.welcome_disclaimer: "Intelligent Terminal maakt gebruik van AI. Controleer op fouten."
 chat.plan_header: "Plan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -105,8 +106,8 @@ agent.custom.auth_hint: "Zorg dat %{name} is geïnstalleerd en in het PATH staat
 
 # ── Agentweergave (src/ui/agents_view.rs) ─────────────────────────────────────
 agents.loading: "Laden..."
-# {Locked="Enter","Shift+enter","Esc","↑","↓"} - toetscombinaties, niet vertalen
-agents.footer_hint: "(↑ ↓ navigeren • Enter sessie starten in nieuw tabblad • Shift+enter sessie starten in agentdeelvenster • Esc afsluiten)"
+# {Locked="Enter","Esc","↑","↓"} - toetscombinaties, niet vertalen
+agents.footer_hint: "(↑ ↓ navigeren • Enter sessie starten • Esc afsluiten)"
 agents.status.active: "Actief"
 agents.status.waiting_for_input: "Wachten op invoer"
 agents.status.error: "Fout"
@@ -177,6 +178,6 @@ time.days_other: "%{count} dagen geleden"
 commands.help.summary: "Deze opdrachtlijst weergeven"
 commands.clear.summary: "Chatgeschiedenis wissen (sessie blijft behouden)"
 commands.new.summary: "Een nieuwe ACP-sessie starten (geschiedenis verwijderen)"
-commands.restart.summary: "Opnieuw verbinden: agentproces afsluiten en opnieuw starten"
+commands.restart.summary: "Agent opnieuw starten"
 commands.stop.summary: "De actieve prompt annuleren"
 commands.sessions.summary: "De selector voor eerdere sessies openen (Ctrl+Shift+/)"
