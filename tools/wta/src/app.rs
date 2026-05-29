@@ -595,8 +595,16 @@ where
         "agent.tool.completed"
         | "agent.tool.finished"
         | "agent.tool.failed"
-        | "agent.stop"
         | "agent.subagent.stop" => SessionEvent::ToolCompleted { key },
+        // Turn boundary. `agent.stop` is the only event that demotes
+        // Working/Attention -> Idle; the tool-boundary events above
+        // intentionally do not, so the F2 status badge stays stable
+        // across the many tool calls in a single turn. Sub-agent
+        // (Claude `SubagentStop`) finishing is treated as a tool
+        // completion because the main agent continues — making it
+        // demote here would re-introduce the very flicker this split
+        // is removing.
+        "agent.stop" => SessionEvent::TurnCompleted { key },
         "agent.notification" => SessionEvent::Notification {
             key,
             message: payload
@@ -9203,6 +9211,179 @@ mod tests {
             }
         }
         assert!(count >= 1, "at least one real-keyed event must reach master");
+    }
+
+    /// Headline UX guarantee of the turn-scoped status split: a model
+    /// turn calling many tools must stay in `Working` throughout, so
+    /// the F2 status badge doesn't flicker green↔grey at every tool
+    /// boundary. Drives the real `route_agent_event_to_registry`
+    /// pipeline with the hook-event vocabulary documented in
+    /// `tools/wta/wt-agent-hooks/README.md`.
+    #[test]
+    fn route_multi_tool_turn_stays_working_until_agent_stop() {
+        use crate::agent_sessions::AgentStatus;
+        let mut reg = crate::agent_sessions::AgentSessionRegistry::new();
+        let pane = "pane-turn-1";
+        let sid = "sid-turn-1";
+
+        // Seed the row so the routing layer has a real session to
+        // attach to (otherwise the orphan/synthetic-key path would
+        // run instead).
+        reg.apply(crate::agent_sessions::SessionEvent::SessionStarted {
+            key: sid.into(),
+            cli_source: crate::agent_sessions::CliSource::Copilot,
+            pane_session_id: pane.into(),
+            cwd: std::path::PathBuf::from("/x"),
+            title: "t".into(),
+        });
+
+        let route = |reg: &mut crate::agent_sessions::AgentSessionRegistry,
+                     event: &str,
+                     extra: serde_json::Value| {
+            let mut payload = json!({});
+            if let Some(obj) = extra.as_object() {
+                for (k, v) in obj { payload[k] = v.clone(); }
+            }
+            let params = json!({
+                "event": event,
+                "cli_source": "copilot",
+                "agent_session_id": sid,
+                "payload": payload,
+            });
+            crate::app::route_agent_event_to_registry(reg, pane, &params);
+        };
+
+        // agent.prompt.submit → Working
+        route(&mut reg, "agent.prompt.submit", json!({}));
+        assert_eq!(reg.get(&sid.to_string()).unwrap().status, AgentStatus::Working);
+
+        // 4 tool round-trips. Status MUST stay Working throughout —
+        // any flip to Idle here would mean the badge flickered.
+        for tool in ["ls", "grep", "edit", "bash"] {
+            route(&mut reg, "agent.tool.starting", json!({"tool_name": tool}));
+            assert_eq!(
+                reg.get(&sid.to_string()).unwrap().status,
+                AgentStatus::Working,
+                "agent.tool.starting must keep Working ({tool})",
+            );
+            route(&mut reg, "agent.tool.finished", json!({"tool_name": tool}));
+            assert_eq!(
+                reg.get(&sid.to_string()).unwrap().status,
+                AgentStatus::Working,
+                "agent.tool.finished must NOT demote to Idle ({tool})",
+            );
+        }
+
+        // Only agent.stop ends the turn.
+        route(&mut reg, "agent.stop", json!({}));
+        assert_eq!(reg.get(&sid.to_string()).unwrap().status, AgentStatus::Idle);
+    }
+
+    /// `agent.subagent.stop` (Claude Code's `SubagentStop` hook) fires
+    /// when a Task-tool sub-agent finishes; the main agent continues
+    /// the turn. The old routing collapsed it into the `agent.stop`
+    /// → Idle path and the next `tool.starting` had to re-promote
+    /// Working — exactly the flicker the split is removing. The new
+    /// mapping routes `subagent.stop` to `ToolCompleted`, which is a
+    /// no-op on Working.
+    #[test]
+    fn route_subagent_stop_does_not_end_the_turn() {
+        use crate::agent_sessions::AgentStatus;
+        let mut reg = crate::agent_sessions::AgentSessionRegistry::new();
+        let pane = "pane-sub";
+        let sid = "sid-sub";
+        reg.apply(crate::agent_sessions::SessionEvent::SessionStarted {
+            key: sid.into(),
+            cli_source: crate::agent_sessions::CliSource::Claude,
+            pane_session_id: pane.into(),
+            cwd: std::path::PathBuf::from("/x"),
+            title: "t".into(),
+        });
+
+        let route = |reg: &mut _, event: &str, extra: serde_json::Value| {
+            let mut payload = json!({});
+            if let Some(obj) = extra.as_object() {
+                for (k, v) in obj { payload[k] = v.clone(); }
+            }
+            let params = json!({
+                "event": event,
+                "cli_source": "claude",
+                "agent_session_id": sid,
+                "payload": payload,
+            });
+            crate::app::route_agent_event_to_registry(reg, pane, &params);
+        };
+
+        route(&mut reg, "agent.prompt.submit", json!({}));
+        route(&mut reg, "agent.tool.starting", json!({"tool_name": "Task"}));
+        route(&mut reg, "agent.subagent.stop", json!({}));
+        assert_eq!(
+            reg.get(&sid.to_string()).unwrap().status,
+            AgentStatus::Working,
+            "subagent.stop must not demote — main agent continues the turn",
+        );
+
+        // Now the actual turn end.
+        route(&mut reg, "agent.stop", json!({}));
+        assert_eq!(reg.get(&sid.to_string()).unwrap().status, AgentStatus::Idle);
+    }
+
+    /// `ask_user` round-trip via the routing layer: Notification flips
+    /// to Attention, the matching `agent.tool.finished` (user answered)
+    /// resumes Working — not Idle. Only the subsequent `agent.stop`
+    /// demotes to Idle.
+    #[test]
+    fn route_ask_user_answer_resumes_working_not_idle() {
+        use crate::agent_sessions::AgentStatus;
+        let mut reg = crate::agent_sessions::AgentSessionRegistry::new();
+        let pane = "pane-ask";
+        let sid = "sid-ask";
+        reg.apply(crate::agent_sessions::SessionEvent::SessionStarted {
+            key: sid.into(),
+            cli_source: crate::agent_sessions::CliSource::Copilot,
+            pane_session_id: pane.into(),
+            cwd: std::path::PathBuf::from("/x"),
+            title: "t".into(),
+        });
+
+        let route = |reg: &mut _, event: &str, extra: serde_json::Value| {
+            let mut payload = json!({});
+            if let Some(obj) = extra.as_object() {
+                for (k, v) in obj { payload[k] = v.clone(); }
+            }
+            let params = json!({
+                "event": event,
+                "cli_source": "copilot",
+                "agent_session_id": sid,
+                "payload": payload,
+            });
+            crate::app::route_agent_event_to_registry(reg, pane, &params);
+        };
+
+        route(&mut reg, "agent.prompt.submit", json!({}));
+        // is_user_input_tool("ask_user") => true, so the route layer
+        // synthesises a Notification on top of the ToolStarting.
+        route(
+            &mut reg,
+            "agent.tool.starting",
+            json!({
+                "tool_name": "ask_user",
+                "tool_input": { "question": "Which folder?" },
+            }),
+        );
+        assert_eq!(
+            reg.get(&sid.to_string()).unwrap().status,
+            AgentStatus::Attention,
+        );
+
+        // User answers → agent.tool.finished → resume Working.
+        route(&mut reg, "agent.tool.finished", json!({"tool_name": "ask_user"}));
+        let s = reg.get(&sid.to_string()).unwrap();
+        assert_eq!(s.status, AgentStatus::Working);
+        assert!(s.attention_reason.is_none());
+
+        route(&mut reg, "agent.stop", json!({}));
+        assert_eq!(reg.get(&sid.to_string()).unwrap().status, AgentStatus::Idle);
     }
 
     fn test_app_with_master_rx() -> (

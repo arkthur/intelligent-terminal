@@ -1892,6 +1892,7 @@ fn session_event_key(event: &crate::agent_sessions::SessionEvent) -> Option<&str
         SessionEvent::SessionStarted { key, .. }
         | SessionEvent::ToolStarting { key, .. }
         | SessionEvent::ToolCompleted { key }
+        | SessionEvent::TurnCompleted { key }
         | SessionEvent::Notification { key, .. }
         | SessionEvent::SessionStopped { key, .. }
         | SessionEvent::ResumeDispatched { key }
@@ -3356,6 +3357,7 @@ mod tests {
                 Some("k2"),
             ),
             (SessionEvent::ToolCompleted { key: "k3".into() }, Some("k3")),
+            (SessionEvent::TurnCompleted { key: "k3b".into() }, Some("k3b")),
             (
                 SessionEvent::Notification {
                     key: "k4".into(),

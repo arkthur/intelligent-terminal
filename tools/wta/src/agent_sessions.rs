@@ -199,7 +199,24 @@ impl AgentSession {
 pub enum SessionEvent {
     SessionStarted   { key: AgentKey, cli_source: CliSource, pane_session_id: String, cwd: PathBuf, title: String },
     ToolStarting     { key: AgentKey, tool_name: String },
+    /// A single tool invocation completed (`agent.tool.completed`,
+    /// `agent.tool.finished`, `agent.tool.failed`, or
+    /// `agent.subagent.stop`). **Does not end the turn** — the
+    /// reducer keeps `Working`/`Working` as `Working` (so the F2
+    /// status badge stays stable across the many tool boundaries in
+    /// one model turn) and demotes `Attention -> Working` (a
+    /// user-input tool like `ask_user` just got an answer, so the
+    /// agent will resume work). The turn-ending demotion to `Idle`
+    /// is [`SessionEvent::TurnCompleted`].
     ToolCompleted    { key: AgentKey },
+    /// The agent's current turn ended (`agent.stop`). Demotes
+    /// `Working`/`Attention -> Idle`, clears `current_tool` and
+    /// `attention_reason`. Honors the same Ended/Historical
+    /// resurrection guard as the other lifecycle events. `Error`
+    /// is sticky — `TurnCompleted` does not touch it, so a
+    /// `ConnectionFailed` from mid-turn keeps surfacing until the
+    /// next prompt cycle resets it.
+    TurnCompleted    { key: AgentKey },
     Notification     { key: AgentKey, message: String },
     SessionStopped   { key: AgentKey, reason: String },
     ConnectionFailed { pane_session_id: String, reason: String },
@@ -421,17 +438,60 @@ impl AgentSessionRegistry {
 
             SessionEvent::ToolCompleted { key } => {
                 if let Some(entry) = self.sessions.get_mut(&key) {
-                    // Demote to Idle when this completion resolves an active
-                    // wait. Two cases produce Attention:
-                    //   1. A user-input tool started (e.g. Copilot's `ask_user`)
-                    //      — its matching ToolCompleted means the user replied.
-                    //   2. A `Notification` event from a permission_prompt hook
-                    //      escalated us mid-tool — the matching tool.completed
-                    //      / tool.failed (approve / reject) resolves it.
-                    // Both cases mean "next event clears Attention", so we
-                    // demote on any ToolCompleted while in Attention. The Error
-                    // state is separate (set by ConnectionFailed) and is NOT
-                    // touched here, so transient-error UX still works.
+                    // Single-tool boundary. Does NOT demote to Idle on its
+                    // own — a model turn often calls many tools, and
+                    // flipping Working->Idle between each one made the F2
+                    // status badge flicker. The turn boundary
+                    // ([`SessionEvent::TurnCompleted`], fired from
+                    // `agent.stop`) owns the Working->Idle transition.
+                    //
+                    // Special case: Attention -> Working. Attention is
+                    // reached via [`SessionEvent::Notification`] (e.g.
+                    // Copilot's `ask_user` prompt or a permission_prompt
+                    // hook). The matching ToolCompleted means the user
+                    // answered, so we resume to Working — not Idle —
+                    // because the agent will continue the turn. The
+                    // turn-ending TurnCompleted will demote later.
+                    //
+                    // Working stays Working. Error stays Error (sticky
+                    // until the next prompt cycle). Idle/Ended/Historical
+                    // are untouched.
+                    if entry.status == AgentStatus::Attention {
+                        entry.status            = AgentStatus::Working;
+                        entry.attention_reason  = None;
+                    }
+                    entry.current_tool      = None;
+                    entry.last_activity_at  = now;
+                    self.dirty = true;
+                }
+            }
+
+            SessionEvent::TurnCompleted { key } => {
+                if let Some(entry) = self.sessions.get_mut(&key) {
+                    // The model turn just ended (e.g. Claude/Copilot
+                    // `Stop` hook, Gemini `AfterAgent`). Demote any
+                    // turn-active status to Idle and clear the
+                    // turn-scoped scratch fields.
+                    //
+                    // Resurrection guard: a stale `agent.stop` arriving
+                    // after the row already terminated (Ended /
+                    // Historical from `PaneClosed` or pane-handoff)
+                    // must not promote it back into the Idle set —
+                    // that would re-enable Enter / focus on a dead
+                    // pane GUID.
+                    //
+                    // Error is intentionally NOT touched: a
+                    // `ConnectionFailed` mid-turn should stay surfaced
+                    // until the next prompt cycle (handled by the
+                    // ToolStarting -> Working transition) so the user
+                    // can see the failure reason.
+                    let terminal = matches!(
+                        entry.status,
+                        AgentStatus::Ended | AgentStatus::Historical
+                    );
+                    if terminal {
+                        return;
+                    }
                     let demotable = entry.status == AgentStatus::Working
                         || entry.status == AgentStatus::Attention;
                     if demotable {
@@ -1241,7 +1301,14 @@ mod tests {
     }
 
     #[test]
-    fn tool_completed_returns_working_to_idle() {
+    fn tool_completed_keeps_working_so_status_does_not_flicker_between_tools() {
+        // Headline behavior of the turn-scoped status split. A model
+        // turn typically calls many tools in sequence; under the old
+        // semantics each `agent.tool.finished` flipped Working->Idle
+        // and the next `agent.tool.starting` flipped it back, so the
+        // F2 status badge flickered every couple of hundred ms.
+        // ToolCompleted now clears only `current_tool`; status stays
+        // Working until TurnCompleted ends the turn.
         let mut reg = AgentSessionRegistry::new();
         reg.apply(SessionEvent::SessionStarted {
             key: k("s"), cli_source: CliSource::Claude,
@@ -1251,27 +1318,79 @@ mod tests {
         reg.apply(SessionEvent::ToolStarting   { key: k("s"), tool_name: "bash".into() });
         reg.apply(SessionEvent::ToolCompleted  { key: k("s") });
         let s = reg.sessions.get("s").unwrap();
-        assert_eq!(s.status, AgentStatus::Idle);
-        assert!(s.current_tool.is_none());
+        assert_eq!(s.status, AgentStatus::Working, "tool boundary must not demote");
+        assert!(s.current_tool.is_none(), "current_tool cleared between tools");
     }
 
     #[test]
-    fn tool_completed_demotes_attention_to_idle_but_not_error() {
-        // Attention is a transient "awaiting user" state set by either a
-        // user-input tool (e.g. ask_user) or a permission_prompt notification
-        // arriving mid-tool. The matching ToolCompleted/ToolFailed/Stop event
-        // means the user has answered (approve, reject, or supplied input),
-        // so Attention must clear back to Idle. Error, by contrast, is a real
-        // failure state set by ConnectionFailed and must persist until a new
-        // SessionStarted/ToolStarting event resets it.
+    fn turn_completed_returns_working_to_idle() {
+        // The turn boundary (mapped from `agent.stop`) IS what demotes
+        // Working back to Idle. This is the old `tool_completed_returns_
+        // working_to_idle` invariant, now scoped to the right event.
         let mut reg = AgentSessionRegistry::new();
         reg.apply(SessionEvent::SessionStarted {
             key: k("s"), cli_source: CliSource::Claude,
             pane_session_id: pane("p"), cwd: PathBuf::from("/x"),
             title: "t".into(),
         });
+        reg.apply(SessionEvent::ToolStarting   { key: k("s"), tool_name: "bash".into() });
+        reg.apply(SessionEvent::TurnCompleted  { key: k("s") });
+        let s = reg.sessions.get("s").unwrap();
+        assert_eq!(s.status, AgentStatus::Idle);
+        assert!(s.current_tool.is_none());
+    }
 
-        // Case 1: Attention from a permission_prompt-style notification.
+    #[test]
+    fn multi_tool_turn_stays_working_until_turn_completed() {
+        // End-to-end at the reducer level: typical 4-tool turn never
+        // flickers through Idle.
+        let mut reg = AgentSessionRegistry::new();
+        reg.apply(SessionEvent::SessionStarted {
+            key: k("s"), cli_source: CliSource::Claude,
+            pane_session_id: pane("p"), cwd: PathBuf::from("/x"),
+            title: "t".into(),
+        });
+        // agent.prompt.submit
+        reg.apply(SessionEvent::ToolStarting { key: k("s"), tool_name: "prompt".into() });
+        assert_eq!(reg.sessions.get("s").unwrap().status, AgentStatus::Working);
+        for tool in ["ls", "grep", "edit", "bash"] {
+            reg.apply(SessionEvent::ToolStarting   {
+                key: k("s"), tool_name: tool.into(),
+            });
+            assert_eq!(
+                reg.sessions.get("s").unwrap().status,
+                AgentStatus::Working,
+                "tool.starting keeps Working ({tool})",
+            );
+            reg.apply(SessionEvent::ToolCompleted { key: k("s") });
+            assert_eq!(
+                reg.sessions.get("s").unwrap().status,
+                AgentStatus::Working,
+                "tool.finished must NOT demote to Idle ({tool})",
+            );
+            assert!(
+                reg.sessions.get("s").unwrap().current_tool.is_none(),
+                "current_tool cleared between tools",
+            );
+        }
+        // agent.stop
+        reg.apply(SessionEvent::TurnCompleted { key: k("s") });
+        assert_eq!(reg.sessions.get("s").unwrap().status, AgentStatus::Idle);
+    }
+
+    #[test]
+    fn tool_completed_demotes_attention_to_working_so_turn_continues() {
+        // Attention is reached via Notification (e.g. `ask_user` or a
+        // permission_prompt). The matching ToolCompleted means the user
+        // answered — under the new semantics the agent is about to
+        // resume the turn, so we go to Working (not Idle). Only
+        // TurnCompleted demotes to Idle.
+        let mut reg = AgentSessionRegistry::new();
+        reg.apply(SessionEvent::SessionStarted {
+            key: k("s"), cli_source: CliSource::Claude,
+            pane_session_id: pane("p"), cwd: PathBuf::from("/x"),
+            title: "t".into(),
+        });
         reg.apply(SessionEvent::ToolStarting {
             key: k("s"), tool_name: "shell".into(),
         });
@@ -1279,18 +1398,89 @@ mod tests {
             key: k("s"), message: "approve: rm -rf foo".into(),
         });
         assert_eq!(reg.sessions.get("s").unwrap().status, AgentStatus::Attention);
-        // User rejects → tool.failed → ToolCompleted. Should clear Attention.
+
         reg.apply(SessionEvent::ToolCompleted { key: k("s") });
         let s = reg.sessions.get("s").unwrap();
-        assert_eq!(s.status, AgentStatus::Idle);
-        assert!(s.attention_reason.is_none(), "attention_reason should be cleared");
-        assert!(s.current_tool.is_none());
+        assert_eq!(s.status, AgentStatus::Working, "attention -> working (turn continues)");
+        assert!(s.attention_reason.is_none(), "attention_reason cleared");
+        assert!(s.current_tool.is_none(), "current_tool cleared");
+    }
 
-        // Case 2: Error must NOT be demoted by ToolCompleted.
+    #[test]
+    fn turn_completed_demotes_attention_to_idle_and_clears_reason() {
+        // When `agent.stop` arrives while we're in Attention (e.g. the
+        // turn ended without a matching tool.completed for the
+        // Notification — possible with some CLIs), TurnCompleted both
+        // demotes to Idle and clears `attention_reason`.
+        let mut reg = AgentSessionRegistry::new();
+        reg.apply(SessionEvent::SessionStarted {
+            key: k("s"), cli_source: CliSource::Claude,
+            pane_session_id: pane("p"), cwd: PathBuf::from("/x"),
+            title: "t".into(),
+        });
+        reg.apply(SessionEvent::Notification {
+            key: k("s"), message: "approve: rm -rf foo".into(),
+        });
+        reg.apply(SessionEvent::TurnCompleted { key: k("s") });
+        let s = reg.sessions.get("s").unwrap();
+        assert_eq!(s.status, AgentStatus::Idle);
+        assert!(s.attention_reason.is_none());
+    }
+
+    #[test]
+    fn turn_completed_does_not_clear_error_state() {
+        // Error is sticky — set by ConnectionFailed, must persist past
+        // the end of the turn so the user can read the failure reason
+        // until they start a new prompt cycle.
+        let mut reg = AgentSessionRegistry::new();
+        reg.apply(SessionEvent::SessionStarted {
+            key: k("s"), cli_source: CliSource::Claude,
+            pane_session_id: pane("p"), cwd: PathBuf::from("/x"),
+            title: "t".into(),
+        });
         reg.sessions.get_mut("s").unwrap().status = AgentStatus::Error;
         reg.sessions.get_mut("s").unwrap().last_error = Some("API failed".into());
+        reg.apply(SessionEvent::TurnCompleted { key: k("s") });
+        let s = reg.sessions.get("s").unwrap();
+        assert_eq!(s.status, AgentStatus::Error);
+        assert_eq!(s.last_error.as_deref(), Some("API failed"));
+    }
+
+    #[test]
+    fn tool_completed_does_not_clear_error_state() {
+        // Same as above for the per-tool boundary — Error must survive
+        // tool.completed/failed events fired between an error and the
+        // turn end.
+        let mut reg = AgentSessionRegistry::new();
+        reg.apply(SessionEvent::SessionStarted {
+            key: k("s"), cli_source: CliSource::Claude,
+            pane_session_id: pane("p"), cwd: PathBuf::from("/x"),
+            title: "t".into(),
+        });
+        reg.sessions.get_mut("s").unwrap().status = AgentStatus::Error;
         reg.apply(SessionEvent::ToolCompleted { key: k("s") });
         assert_eq!(reg.sessions.get("s").unwrap().status, AgentStatus::Error);
+    }
+
+    #[test]
+    fn turn_completed_on_terminal_row_is_noop_resurrection_guard() {
+        // Stale `agent.stop` arriving after the row already ended
+        // (PaneClosed / pane handoff) must not resurrect it into the
+        // Idle bucket — that would re-enable Enter / focus on a dead
+        // pane GUID.
+        let mut reg = AgentSessionRegistry::new();
+        reg.apply(SessionEvent::SessionStarted {
+            key: k("s"), cli_source: CliSource::Claude,
+            pane_session_id: pane("p"), cwd: PathBuf::from("/x"),
+            title: "t".into(),
+        });
+        reg.sessions.get_mut("s").unwrap().status = AgentStatus::Ended;
+        reg.apply(SessionEvent::TurnCompleted { key: k("s") });
+        assert_eq!(reg.sessions.get("s").unwrap().status, AgentStatus::Ended);
+
+        reg.sessions.get_mut("s").unwrap().status = AgentStatus::Historical;
+        reg.apply(SessionEvent::TurnCompleted { key: k("s") });
+        assert_eq!(reg.sessions.get("s").unwrap().status, AgentStatus::Historical);
     }
 
     #[test]
@@ -1974,11 +2164,13 @@ mod tests {
     }
 
     #[test]
-    fn tool_completed_demotes_attention_when_current_tool_was_user_input() {
+    fn tool_completed_after_ask_user_resumes_working_not_idle() {
         // Models the Copilot ask_user flow: BeforeTool fires with
         // tool_name="ask_user" → registry sees it as Attention. When the
         // user answers, AfterTool fires → ToolCompleted should demote
-        // Attention back to Idle (so the row stops nagging).
+        // Attention to **Working** (not Idle): the agent is about to
+        // resume the turn with the user's answer. Only TurnCompleted
+        // demotes to Idle.
         let mut reg = AgentSessionRegistry::new();
         reg.apply(SessionEvent::SessionStarted {
             key: k("s"), cli_source: CliSource::Copilot,
@@ -1999,9 +2191,13 @@ mod tests {
         // User answers → AfterTool → ToolCompleted.
         reg.apply(SessionEvent::ToolCompleted { key: k("s") });
         let s = reg.sessions.get("s").unwrap();
-        assert_eq!(s.status, AgentStatus::Idle);
+        assert_eq!(s.status, AgentStatus::Working, "agent resumes the turn");
         assert!(s.current_tool.is_none());
         assert!(s.attention_reason.is_none());
+
+        // ... and a subsequent agent.stop ends the turn.
+        reg.apply(SessionEvent::TurnCompleted { key: k("s") });
+        assert_eq!(reg.sessions.get("s").unwrap().status, AgentStatus::Idle);
     }
 
     #[test]

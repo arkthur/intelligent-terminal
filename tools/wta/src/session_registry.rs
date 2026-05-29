@@ -481,6 +481,11 @@ pub enum SessionHookParams {
     ToolCompleted {
         key: crate::agent_sessions::AgentKey,
     },
+    /// Turn boundary — see [`crate::agent_sessions::SessionEvent::TurnCompleted`].
+    /// Wire serialization: `{"kind":"TurnCompleted","key":"…"}`.
+    TurnCompleted {
+        key: crate::agent_sessions::AgentKey,
+    },
     Notification {
         key: crate::agent_sessions::AgentKey,
         message: String,
@@ -527,6 +532,7 @@ impl From<&crate::agent_sessions::SessionEvent> for SessionHookParams {
                 tool_name: tool_name.clone(),
             },
             SessionEvent::ToolCompleted { key } => Self::ToolCompleted { key: key.clone() },
+            SessionEvent::TurnCompleted { key } => Self::TurnCompleted { key: key.clone() },
             SessionEvent::Notification { key, message } => Self::Notification {
                 key: key.clone(),
                 message: message.clone(),
@@ -577,6 +583,7 @@ impl From<SessionHookParams> for crate::agent_sessions::SessionEvent {
                 Self::ToolStarting { key, tool_name }
             }
             SessionHookParams::ToolCompleted { key } => Self::ToolCompleted { key },
+            SessionHookParams::TurnCompleted { key } => Self::TurnCompleted { key },
             SessionHookParams::Notification { key, message } => {
                 Self::Notification { key, message }
             }
@@ -1105,6 +1112,33 @@ fn apply_event_locked(state: &mut RegistryState, ev: SessionEvent) -> bool {
             if matches!(entry.status, Some(AgentStatus::Ended | AgentStatus::Historical)) {
                 return false;
             }
+            // Single-tool boundary: do NOT demote Working -> Idle (the
+            // turn likely continues with more tools). The
+            // Working -> Idle transition happens on TurnCompleted
+            // (`agent.stop`). Attention -> Working models "user just
+            // answered an `ask_user`, agent resumes the turn." See
+            // helper-side reducer in `agent_sessions.rs` for the full
+            // rationale.
+            if matches!(entry.status, Some(AgentStatus::Attention)) {
+                entry.status = Some(AgentStatus::Working);
+                entry.attention_reason = None;
+            }
+            entry.current_tool = None;
+            entry.last_activity_at_ms = Some(now);
+            true
+        }
+        SessionEvent::TurnCompleted { key } => {
+            let sid = acp::SessionId::new(key);
+            let Some(entry) = state.sessions.get_mut(&sid) else { return false; };
+            // Resurrection guard mirrors ToolStarting / ToolCompleted.
+            if matches!(entry.status, Some(AgentStatus::Ended | AgentStatus::Historical)) {
+                return false;
+            }
+            // The model turn ended (`agent.stop`). Demote
+            // Working/Attention -> Idle and clear turn-scoped scratch
+            // fields. `Error` is intentionally sticky so a
+            // `ConnectionFailed` from earlier in the turn stays
+            // surfaced until the next prompt cycle.
             if matches!(entry.status, Some(AgentStatus::Working | AgentStatus::Attention)) {
                 entry.status = Some(AgentStatus::Idle);
                 entry.attention_reason = None;
@@ -1851,11 +1885,88 @@ mod tests {
         assert_eq!(row.status, Some(crate::agent_sessions::AgentStatus::Attention));
         assert_eq!(row.attention_reason.as_deref(), Some("approve?"));
 
+        // Under the turn-scoped status split, ToolCompleted on Attention
+        // resumes Working (user just answered, agent continues the turn)
+        // — it does NOT demote to Idle. The Idle demotion comes from
+        // TurnCompleted (`agent.stop`) below.
         reg.apply_event(crate::agent_sessions::SessionEvent::ToolCompleted { key: "sid".into() }).await;
+        let row = reg.lookup(&acp::SessionId::new("sid")).await.unwrap();
+        assert_eq!(row.status, Some(crate::agent_sessions::AgentStatus::Working));
+        assert!(row.current_tool.is_none());
+        assert!(row.attention_reason.is_none());
+
+        // TurnCompleted is what ends the turn → Idle.
+        reg.apply_event(crate::agent_sessions::SessionEvent::TurnCompleted { key: "sid".into() }).await;
         let row = reg.lookup(&acp::SessionId::new("sid")).await.unwrap();
         assert_eq!(row.status, Some(crate::agent_sessions::AgentStatus::Idle));
         assert!(row.current_tool.is_none());
-        assert!(row.attention_reason.is_none());
+    }
+
+    /// Master-side mirror of `agent_sessions::tests::
+    /// multi_tool_turn_stays_working_until_turn_completed` — same
+    /// guarantee at the master reducer.
+    #[tokio::test]
+    async fn master_reducer_multi_tool_turn_stays_working_until_turn_completed() {
+        use crate::agent_sessions::{AgentStatus, CliSource, SessionEvent};
+        let reg = InMemoryRegistry::new();
+        reg.apply_event(SessionEvent::SessionStarted {
+            key: "sid".into(),
+            cli_source: CliSource::Copilot,
+            pane_session_id: "p".into(),
+            cwd: PathBuf::from("C:\\x"),
+            title: "t".into(),
+        }).await;
+        // agent.prompt.submit
+        reg.apply_event(SessionEvent::ToolStarting {
+            key: "sid".into(), tool_name: "prompt".into(),
+        }).await;
+        for tool in ["ls", "grep", "edit", "bash"] {
+            reg.apply_event(SessionEvent::ToolStarting {
+                key: "sid".into(), tool_name: tool.into(),
+            }).await;
+            reg.apply_event(SessionEvent::ToolCompleted { key: "sid".into() }).await;
+            let row = reg.lookup(&acp::SessionId::new("sid")).await.unwrap();
+            assert_eq!(
+                row.status,
+                Some(AgentStatus::Working),
+                "between-tool boundary must keep Working ({tool})",
+            );
+        }
+        reg.apply_event(SessionEvent::TurnCompleted { key: "sid".into() }).await;
+        let row = reg.lookup(&acp::SessionId::new("sid")).await.unwrap();
+        assert_eq!(row.status, Some(AgentStatus::Idle));
+    }
+
+    #[tokio::test]
+    async fn master_reducer_turn_completed_does_not_resurrect_terminal_row() {
+        use crate::agent_sessions::{AgentStatus, SessionEvent};
+        let reg = InMemoryRegistry::new();
+        let mut info = SessionInfo::new(acp::SessionId::new("ended-sid"), PathBuf::from("/repo"));
+        info.status = Some(AgentStatus::Ended);
+        reg.upsert(info).await;
+        let applied = reg
+            .apply_event(SessionEvent::TurnCompleted { key: "ended-sid".into() })
+            .await;
+        assert!(!applied, "TurnCompleted on Ended must be a no-op");
+        let row = reg.lookup(&acp::SessionId::new("ended-sid")).await.unwrap();
+        assert_eq!(row.status, Some(AgentStatus::Ended));
+    }
+
+    #[tokio::test]
+    async fn master_reducer_turn_completed_does_not_clear_error() {
+        use crate::agent_sessions::{AgentStatus, SessionEvent};
+        let reg = InMemoryRegistry::new();
+        let mut info = SessionInfo::new(acp::SessionId::new("err-sid"), PathBuf::from("/repo"));
+        info.status = Some(AgentStatus::Error);
+        info.last_error = Some("pipe closed".into());
+        reg.upsert(info).await;
+        let applied = reg
+            .apply_event(SessionEvent::TurnCompleted { key: "err-sid".into() })
+            .await;
+        assert!(applied, "non-terminal Error row still receives the event");
+        let row = reg.lookup(&acp::SessionId::new("err-sid")).await.unwrap();
+        assert_eq!(row.status, Some(AgentStatus::Error), "Error is sticky");
+        assert_eq!(row.last_error.as_deref(), Some("pipe closed"));
     }
 
     #[tokio::test]
