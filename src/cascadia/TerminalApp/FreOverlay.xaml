@@ -235,7 +235,40 @@
                             </Grid>
                         </Border>
 
-                        <!--  Auto-error detection  -->
+                        <!--  Automatic error detection — gates suggestion below.
+                              When off, the suggestion toggle is forced off and
+                              disabled (see _OnAutoDetectToggled).  -->
+                        <Border Background="#19FFFFFF" CornerRadius="4" Padding="16,12">
+                            <StackPanel Spacing="4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <TextBlock x:Uid="FreOverlay_AutoDetectLabel"
+                                                   FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="White" />
+                                        <TextBlock x:Uid="FreOverlay_AutoDetectDescription"
+                                                   FontSize="12" Foreground="#99FFFFFF"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ToggleSwitch x:Name="AutoDetectToggle" Grid.Column="1"
+                                                  IsOn="True" VerticalAlignment="Center"
+                                                  HorizontalAlignment="Right" MinWidth="0"
+                                                  Toggled="_OnAutoDetectToggled" />
+                                </Grid>
+                                <TextBlock x:Name="AutoDetectPolicyNotice"
+                                           FontSize="12" FontStyle="Italic"
+                                           Foreground="#CCFFA500" TextWrapping="Wrap"
+                                           Visibility="Collapsed"
+                                           AutomationProperties.LiveSetting="Polite" />
+                            </StackPanel>
+                        </Border>
+
+                        <!--  Automatic error suggestion — depends on detection
+                              above (auto-suggest needs errors to be detected
+                              first).  -->
                         <Border Background="#19FFFFFF" CornerRadius="4" Padding="16,12">
                             <StackPanel Spacing="4">
                                 <Grid>
