@@ -1572,7 +1572,7 @@ fn uninstall_for(cli: CliKind, home: Option<&Path>) -> CliUninstallResult {
         CliKind::Copilot => copilot_uninstall(home),
         CliKind::Claude => claude_uninstall(home),
         CliKind::Gemini => gemini_uninstall(home),
-        CliKind::Codex => codex_uninstall(home),
+        CliKind::Codex => uninstall_for_codex(home),
     }
 }
 
@@ -2498,15 +2498,64 @@ fn codex_marketplace_info(home: &Path) -> MarketplaceInfo {
     info
 }
 
-fn codex_uninstall(_home: Option<&Path>) -> CliUninstallResult {
-    CliUninstallResult {
+fn uninstall_for_codex(home: Option<&Path>) -> CliUninstallResult {
+    let mut result = CliUninstallResult {
         name: CliKind::Codex.name(),
         attempted: false,
         plugin_uninstalled: None,
         marketplace_removed: None,
-        staging_dir_removed: false,
+        staging_dir_removed: true,
         messages: Vec::new(),
+    };
+
+    let Some(home) = home else {
+        result.messages.push("home path not provided; skipping".into());
+        return result;
+    };
+
+    let codex_dir = home.join(".codex");
+    if !codex_dir.is_dir() {
+        result.messages.push("skipped: no ~/.codex directory".to_string());
+        return result;
     }
+    result.attempted = true;
+
+    let plugin_ref = format!("{}@{}", PLUGIN_NAME, MARKETPLACE_NAME);
+    match run_plugin_cli(
+        "codex",
+        &["plugin", "remove", &plugin_ref],
+        "agent_hooks",
+        &["not installed"],
+    ) {
+        Ok(()) => {
+            result.plugin_uninstalled = Some(true);
+            result.messages.push("codex plugin remove succeeded".to_string());
+        }
+        Err(e) => {
+            result.plugin_uninstalled = Some(false);
+            result.messages.push(format!("codex plugin remove failed: {e}"));
+        }
+    }
+
+    match run_plugin_cli(
+        "codex",
+        &["plugin", "marketplace", "remove", MARKETPLACE_NAME],
+        "agent_hooks",
+        &["not registered", "not found"],
+    ) {
+        Ok(()) => {
+            result.marketplace_removed = Some(true);
+            result.messages.push("codex plugin marketplace remove succeeded".to_string());
+        }
+        Err(e) => {
+            result.marketplace_removed = Some(false);
+            result.messages.push(format!("codex plugin marketplace remove failed: {e}"));
+        }
+    }
+
+    result.staging_dir_removed = sweep_legacy_staging_dirs(&mut result.messages, CliKind::Codex);
+
+    result
 }
 
 // ---------------------------------------------------------------------------
@@ -4029,5 +4078,16 @@ Registered marketplaces:
         // Plugin is present even if not currently enabled; we still treat
         // it as installed so that we know there's something to clean up.
         assert!(parse_codex_plugin_list(sample));
+    }
+
+    #[test]
+    fn uninstall_for_codex_skips_when_home_absent() {
+        let parent = unique_dir("uninstall_codex_absent");
+        let result = uninstall_for_codex(Some(&parent));
+        assert_eq!(result.name, "codex");
+        assert!(!result.attempted);
+        assert!(result.plugin_uninstalled.is_none());
+        assert!(result.marketplace_removed.is_none());
+        let _ = std::fs::remove_dir_all(&parent);
     }
 }
