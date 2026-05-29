@@ -1,5 +1,5 @@
 # Titles de la pantalla de configuració
-# {Locked="Intelligent Terminal"} - nom del producte, no traduïu
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Us donem la benvinguda a l'Terminal Intel·ligent!"
 setup.title.agent_missing: "No s'ha trobat l'agent"
 setup.title.agent_error: "No s'ha pogut connectar amb l'agent"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "El vostre agent \"%{agent}\" no està instal·lat
 setup.subtitle.copilot_auth: "El vostre agent \"%{agent}\" requereix autenticació. Seguiu els passos següents per iniciar la sessió. Per canviar d'agent, aneu a Terminal Intel·ligent Settings > Agent."
 setup.subtitle.agent_auth: "El vostre agent \"%{agent}\" requereix autenticació. Inicieu la sessió mitjançant l'agent i seleccioneu \"He iniciat la sessió\" a continuació. Per canviar d'agent, aneu a Terminal Intel·ligent Settings > Agent."
 
-# {Locked="Intelligent Terminal"}, {Locked="Settings"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}, {Locked="Settings"}
 setup.description.fre_line1: "Trieu el CLI d'agent predeterminat que voleu utilitzar a l'Terminal Intel·ligent. Podeu"
 setup.description.fre_line2: "anar a Settings per configurar el vostre espai de treball."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Premeu Enter per iniciar la sessió, Esc per tornar enrere"
 
 # ── Vista de xat (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Pensant…"
-# {Locked="Intelligent Terminal"} - nom del producte, no traduïu
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Us donem la benvinguda a l'Terminal Intel·ligent!"
 chat.welcome_disclaimer: "Terminal Intel·ligent utilitza IA. Comproveu si hi ha errors."
 chat.plan_header: "Pla:"

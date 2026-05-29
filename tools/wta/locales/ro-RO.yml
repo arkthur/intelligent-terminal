@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Bun venit la Terminal Inteligent!"
 setup.title.agent_missing: "Agentul nu a fost găsit"
 setup.title.agent_error: "Conectarea la agent a eșuat"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Agentul \"%{agent}\" nu este instalat. Reinstala�
 setup.subtitle.copilot_auth: "Agentul \"%{agent}\" necesită autentificare. Urmați pașii de mai jos pentru a vă conecta. Pentru a schimba agentul, accesați Terminal Inteligent Settings > Agent."
 setup.subtitle.agent_auth: "Agentul \"%{agent}\" necesită autentificare. Conectați-vă prin agent, apoi selectați \"M-am conectat\" mai jos. Pentru a schimba agentul, accesați Terminal Inteligent Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Alegeți agentul implicit pe care doriți să îl utilizați în Terminal Inteligent. Puteți"
 setup.description.fre_line2: "naviga la Settings pentru a configura spațiul de lucru."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Apăsați Enter pentru conectare, Esc pentru a reveni"  # {
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Se gândește..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Bun venit la Terminal Inteligent!"
 chat.welcome_disclaimer: "Terminal Inteligent folosește AI. Verificați erorile."
 chat.plan_header: "Plan:"

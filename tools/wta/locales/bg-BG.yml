@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Добре дошли в Интелигентен Терминал!"
 setup.title.agent_missing: "Агентът не е намерен"
 setup.title.agent_error: "Връзката с агента е неуспешна"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Вашият агент \"%{agent}\" не е ин
 setup.subtitle.copilot_auth: "Вашият агент \"%{agent}\" изисква удостоверяване. Следвайте стъпките по-долу, за да влезете. За да смените агента, отидете в Интелигентен Терминал Settings > Agent."
 setup.subtitle.agent_auth: "Вашият агент \"%{agent}\" изисква удостоверяване. Влезте чрез агента и изберете \"Влязох\" по-долу. За да смените агента, отидете в Интелигентен Терминал Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Изберете агента по подразбиране, който искате да използвате в Интелигентен Терминал. Можете"
 setup.description.fre_line2: "да отидете в Settings, за да конфигурирате работното си пространство."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Натиснете Enter за влизане, Esc за вр
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Мисля..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Добре дошли в Интелигентен Терминал!"
 chat.welcome_disclaimer: "Интелигентен Терминал използва AI. Проверявайте за грешки."
 chat.plan_header: "План:"

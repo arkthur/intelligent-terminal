@@ -182,8 +182,7 @@
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>ఇంటెలిజెంట్ టెర్మినల్ కు మీ రన్ అవుతున్న లేదా సక్రియ ఏజెంట్‌ల స్థితిని ట్రాక్ చేయడానికి అనుమతి ఇవ్వండి.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ దీన్ని ఎనేబుల్ చేయడం వలన మీ ఏజెంట్‌లలో సెషన్‌లను ట్రాక్ చేయడానికి ఇంటిగ్రేషన్ hooks ఇన్‌స్టాల్ చేయబడతాయి.</value>

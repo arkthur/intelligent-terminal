@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Akıllı Terminal'e hoş geldiniz!"
 setup.title.agent_missing: "Aracı bulunamadı"
 setup.title.agent_error: "Aracı bağlantısı başarısız oldu"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Aracınız \"%{agent}\" yüklü değil. Lütfen e
 setup.subtitle.copilot_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Oturum açmak için aşağıdaki adımları izleyin. Aracı değiştirmek için Akıllı Terminal Settings > Agent'e gidin."
 setup.subtitle.agent_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Lütfen aracı üzerinden oturum açın, ardından aşağıda \"Oturum açtım\" seçeneğini belirleyin. Aracı değiştirmek için Akıllı Terminal Settings > Agent'e gidin."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Akıllı Terminal'de kullanmak istediğiniz varsayılan aracı seçin. Çalışma alanınızı"
 setup.description.fre_line2: "yapılandırmak ve ayarlamak için Settings'e gidebilirsiniz."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Oturum açmak için Enter, geri dönmek için Esc tuşuna b
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Düşünüyor…"
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Akıllı Terminal'e hoş geldiniz!"
 chat.welcome_disclaimer: "Akıllı Terminal, AI kullanır. Hataları kontrol edin."
 chat.plan_header: "Plan:"

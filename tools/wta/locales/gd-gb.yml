@@ -1,5 +1,5 @@
 # Tiotalan sgrìn stèidheachaidh
-# {Locked="Intelligent Terminal"} - ainm an toraidh, na eadar-theangaich
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Fàilte gu Tèirmineal Glic!"
 setup.title.agent_missing: "Cha deach an àidseant a lorg"
 setup.title.agent_error: "Dh'fhàillig ceangal an àidseant"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Chan eil an àidseant agad \"%{agent}\" air a st�
 setup.subtitle.copilot_auth: "Feumaidh an àidseant agad \"%{agent}\" dearbhadh. Lean na ceumannan gu h-ìosal gus clàradh a-steach. Airson àidseant atharrachadh, rach gu Tèirmineal Glic Settings > Agent."
 setup.subtitle.agent_auth: "Feumaidh an àidseant agad \"%{agent}\" dearbhadh. Clàraich a-steach tron àidseant, an uair sin tagh \"Chlàraich mi a-steach\" gu h-ìosal. Airson àidseant atharrachadh, rach gu Tèirmineal Glic Settings > Agent."
 
-# {Locked="Intelligent Terminal"}, {Locked="Settings"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}, {Locked="Settings"}
 setup.description.fre_line1: "Tagh an àidseant bunaiteach a bu mhath leat a chleachdadh ann an Tèirmineal Glic. 'S urrainn dhut"
 setup.description.fre_line2: "a dhol gu Settings gus an raon-obrach agad a rèiteachadh."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Brùth Enter gus clàradh a-steach, Esc gus tilleadh"  # {L
 
 # ── Sealladh còmhraidh (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "A' smaoineachadh…"
-# {Locked="Intelligent Terminal"} - ainm an toraidh, na eadar-theangaich
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Fàilte gu Tèirmineal Glic!"
 chat.welcome_disclaimer: "Bidh Tèirmineal Glic a' cleachdadh AI. Thoir sùil airson mearachdan."
 chat.plan_header: "Plana:"

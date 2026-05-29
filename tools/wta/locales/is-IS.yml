@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Velkomin í Snjallútstöð!"
 setup.title.agent_missing: "Agent fannst ekki"
 setup.title.agent_error: "Tenging við agent mistókst"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Agentinn þinn \"%{agent}\" er ekki uppsettur. Se
 setup.subtitle.copilot_auth: "Agentinn þinn \"%{agent}\" krefst auðkenningar. Fylgdu skrefunum hér að neðan til að skrá þig inn. Til að skipta um agent, farðu í Snjallútstöð Settings > Agent."
 setup.subtitle.agent_auth: "Agentinn þinn \"%{agent}\" krefst auðkenningar. Skráðu þig inn í gegnum agentinn og veldu svo \"Ég hef skráð mig inn\" hér að neðan. Til að skipta um agent, farðu í Snjallútstöð Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Veldu sjálfgefna agentinn sem þú vilt nota í Snjallútstöð. Þú getur"
 setup.description.fre_line2: "farið í Settings til að stilla og setja upp vinnusvæðið þitt."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Ýttu á Enter til að skrá þig inn, Esc til að fara til
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Hugsa..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Velkomin í Snjallútstöð!"
 chat.welcome_disclaimer: "Snjallútstöð notar AI. Athugaðu hvort villur séu."
 chat.plan_header: "Áætlun:"

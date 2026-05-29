@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Vítejte v Inteligentní Terminál!"
 setup.title.agent_missing: "Agenta se nepodařilo najít"
 setup.title.agent_error: "Připojení k agentovi se nezdařilo"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Váš agent \"%{agent}\" není nainstalován. Př
 setup.subtitle.copilot_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Postupujte podle níže uvedených kroků a přihlaste se. Chcete-li přepnout agenta, přejděte do Inteligentní Terminál Settings > Agent."
 setup.subtitle.agent_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Přihlaste se přes agenta a pak vyberte \"Přihlásil/a jsem se\" níže. Chcete-li přepnout agenta, přejděte do Inteligentní Terminál Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Vyberte výchozího agenta, kterého chcete používat v Inteligentní Terminál. Můžete"
 setup.description.fre_line2: "přejít do Settings a nakonfigurovat svůj pracovní prostor."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Stiskněte Enter pro přihlášení, Esc pro návrat"  # {L
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Přemýšlím..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Vítejte v Inteligentní Terminál!"
 chat.welcome_disclaimer: "Inteligentní Terminál používá AI. Kontrolujte chyby."
 chat.plan_header: "Plán:"

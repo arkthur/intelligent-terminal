@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "ئەقلىي تېرمىنال ھە خوش كەلدىڭىز!"
 setup.title.agent_missing: "AI ئاگېنتى تېپىلمىدى"
 setup.title.agent_error: "AI ئاگېنتى بىلەن باغلىنىش مەغلۇب بولدى"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "سىزنىڭ AI ئاگېنتىڭىز \"%{agent}\"
 setup.subtitle.copilot_auth: "سىزنىڭ AI ئاگېنتىڭىز \"%{agent}\" تونۇقتۇرۇش تەلەپ قىلىدۇ. كىرىش ئۈچۈن تۆۋەندىكى قەدەملەرنى بېسىڭ. AI ئاگېنتىنى الماشتۇرۇش ئۈچۈن ئەقلىي تېرمىنال Settings > Agent قا كىرىڭ."
 setup.subtitle.agent_auth: "سىزنىڭ AI ئاگېنتىڭىز \"%{agent}\" تونۇقتۇرۇش تەلەپ قىلىدۇ. AI ئاگېنتى ئارقىلىق كىرىپ تۆۋەندە \"كىردىم\" نى تاللاڭ. AI ئاگېنتىنى الماشتۇرۇش ئۈچۈن ئەقلىي تېرمىنال Settings > Agent قا كىرىڭ."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "ئەقلىي تېرمىنال دا ئىشلەتمەكچى بولغان كۆڭۈلدىكى AI ئاگېنتىنى تاللاڭ. سىز"
 setup.description.fre_line2: "Settings قا كىرىپ ئىش بوشلۇقىڭىزنى تەڭشىيەلەيسىز."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Enter كىرىش ئۈچۈن, Esc قايتىش ئۈچۈن ب
 
 # ── Chat view (src/ui/chat.rs) ────────────────────────────────────────────────────────────────────────
 chat.activity_thinking: "ئويلىنىۋاتىدۇ…"
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "ئەقلىي تېرمىنال ھە خوش كەلدىڭىز!"
 chat.welcome_disclaimer: "ئەقلىي تېرمىنال AI ئىشلىتىدۇ. خاتالىقلارنى تەكشۈرۈڭ."
 chat.plan_header: "پىلان:"

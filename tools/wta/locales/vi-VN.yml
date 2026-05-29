@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - tên sản phẩm, không dịch
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Chào mừng bạn đến Đầu cuối thông minh!"
 setup.title.agent_missing: "Không tìm thấy tác nhân AI"
 setup.title.agent_error: "Kết nối tới tác nhân AI thất bại"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Tác nhân AI \"%{agent}\" của bạn chưa đư
 setup.subtitle.copilot_auth: "Tác nhân AI \"%{agent}\" của bạn yêu cầu xác thực. Thực hiện theo các bước bên dưới để đăng nhập. Để chuyển tác nhân AI, hãy đi tới Đầu cuối thông minh Settings > Agent."
 setup.subtitle.agent_auth: "Tác nhân AI \"%{agent}\" của bạn yêu cầu xác thực. Vui lòng đăng nhập qua tác nhân AI, sau đó chọn \"Tôi đã đăng nhập\" bên dưới. Để chuyển tác nhân AI, hãy đi tới Đầu cuối thông minh Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Chọn CLI tác nhân AI mặc định mà bạn muốn sử dụng trong Đầu cuối thông minh. Bạn có thể"
 setup.description.fre_line2: "đi tới Settings để cấu hình và thiết lập không gian làm việc của bạn."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Nhấn Enter để đăng nhập, Esc để quay lại"  # 
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Đang suy nghĩ…"
-# {Locked="Intelligent Terminal"} - tên sản phẩm, không dịch
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Chào mừng bạn đến Đầu cuối thông minh!"
 chat.welcome_disclaimer: "Đầu cuối thông minh sử dụng AI. Hãy kiểm tra lỗi."
 chat.plan_header: "Kế hoạch:"

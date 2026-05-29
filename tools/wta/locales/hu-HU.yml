@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Üdvözli az Intelligens Terminál!"
 setup.title.agent_missing: "Az ügynök nem található"
 setup.title.agent_error: "Az ügynökhöz való kapcsolódás sikertelen"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "A(z) \"%{agent}\" ügynök nincs telepítve. Tele
 setup.subtitle.copilot_auth: "A(z) \"%{agent}\" ügynök hitelesítést igényel. Kövesse az alábbi lépéseket a bejelentkezéshez. Az ügynök váltásához lépjen a Intelligens Terminál Settings > Agent oldalra."
 setup.subtitle.agent_auth: "A(z) \"%{agent}\" ügynök hitelesítést igényel. Jelentkezzen be az ügynökön keresztül, majd válassza a \"Bejelentkeztem\" lehetőséget alul. Az ügynök váltásához lépjen a Intelligens Terminál Settings > Agent oldalra."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Válassza ki az Intelligens Terminál alkalmazásban használni kívánt alapértelmezett ügynököt. A"
 setup.description.fre_line2: "Settings oldalon konfigurálhatja és beállíthatja a munkaterületét."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Nyomja meg az Entert a bejelentkezéshez, az Esc-et a vissz
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Gondolkodás..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Üdvözli az Intelligens Terminál!"
 chat.welcome_disclaimer: "Az Intelligens Terminál AI-t használ. Ellenőrizze a hibákat."
 chat.plan_header: "Terv:"

@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Nau mai ki Iho Atamai!"
 setup.title.agent_missing: "Kaore i kitea te agent"
 setup.title.agent_error: "I rahua te hononga agent"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Kaore to agent \"%{agent}\" i tautahia. Tautahia 
 setup.subtitle.copilot_auth: "Me whakamanatu to agent \"%{agent}\". Whaia nga hipanga i raro nei ki te takiuru. Ki te huri agent, haere ki Iho Atamai Settings > Agent."
 setup.subtitle.agent_auth: "Me whakamanatu to agent \"%{agent}\". Takiuru mā te agent, kātahi ka kōwhiria \"Kua takiuru au\" i raro. Ki te huri agent, haere ki Iho Atamai Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Kōwhiria te agent taunoa hei whakamahi i roto i Iho Atamai. Ka taea e koe te"
 setup.description.fre_line2: "haere ki Settings hei whirihiri me te whakarite i to wahi mahi."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Pehi Enter ki te takiuru, Esc ki te hoki"  # {Locked="Enter
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "E whakaaro ana..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Nau mai ki Iho Atamai!"
 chat.welcome_disclaimer: "Ka whakamahia e Iho Atamai te AI. Tirohia ngā hapa."
 chat.plan_header: "Mahere:"

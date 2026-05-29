@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Aqlli terminal-ga xush kelibsiz!"
 setup.title.agent_missing: "Agent topilmadi"
 setup.title.agent_error: "Agentga ulanish amalga oshmadi"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Agentingiz \"%{agent}\" oʻrnatilmagan. Iltimos, 
 setup.subtitle.copilot_auth: "Agentingiz \"%{agent}\" autentifikatsiyani talab qiladi. Tizimga kirish uchun quyidagi qadamlarni bajaring. Agentni almashtirish uchun Aqlli terminal Settings > Agent boʻlimiga oʻting."
 setup.subtitle.agent_auth: "Agentingiz \"%{agent}\" autentifikatsiyani talab qiladi. Iltimos, agent orqali tizimga kiring, keyin pastda \"Men tizimga kirdim\" ni tanlang. Agentni almashtirish uchun Aqlli terminal Settings > Agent boʻlimiga oʻting."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Aqlli terminal-da foydalanmoqchi boʻlgan standart agentni tanlang. Ish"
 setup.description.fre_line2: "muhitingizni sozlash va oʻrnatish uchun Settings boʻlimiga oʻtishingiz mumkin."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Tizimga kirish uchun Enter, orqaga qaytish uchun Esc bosing
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Oʻylayapman…"
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Aqlli terminal-ga xush kelibsiz!"
 chat.welcome_disclaimer: "Aqlli terminal AI-dan foydalanadi. Xatolarni tekshiring."
 chat.plan_header: "Reja:"

@@ -183,8 +183,7 @@
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>इंटेलिजंट टर्मिनल क तुमच्या चालू वा सक्रिय एजेंटांची स्थिती मागोवपाक परवानगी द्यात.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ हें सक्षम केल्यार तुमच्या एजेंटां मदीं सत्रांचो मागोवो घेवपाक एकत्रीकरण hooks इन्स्टॉल जातले.</value>

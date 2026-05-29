@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - nama produk, jangan diterjemahkan
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Selamat datang ke Terminal Pintar!"
 setup.title.agent_missing: "Ejen AI tidak ditemui"
 setup.title.agent_error: "Sambungan ejen AI gagal"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Ejen AI \"%{agent}\" anda belum dipasang. Sila pa
 setup.subtitle.copilot_auth: "Ejen AI \"%{agent}\" anda memerlukan pengesahan. Ikuti langkah di bawah untuk log masuk. Untuk menukar ejen AI, pergi ke Terminal Pintar Settings > Agent."
 setup.subtitle.agent_auth: "Ejen AI \"%{agent}\" anda memerlukan pengesahan. Sila log masuk melalui ejen AI, kemudian pilih \"Saya telah log masuk\" di bawah. Untuk menukar ejen AI, pergi ke Terminal Pintar Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Pilih CLI ejen AI lalai yang ingin anda gunakan dalam Terminal Pintar. Anda boleh"
 setup.description.fre_line2: "pergi ke Settings untuk mengkonfigurasi dan menyediakan ruang kerja anda."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Tekan Enter untuk log masuk, Esc untuk kembali"  # {Locked=
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Sedang berfikir…"
-# {Locked="Intelligent Terminal"} - nama produk, jangan diterjemahkan
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Selamat datang ke Terminal Pintar!"
 chat.welcome_disclaimer: "Terminal Pintar menggunakan AI. Semak kesilapan."
 chat.plan_header: "Pelan:"

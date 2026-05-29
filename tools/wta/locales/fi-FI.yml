@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Tervetuloa Älykäs Pääteiin!"
 setup.title.agent_missing: "Agenttia ei löytynyt"
 setup.title.agent_error: "Yhteys agenttiin epäonnistui"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Agenttiasi \"%{agent}\" ei ole asennettu. Asenna 
 setup.subtitle.copilot_auth: "Agenttisi \"%{agent}\" vaatii todennuksen. Kirjaudu sisään seuraamalla alla olevia ohjeita. Vaihtaaksesi agenttia siirry kohtaan Älykäs Pääte Settings > Agent."
 setup.subtitle.agent_auth: "Agenttisi \"%{agent}\" vaatii todennuksen. Kirjaudu sisään agentin kautta ja valitse sitten alta \"Olen kirjautunut sisään\". Vaihtaaksesi agenttia siirry kohtaan Älykäs Pääte Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Valitse oletusagentti, jota haluat käyttää Älykäs Pääteissa. Voit"
 setup.description.fre_line2: "siirtyä kohtaan Settings määrittääksesi ja ottaaksesi käyttöön työtilasi."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Paina Enter kirjautuaksesi sisään, Esc palataksesi takais
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Ajattelee..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Tervetuloa Älykäs Pääteiin!"
 chat.welcome_disclaimer: "Älykäs Pääte käyttää tekoälyä. Tarkista virheet."
 chat.plan_header: "Suunnitelma:"

@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Акыллы терминал-га рәхим итегез!"
 setup.title.agent_missing: "Агент табылмады"
 setup.title.agent_error: "Агентка тоташу уңышсыз булды"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Сезнең \"%{agent}\" агентыгыз ур
 setup.subtitle.copilot_auth: "Сезнең \"%{agent}\" агентыгыз аутентификация таләп итә. Керү өчен түбәндәге адымнарны үтәгез. Агентны алыштыру өчен Акыллы терминал Settings > Agent бүлегенә күчегез."
 setup.subtitle.agent_auth: "Сезнең \"%{agent}\" агентыгыз аутентификация таләп итә. Зинһар, агент аша керегез, аннан түбәндә \"Мин кердем\" сайлагыз. Агентны алыштыру өчен Акыллы терминал Settings > Agent бүлегенә күчегез."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Акыллы терминал-да кулланырга теләгән килешенгән агентны сайлагыз. Эш"
 setup.description.fre_line2: "мәйданыгызны көйләү өчен Settings бүлегенә күчә аласыз."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Керү өчен Enter, артка кайту өчен Esc
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Уйлыйм…"
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Акыллы терминал-га рәхим итегез!"
 chat.welcome_disclaimer: "Акыллы терминал AI куллана. Хаталарны тикшерегез."
 chat.plan_header: "План:"

@@ -1,5 +1,5 @@
 # Astellungs-Écran Titelen
-# {Locked="Intelligent Terminal"} - Produktnumm, net iwwersetzen
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Wëllkomm am Intelligenten Terminal!"
 setup.title.agent_missing: "Agent net fonnt"
 setup.title.agent_error: "Verbindung mam Agent ass gescheitert"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Ären Agent \"%{agent}\" ass net installéiert. I
 setup.subtitle.copilot_auth: "Ären Agent \"%{agent}\" brauch eng Authentifizéierung. Follegt de Schrëtt hei drënner fir Iech unzemellen. Fir den Agent ze wiesselen, gitt op Intelligenten Terminal Settings > Agent."
 setup.subtitle.agent_auth: "Ären Agent \"%{agent}\" brauch eng Authentifizéierung. Mellt Iech iwwer den Agent un a wielt dann \"Ech hu mech ugemellt\" hei ënnendrënner. Fir den Agent ze wiesselen, gitt op Intelligenten Terminal Settings > Agent."
 
-# {Locked="Intelligent Terminal"}, {Locked="Settings"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}, {Locked="Settings"}
 setup.description.fre_line1: "Wielt de Standard-Agent deen Dir am Intelligenten Terminal benotze wëllt. Dir kënnt"
 setup.description.fre_line2: "op Settings goen fir Ären Aarbechtsberäich ze konfiguréieren an anzeriichten."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Dréckt Enter fir Iech unzemellen, Esc fir zréckzegoen"  #
 
 # ── Chat-Vue (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Denkt no…"
-# {Locked="Intelligent Terminal"} - Produktnumm, net iwwersetzen
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Wëllkomm am Intelligenten Terminal!"
 chat.welcome_disclaimer: "Intelligenten Terminal benotzt KI. Kuckt no Feeler."
 chat.plan_header: "Plang:"

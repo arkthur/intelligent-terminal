@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Laipni lūdzam Viedais Terminālis!"
 setup.title.agent_missing: "Aģents nav atrasts"
 setup.title.agent_error: "Neizdevās izveidot savienojumu ar aģentu"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Jūsu aģents \"%{agent}\" nav instalēts. Pārin
 setup.subtitle.copilot_auth: "Jūsu aģents \"%{agent}\" pieprasa autentifikāciju. Izpildiet tālāk norādītās darbības, lai pierakstītos. Lai mainītu aģentu, dodieties uz Viedais Terminālis Settings > Agent."
 setup.subtitle.agent_auth: "Jūsu aģents \"%{agent}\" pieprasa autentifikāciju. Pierakstieties, izmantojot aģentu, un izvēlieties \"Esmu pierakstījies\" zemāk. Lai mainītu aģentu, dodieties uz Viedais Terminālis Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Izvēlieties noklusējuma aģentu, ko vēlaties izmantot Viedais Terminālis. Varat"
 setup.description.fre_line2: "doties uz Settings, lai konfigurētu un iestatītu savu darbvietu."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Nospiediet Enter, lai pierakstītos, Esc, lai atgrieztos"  
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Domā..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Laipni lūdzam Viedais Terminālis!"
 chat.welcome_disclaimer: "Viedais Terminālis izmanto AI. Pārbaudiet kļūdas."
 chat.plan_header: "Plāns:"

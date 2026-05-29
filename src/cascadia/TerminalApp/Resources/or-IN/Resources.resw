@@ -183,8 +183,7 @@
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>ଇଣ୍ଟେଲିଜେଣ୍ଟ ଟର୍ମିନାଲ କୁ ଆପଣଙ୍କ ଚାଲୁଥିବା କିମ୍ବା ସକ୍ରିୟ ଏଜେଣ୍ଟମାନଙ୍କ ସ୍ଥିତି ଟ୍ରାକ୍ କରିବା ପାଇଁ ଅନୁମତି ଦିଅନ୍ତୁ।</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ ଏହା ସକ୍ଷମ କଲେ ଆପଣଙ୍କ ଏଜେଣ୍ଟମାନଙ୍କ ମଧ୍ୟରେ ସେସନ୍ ଟ୍ରାକ୍ କରିବା ପାଇଁ ଇଣ୍ଟିଗ୍ରେସନ୍ hooks ଇନ୍‌ଷ୍ଟଲ୍ ହେବ।</value>

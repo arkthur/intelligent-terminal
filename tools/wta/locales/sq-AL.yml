@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Mirë se vini në Terminali inteligjent!"
 setup.title.agent_missing: "Agjenti nuk u gjet"
 setup.title.agent_error: "Lidhja me agjentin dështoi"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Agjenti juaj \"%{agent}\" nuk është i instaluar
 setup.subtitle.copilot_auth: "Agjenti juaj \"%{agent}\" kërkon vërtetim. Ndiqni hapat më poshtë për t'u identifikuar. Për të ndryshuar agjentin, shkoni te Terminali inteligjent Settings > Agent."
 setup.subtitle.agent_auth: "Agjenti juaj \"%{agent}\" kërkon vërtetim. Identifikohuni përmes agjentit dhe zgjidhni \"U identifikova\" më poshtë. Për të ndryshuar agjentin, shkoni te Terminali inteligjent Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Zgjidhni agjentin e paracaktuar që dëshironi të përdorni në Terminali inteligjent. Mund të"
 setup.description.fre_line2: "shkoni te Settings për të konfiguruar hapësirën tuaj të punës."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Shtypni Enter për t'u identifikuar, Esc për t'u kthyer"  
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Po mendoj..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Mirë se vini në Terminali inteligjent!"
 chat.welcome_disclaimer: "Terminali inteligjent përdor AI. Kontrolloni për gabime."
 chat.plan_header: "Plani:"

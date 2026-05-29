@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Dobrodošli v Inteligentni Terminal!"
 setup.title.agent_missing: "Agenta ni mogoče najti"
 setup.title.agent_error: "Povezava z agentom ni uspela"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Vaš agent \"%{agent}\" ni nameščen. Znova ga n
 setup.subtitle.copilot_auth: "Vaš agent \"%{agent}\" zahteva preverjanje pristnosti. Sledite spodnjim korakom za prijavo. Za zamenjavo agenta pojdite v Inteligentni Terminal Settings > Agent."
 setup.subtitle.agent_auth: "Vaš agent \"%{agent}\" zahteva preverjanje pristnosti. Prijavite se prek agenta in nato spodaj izberite \"Prijavil/a sem se\". Za zamenjavo agenta pojdite v Inteligentni Terminal Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Izberite privzetega agenta, ki ga želite uporabljati v Inteligentni Terminal. Lahko"
 setup.description.fre_line2: "odprete Settings za konfiguracijo delovnega prostora."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Pritisnite Enter za prijavo, Esc za vrnitev"  # {Locked="En
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Razmišljam..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Dobrodošli v Inteligentni Terminal!"
 chat.welcome_disclaimer: "Inteligentni Terminal uporablja AI. Preverite napake."
 chat.plan_header: "Načrt:"

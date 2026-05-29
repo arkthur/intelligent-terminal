@@ -1,5 +1,5 @@
 # Konfigurazio-pantailaren tituluak
-# {Locked="Intelligent Terminal"} - produktuaren izena, ez itzuli
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Ongi etorri Terminal Adimenduna-era!"
 setup.title.agent_missing: "Agentea ez da aurkitu"
 setup.title.agent_error: "Agentearekin konektatzeak huts egin du"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Zure agentea \"%{agent}\" ez dago instalatuta. Bi
 setup.subtitle.copilot_auth: "Zure agenteak \"%{agent}\" autentifikazioa behar du. Jarraitu beheko urratsak saioa hasteko. Agenteak aldatzeko, joan Terminal Adimenduna Settings > Agent atalera."
 setup.subtitle.agent_auth: "Zure agenteak \"%{agent}\" autentifikazioa behar du. Hasi saioa agentearen bidez, eta hautatu \"Saioa hasi dut\" behean. Agenteak aldatzeko, joan Terminal Adimenduna Settings > Agent atalera."
 
-# {Locked="Intelligent Terminal"}, {Locked="Settings"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}, {Locked="Settings"}
 setup.description.fre_line1: "Aukeratu Terminal Adimenduna-en erabili nahi duzun agente CLI lehenetsia. Hau egin dezakezu:"
 setup.description.fre_line2: "joan Settings atalera zure lan-eremua konfiguratu eta ezartzeko."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Sakatu Enter saioa hasteko, Esc atzera joateko"  # {Locked=
 
 # ── Txat-ikuspegia (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Pentsatzen…"
-# {Locked="Intelligent Terminal"} - produktuaren izena, ez itzuli
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Ongi etorri Terminal Adimenduna-era!"
 chat.welcome_disclaimer: "Terminal Adimenduna-ek AI erabiltzen du. Egiaztatu akatsak."
 chat.plan_header: "Plana:"

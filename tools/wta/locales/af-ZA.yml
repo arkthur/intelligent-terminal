@@ -1,5 +1,5 @@
 # Opstellingskerm titels
-# {Locked="Intelligent Terminal"} - produknaam, moenie vertaal nie
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Welkom by Intelligente Terminaal!"
 setup.title.agent_missing: "Agent nie gevind nie"
 setup.title.agent_error: "Agentverbinding het misluk"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Jou agent \"%{agent}\" is nie geïnstalleer nie. 
 setup.subtitle.copilot_auth: "Jou agent \"%{agent}\" vereis stawing. Volg die stappe hieronder om aan te meld. Om van agent te wissel, gaan na Intelligente Terminaal Settings > Agent."
 setup.subtitle.agent_auth: "Jou agent \"%{agent}\" vereis stawing. Meld aan via die agent en kies dan \"Ek het aangemeld\" hieronder. Om van agent te wissel, gaan na Intelligente Terminaal Settings > Agent."
 
-# {Locked="Intelligent Terminal"}, {Locked="Settings"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}, {Locked="Settings"}
 setup.description.fre_line1: "Kies die verstek agent wat jy in Intelligente Terminaal wil gebruik. Jy kan"
 setup.description.fre_line2: "na Settings navigeer om jou werkspasie op te stel en te konfigureer."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Druk Enter om aan te meld, Esc om terug te gaan"  # {Locked
 
 # ── Kletsaansig (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Dink na…"
-# {Locked="Intelligent Terminal"} - produknaam, moenie vertaal nie
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Welkom by Intelligente Terminaal!"
 chat.welcome_disclaimer: "Intelligente Terminaal gebruik AI. Kyk vir foute."
 chat.plan_header: "Plan:"

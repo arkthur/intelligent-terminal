@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Ağıllı Terminal-a xoş gəlmisiniz!"
 setup.title.agent_missing: "Agent tapılmadı"
 setup.title.agent_error: "Agent bağlantısı uğursuz oldu"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Agentiniz \"%{agent}\" quraşdırılmayıb. Lütf
 setup.subtitle.copilot_auth: "Agentiniz \"%{agent}\" kimlik doğrulaması tələb edir. Daxil olmaq üçün aşağıdakı addımları izləyin. Agenti dəyişmək üçün Ağıllı Terminal Settings > Agent-ə keçin."
 setup.subtitle.agent_auth: "Agentiniz \"%{agent}\" kimlik doğrulaması tələb edir. Lütfən agent vasitəsilə daxil olun, sonra aşağıda \"Daxil oldum\" seçin. Agenti dəyişmək üçün Ağıllı Terminal Settings > Agent-ə keçin."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Ağıllı Terminal-da istifadə etmək istədiyiniz standart agenti seçin. İş sahənizi"
 setup.description.fre_line2: "konfiqurasiya etmək və qurmaq üçün Settings-ə keçə bilərsiniz."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Daxil olmaq üçün Enter, geri qayıtmaq üçün Esc bası
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Düşünür…"
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Ağıllı Terminal-a xoş gəlmisiniz!"
 chat.welcome_disclaimer: "Ağıllı Terminal AI istifadə edir. Səhvləri yoxlayın."
 chat.plan_header: "Plan:"

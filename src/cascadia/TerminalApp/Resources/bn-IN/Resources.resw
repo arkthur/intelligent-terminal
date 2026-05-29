@@ -182,8 +182,7 @@
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
     <value>ইন্টেলিজেন্ট টার্মিনাল-কে আপনার চলমান বা সক্রিয় এজেন্টগুলির অবস্থা ট্র্যাক করতে অনুমতি দিন।</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ এটি সক্ষম করলে আপনার এজেন্টগুলোর মধ্যে সেশন ট্র্যাক করতে ইন্টিগ্রেশন hooks ইনস্টল হবে।</value>

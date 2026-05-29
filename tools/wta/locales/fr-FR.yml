@@ -1,5 +1,5 @@
 # Titres de l'écran de configuration
-# {Locked="Intelligent Terminal"} - nom du produit, ne pas traduire
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Bienvenue dans Terminal Intelligent !"
 setup.title.agent_missing: "Agent introuvable"
 setup.title.agent_error: "Échec de la connexion à l'agent"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Votre agent « %{agent} » n'est pas installé. V
 setup.subtitle.copilot_auth: "Votre agent « %{agent} » nécessite une authentification. Suivez les étapes ci-dessous pour vous connecter. Pour changer d'agent, accédez aux paramètres Terminal Intelligent > Agent."
 setup.subtitle.agent_auth: "Votre agent « %{agent} » nécessite une authentification. Veuillez vous connecter via l'agent, puis sélectionnez « Je me suis connecté » ci-dessous. Pour changer d'agent, accédez aux paramètres Terminal Intelligent > Agent."
 
-# {Locked="Intelligent Terminal"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.description.fre_line1: "Choisissez la CLI d'agent par défaut que vous souhaitez utiliser dans Terminal Intelligent. Vous pouvez"
 setup.description.fre_line2: "accéder aux paramètres pour configurer et paramétrer votre espace de travail."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Appuyez sur Enter pour vous connecter, Esc pour revenir"  #
 
 # ── Vue de conversation (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Réflexion en cours…"
-# {Locked="Intelligent Terminal"} - nom du produit, ne pas traduire
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Bienvenue dans Terminal Intelligent !"
 chat.welcome_disclaimer: "Terminal Intelligent utilise l'IA. Vérifiez les erreurs."
 chat.plan_header: "Plan :"

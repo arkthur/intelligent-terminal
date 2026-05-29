@@ -1,5 +1,5 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 setup.title.first_run: "Allillanchu Yuyaysapa Terminal!"
 setup.title.agent_missing: "Mana agente tarikusqachu"
 setup.title.agent_error: "Agente t'inkiynin mana allinchu"
@@ -13,7 +13,7 @@ setup.subtitle.agent_missing: "Agentiyki \"%{agent}\" mana churasqachu. Ama hina
 setup.subtitle.copilot_auth: "Agentiyki \"%{agent}\" yaykunata munan. Yaykunaykipaq uraypi llamk'ankunata ruway. Agente t'ikranapaq Yuyaysapa Terminal Settings > Agent nisqaman riy."
 setup.subtitle.agent_auth: "Agentiyki \"%{agent}\" yaykunata munan. Agentewan yaykuy, chaymanta uraypi \"Yaykurqaniña\" nisqata akllay. Agente t'ikranapaq Yuyaysapa Terminal Settings > Agent nisqaman riy."
 
-# {Locked="Intelligent Terminal"}, {Locked="Settings"}
+# {Locked=qps-ploc,qps-ploca,qps-plocm}, {Locked="Settings"}
 setup.description.fre_line1: "Yuyaysapa Terminal nisqapi llamk'achinaykipaq qallariy agente nisqata akllay. Qamqa"
 setup.description.fre_line2: "Settings nisqaman riy llamk'ana k'itiykita wakichinapaq."
 
@@ -43,7 +43,7 @@ auth.hint_footer: "  Enter nit'iy yaykunapaq, Esc kutirinapaq"  # {Locked="Enter
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Yuyachkan..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
 chat.welcome_title: "Allillanchu Yuyaysapa Terminal!"
 chat.welcome_disclaimer: "Yuyaysapa Terminal AI-ta llamk'achin. Pantaykunata qhaway."
 chat.plan_header: "Ruwana:"
