@@ -2617,14 +2617,8 @@ impl App {
         // reset guarantees any post-failure output isn't tinted /
         // blinking.
         let raw_cwd_string = s.cwd.to_string_lossy().to_string();
-        // Validate the historical cwd before handing it to wtcli. If the
-        // project directory has been moved/deleted since the session was
-        // recorded, passing `-d <stale>` makes `wtcli new-tab` succeed
-        // up until `CreateProcessW`, which then fails with
-        // `ERROR_DIRECTORY` and leaves the user with a broken pane.
-        // Dropping `-d` lets WT fall back to the profile's
-        // `startingDirectory` (ultimately `%USERPROFILE%`), matching a
-        // plain "open new tab" action.
+        // Drop stale cwd so wtcli falls back to the profile default
+        // rather than failing CreateProcessW with ERROR_DIRECTORY.
         let valid_cwd = crate::cwd_util::validate_starting_directory(&s.cwd);
         if valid_cwd.is_none() && !raw_cwd_string.is_empty() {
             tracing::warn!(
@@ -2648,7 +2642,6 @@ impl App {
             argv.push("-d".to_string());
             argv.push(cwd.clone());
         }
-        // For logs/tests: report the cwd we actually used (empty when fallback).
         let cwd_string = valid_cwd.clone().unwrap_or_default();
 
         // Optimistic state flip: bump Historical/Ended -> Idle so a rapid
@@ -2826,11 +2819,6 @@ impl App {
 
         let key = s.key.clone();
         let raw_cwd_string = s.cwd.to_string_lossy().to_string();
-        // Same rationale as dispatch_resume: a stale cwd hands C++ a
-        // bad `startingDirectory` for `_OpenNewTab`, which propagates to
-        // `ConptyConnection::CreateProcessW` and produces a broken pane.
-        // Omit the field entirely on failure so WT uses the profile's
-        // default starting directory.
         let valid_cwd = crate::cwd_util::validate_starting_directory(&s.cwd);
         if valid_cwd.is_none() && !raw_cwd_string.is_empty() {
             tracing::warn!(

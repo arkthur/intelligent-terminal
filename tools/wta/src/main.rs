@@ -2467,12 +2467,6 @@ async fn run_acp_app(
                                 .map(str::to_string)
                                 .filter(|s| !s.is_empty())
                                 .and_then(|s| {
-                                    // See cwd_util::validate_starting_directory:
-                                    // a stale --initial-load-cwd ultimately
-                                    // becomes a broken pane via WT's
-                                    // ConptyConnection. Drop it on failure
-                                    // and let the consumer fall back to the
-                                    // profile default.
                                     let v = crate::cwd_util::validate_starting_directory(&s);
                                     if v.is_none() {
                                         tracing::warn!(
