@@ -1956,14 +1956,25 @@ namespace winrt::TerminalApp::implementation
 
     safe_void_coroutine TerminalPage::_InitShellIntegration(const ShellIntegrationTarget target)
     {
+        // Publish "user clicked Install -> desired = true" SYNCHRONOUSLY,
+        // before the first suspension. If we deferred this until after the
+        // resume_background() below, a settings reload that publishes
+        // `false` between the click and our resumption could complete its
+        // uninstall first, and then this coroutine would stamp `true`
+        // back over it and reinstall — leaving $PROFILE installed while
+        // the toggle is off. Publishing pre-suspension makes the
+        // last-writer-wins semantics depend on UI-thread ordering (which
+        // matches user intent ordering), not on coroutine resume ordering.
+        _shellIntegrationDesiredEnabled.store(true, std::memory_order_release);
+
         const auto weak = get_weak();
         const auto dispatcher = Dispatcher();
 
         co_await winrt::resume_background();
 
-        // Acquire a strong reference *before* touching any member state so a
-        // page destroyed while this coroutine was queued doesn't leave us
-        // chasing freed members. Mirrors the pattern in
+        // Acquire a strong reference *before* touching any more member
+        // state so a page destroyed while this coroutine was queued
+        // doesn't leave us chasing freed members. Mirrors the pattern in
         // _ReconcileShellIntegration.
         auto self = weak.get();
         if (!self)
@@ -1972,13 +1983,6 @@ namespace winrt::TerminalApp::implementation
         }
 
         namespace SI = ::Microsoft::Terminal::ShellIntegration;
-
-        // Publish "user clicked Install -> desired = true" BEFORE attempting
-        // to acquire the mutex. Combined with the post-acquire re-check
-        // below, this gives us a "latest expressed intent wins" semantic
-        // even when an explicit install and a toggle-off reconcile race
-        // for the mutex.
-        _shellIntegrationDesiredEnabled.store(true, std::memory_order_release);
 
         bool desiredAtRun = true;
         bool pwshAlready = false;
