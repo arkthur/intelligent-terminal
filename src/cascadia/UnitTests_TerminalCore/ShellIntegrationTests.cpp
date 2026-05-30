@@ -11,6 +11,7 @@
 #include "pch.h"
 #include <WexTestClass.h>
 
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -108,11 +109,16 @@ private:
     static std::filesystem::path _MakeUniqueScratchDir()
     {
         // Each test gets a unique subdir so parallel runs / leftover state
-        // never bleed across tests.
-        GUID g{};
-        (void)CoCreateGuid(&g);
+        // never bleed across tests. We deliberately avoid CoCreateGuid /
+        // StringFromGUID2 here so this test project doesn't take an
+        // ole32.lib dependency it doesn't otherwise need.
+        static std::atomic<uint64_t> counter{ 0 };
         wchar_t buf[64]{};
-        StringFromGUID2(g, buf, ARRAYSIZE(buf));
+        swprintf_s(buf,
+                   L"%lu-%llu-%llu",
+                   ::GetCurrentProcessId(),
+                   static_cast<unsigned long long>(::GetTickCount64()),
+                   static_cast<unsigned long long>(counter.fetch_add(1, std::memory_order_relaxed)));
         return std::filesystem::temp_directory_path() / L"ShellIntegrationTests" / buf;
     }
 
