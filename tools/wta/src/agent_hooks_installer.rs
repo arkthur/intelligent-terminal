@@ -2278,7 +2278,7 @@ fn paths_equivalent(a: &Path, b: &Path) -> bool {
 // Gemini: peek at `~/.gemini/extensions/wt-agent-hooks/.gemini-extension-install.json`
 // for the recorded `{type, source}`. If `source` is under the current bundle
 // dir AND still a directory, `gemini extensions update` re-pulls from there
-// cleanly. Otherwise (post-MSIX-version-dir-bump symptom — Gemini's
+// cleanly. Otherwise, (post-MSIX-version-dir-bump symptom — Gemini's
 // `checkForExtensionUpdate` silently returns `NOT_UPDATABLE`), fall back to
 // uninstall + install. To preserve user intent, we capture `isActive` from
 // `gemini extensions list -o json` before uninstall and `extensions disable`
