@@ -332,7 +332,7 @@ namespace winrt::TerminalApp::implementation
             const bool isFirstLoad = !_autoErrorDetectionSnapshotInitialized;
             // First load gating:
             //   - explicit value present (true or false, e.g. roaming-synced settings.json,
-            //     or local user has already saved) -> reconcile, which installs/uninstalls
+            //     or local user has already saved) -> reconcile, which installs or removes
             //     to match the user's expressed intent.
             //   - no explicit value (fresh user, default true) -> do NOT install just because
             //     the default is true. The FRE / Settings Save flow is the explicit consent
