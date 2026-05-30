@@ -132,8 +132,6 @@ connection.starting: "এজেণ্ট আৰম্ভ হৈ আছে..."
 connection.reconnecting: "পুনৰ সংযোগ হৈ আছে..."
 connection.connecting_activity: "এজেণ্টলৈ সংযোগ হৈ আছে…"
 connection.lost: "এজেণ্টৰ সৈতে সংযোগ হেৰাই গ'ল। পুনৰ সংযোগ কৰিবলৈ /restart টাইপ কৰক।"  # {Locked="/restart"}
-connection.start_failed: "এজেণ্টলৈ পৌঁছাব পৰা নগ'ল — ই এতিয়াও আৰম্ভ হৈ থাকিব পাৰে। পুনৰ চেষ্টা কৰিবলৈ /restart টাইপ কৰক।"  # {Locked="/restart"}
-connection.timeout: "এজেণ্টে সময়মতে সঁহাৰি নিদিলে। পুনৰ চেষ্টা কৰিবলৈ /restart টাইপ কৰক।"  # {Locked="/restart"}
 
 # ── ছিষ্টেম বাৰ্তা (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "বাতিল কৰা হৈছে।"

@@ -121,8 +121,6 @@ connection.starting: "A' tòiseachadh an àidseant..."
 connection.reconnecting: "Ag ath-cheangal..."
 connection.connecting_activity: "A' ceangal ris an àidseant…"
 connection.lost: "Chaidh an ceangal ris an àidseant a chall. Sgrìobh /restart gus ath-cheangal."  # {Locked="/restart"}
-connection.start_failed: "Cha b' urrainn dhuinn an t-àidseant a ruighinn — 's dòcha gu bheil e fhathast a' tòiseachadh. Sgrìobh /restart gus feuchainn a-rithist."  # {Locked="/restart"}
-connection.timeout: "Cha do fhreagair an t-àidseant ann an àm. Sgrìobh /restart gus feuchainn a-rithist."  # {Locked="/restart"}
 
 # ── Teachdaireachdan siostam (src/app.rs) ────────────────────────────────────
 system.cancelled: "Air a sgur dheth."

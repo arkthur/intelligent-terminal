@@ -132,8 +132,6 @@ connection.starting: "এজেন্ট চালু হচ্ছে..."
 connection.reconnecting: "পুনরায় সংযোগ হচ্ছে..."
 connection.connecting_activity: "এজেন্টের সাথে সংযোগ হচ্ছে…"
 connection.lost: "এজেন্টের সাথে সংযোগ হারিয়ে গেছে। পুনরায় সংযোগ করতে /restart টাইপ করুন।"  # {Locked="/restart"}
-connection.start_failed: "এজেন্টের সাথে যোগাযোগ করা যায়নি — এটি এখনও চালু হতে পারে। আবার চেষ্টা করতে /restart টাইপ করুন।"  # {Locked="/restart"}
-connection.timeout: "এজেন্ট সময়মতো সাড়া দেয়নি। আবার চেষ্টা করতে /restart টাইপ করুন।"  # {Locked="/restart"}
 
 # ── সিস্টেম বার্তা (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "বাতিল করা হয়েছে।"

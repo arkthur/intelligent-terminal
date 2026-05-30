@@ -128,8 +128,6 @@ connection.starting: "Uruchamianie agenta..."
 connection.reconnecting: "Ponowne łączenie..."
 connection.connecting_activity: "Łączenie z agentem…"
 connection.lost: "Połączenie z agentem zostało utracone. Wpisz /restart, aby połączyć się ponownie."  # {Locked="/restart"}
-connection.start_failed: "Nie można skontaktować się z agentem — być może nadal się uruchamia. Wpisz /restart, aby spróbować ponownie."  # {Locked="/restart"}
-connection.timeout: "Agent nie odpowiedział w wymaganym czasie. Wpisz /restart, aby spróbować ponownie."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Anulowano."

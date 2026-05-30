@@ -121,8 +121,6 @@ connection.starting: "Εκκίνηση παράγοντα..."
 connection.reconnecting: "Επανασύνδεση..."
 connection.connecting_activity: "Σύνδεση με τον παράγοντα…"
 connection.lost: "Η σύνδεση με τον παράγοντα χάθηκε. Πληκτρολογήστε /restart για επανασύνδεση."  # {Locked="/restart"}
-connection.start_failed: "Δεν ήταν δυνατή η πρόσβαση στον παράγοντα — ενδέχεται να εξακολουθεί να εκκινείται. Πληκτρολογήστε /restart για να δοκιμάσετε ξανά."  # {Locked="/restart"}
-connection.timeout: "Ο παράγοντας δεν αποκρίθηκε εγκαίρως. Πληκτρολογήστε /restart για να δοκιμάσετε ξανά."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Ακυρώθηκε."

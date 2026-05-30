@@ -121,8 +121,6 @@ connection.starting: "Starter agenten..."
 connection.reconnecting: "Genopretter forbindelse..."
 connection.connecting_activity: "Opretter forbindelse til agenten…"
 connection.lost: "Forbindelsen til agenten gik tabt. Skriv /restart for at oprette forbindelse igen."  # {Locked="/restart"}
-connection.start_failed: "Kunne ikke få kontakt til agenten — den starter muligvis stadig. Skriv /restart for at prøve igen."  # {Locked="/restart"}
-connection.timeout: "Agenten svarede ikke i tide. Skriv /restart for at prøve igen."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Annulleret."

@@ -132,8 +132,6 @@ connection.starting: "एजेंट प्रारंभ हो रहा ह
 connection.reconnecting: "पुनः कनेक्ट हो रहा है..."
 connection.connecting_activity: "एजेंट से कनेक्ट हो रहा है…"
 connection.lost: "एजेंट से कनेक्शन टूट गया. फिर से कनेक्ट करने के लिए /restart टाइप करें."  # {Locked="/restart"}
-connection.start_failed: "एजेंट तक नहीं पहुंचा जा सका — हो सकता है वह अभी भी प्रारंभ हो रहा हो. फिर से प्रयास करने के लिए /restart टाइप करें."  # {Locked="/restart"}
-connection.timeout: "एजेंट ने समय पर प्रतिसाद नहीं दिया. फिर से प्रयास करने के लिए /restart टाइप करें."  # {Locked="/restart"}
 
 # ── सिस्टम संदेश (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "रद्द किया गया।"

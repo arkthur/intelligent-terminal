@@ -117,8 +117,6 @@ connection.starting: "에이전트 시작 중..."
 connection.reconnecting: "다시 연결 중..."
 connection.connecting_activity: "에이전트에 연결 중…"
 connection.lost: "에이전트와의 연결이 끊어졌습니다. 다시 연결하려면 /restart 명령을 입력하세요."  # {Locked="/restart"}
-connection.start_failed: "에이전트에 연결할 수 없습니다 — 아직 시작 중일 수 있습니다. 다시 시도하려면 /restart 명령을 입력하세요."  # {Locked="/restart"}
-connection.timeout: "에이전트가 제때 응답하지 않았습니다. 다시 시도하려면 /restart 명령을 입력하세요."  # {Locked="/restart"}
 
 # ── 시스템 메시지 (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "취소되었습니다."

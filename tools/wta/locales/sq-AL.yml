@@ -121,8 +121,6 @@ connection.starting: "Po niset agjenti..."
 connection.reconnecting: "Po rilidhet..."
 connection.connecting_activity: "Po lidhet me agjentin…"
 connection.lost: "Lidhja me agjentin u humb. Shkruani /restart për t'u rilidhur."  # {Locked="/restart"}
-connection.start_failed: "Nuk u arrit agjenti — mund të jetë ende duke u nisur. Shkruani /restart për ta provuar përsëri."  # {Locked="/restart"}
-connection.timeout: "Agjenti nuk u përgjigj në kohë. Shkruani /restart për ta provuar përsëri."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "U anulua."

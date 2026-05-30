@@ -121,8 +121,6 @@ connection.starting: "Yn cychwyn yr asiant..."
 connection.reconnecting: "Yn ailgysylltu..."
 connection.connecting_activity: "Yn cysylltu â'r asiant…"
 connection.lost: "Collwyd y cysylltiad â'r asiant. Teipiwch /restart i ailgysylltu."  # {Locked="/restart"}
-connection.start_failed: "Methu cyrraedd yr asiant — efallai ei fod yn dal i gychwyn. Teipiwch /restart i roi cynnig arall arni."  # {Locked="/restart"}
-connection.timeout: "Ni ymatebodd yr asiant mewn pryd. Teipiwch /restart i roi cynnig arall arni."  # {Locked="/restart"}
 
 # ── Negeseuon system (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Wedi'i ganslo."

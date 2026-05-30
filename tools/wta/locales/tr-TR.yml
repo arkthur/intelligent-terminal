@@ -132,8 +132,6 @@ connection.starting: "Aracı başlatılıyor..."
 connection.reconnecting: "Yeniden bağlanılıyor..."
 connection.connecting_activity: "Aracıya bağlanılıyor…"
 connection.lost: "Aracı bağlantısı kesildi. Yeniden bağlanmak için /restart yazın."  # {Locked="/restart"}
-connection.start_failed: "Aracıya ulaşılamadı — hâlâ başlatılıyor olabilir. Yeniden denemek için /restart yazın."  # {Locked="/restart"}
-connection.timeout: "Aracı zamanında yanıt vermedi. Yeniden denemek için /restart yazın."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "İptal edildi."

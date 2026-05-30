@@ -128,8 +128,6 @@ connection.starting: "Покретање агента..."
 connection.reconnecting: "Поновно повезивање..."
 connection.connecting_activity: "Повезивање са агентом…"
 connection.lost: "Веза са агентом је изгубљена. Унесите /restart да бисте се поново повезали."  # {Locked="/restart"}
-connection.start_failed: "Није могуће приступити агенту — можда се још покреће. Унесите /restart да бисте покушали поново."  # {Locked="/restart"}
-connection.timeout: "Агент није одговорио на вријеме. Унесите /restart да бисте покушали поново."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Отказано."

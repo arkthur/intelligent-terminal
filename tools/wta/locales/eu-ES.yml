@@ -121,8 +121,6 @@ connection.starting: "Agentea abiarazten..."
 connection.reconnecting: "Birkonektatzen..."
 connection.connecting_activity: "Agentearekin konektatzen…"
 connection.lost: "Agentearekiko konexioa galdu da. Idatzi /restart berriro konektatzeko."  # {Locked="/restart"}
-connection.start_failed: "Ezin izan da agentearekin konektatu — baliteke oraindik abiarazten egotea. Idatzi /restart berriro saiatzeko."  # {Locked="/restart"}
-connection.timeout: "Agenteak ez du garaiz erantzun. Idatzi /restart berriro saiatzeko."  # {Locked="/restart"}
 
 # ── Sistema-mezuak (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Bertan behera utzia."

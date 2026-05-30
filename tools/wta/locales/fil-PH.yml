@@ -121,8 +121,6 @@ connection.starting: "Sinisimulan ang agent..."
 connection.reconnecting: "Kumokonekta muli..."
 connection.connecting_activity: "Kumokonekta sa agent…"
 connection.lost: "Nawala ang koneksyon sa agent. I-type ang /restart para kumonektang muli."  # {Locked="/restart"}
-connection.start_failed: "Hindi maabot ang agent — maaaring nagsisimula pa ito. I-type ang /restart para subukang muli."  # {Locked="/restart"}
-connection.timeout: "Hindi tumugon sa oras ang agent. I-type ang /restart para subukang muli."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Kinansela."

@@ -121,8 +121,6 @@ connection.starting: "E timata ana i te agent..."
 connection.reconnecting: "E hono ano ana..."
 connection.connecting_activity: "E hono ana ki te agent…"
 connection.lost: "Kua ngaro te hononga ki te agent. Patohia /restart kia hono anō."  # {Locked="/restart"}
-connection.start_failed: "Kāore i taea te toro atu ki te agent — tērā pea kei te tīmata tonu. Patohia /restart kia ngana anō."  # {Locked="/restart"}
-connection.timeout: "Kāore te agent i whakautu i te wā tika. Patohia /restart kia ngana anō."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Kua whakakorea."

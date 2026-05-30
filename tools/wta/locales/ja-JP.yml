@@ -117,8 +117,6 @@ connection.starting: "エージェントを起動中..."
 connection.reconnecting: "再接続中..."
 connection.connecting_activity: "エージェントに接続中…"
 connection.lost: "エージェントへの接続が失われました。再接続するには /restart と入力してください。"  # {Locked="/restart"}
-connection.start_failed: "エージェントに到達できませんでした — まだ起動中の可能性があります。再試行するには /restart と入力してください。"  # {Locked="/restart"}
-connection.timeout: "エージェントが時間内に応答しませんでした。再試行するには /restart と入力してください。"  # {Locked="/restart"}
 
 # ── システム メッセージ (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "キャンセルされました。"

@@ -121,8 +121,6 @@ connection.starting: "Agente qallarichkan..."
 connection.reconnecting: "Watiqmanta t'inkichkan..."
 connection.connecting_activity: "Agente-man t'inkichkan…"
 connection.lost: "Agente-man t'inkiy chinkarun. Watiqmanta t'inkinapaq /restart qillqay."  # {Locked="/restart"}
-connection.start_failed: "Agenteman mana chayay atikunchu — icha qallariychkanraq. Watiqmanta ruwanapaq /restart qillqay."  # {Locked="/restart"}
-connection.timeout: "Agenteqa pachanpi mana kutichirqanchu. Watiqmanta ruwanapaq /restart qillqay."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Chinkachisqa."

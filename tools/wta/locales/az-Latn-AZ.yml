@@ -132,8 +132,6 @@ connection.starting: "Agent başladılır..."
 connection.reconnecting: "Yenidən qoşulur..."
 connection.connecting_activity: "Agentə qoşulur…"
 connection.lost: "Agentlə bağlantı itdi. Yenidən qoşulmaq üçün /restart yazın."  # {Locked="/restart"}
-connection.start_failed: "Agentə çatmaq mümkün olmadı — o hələ də başlayır ola bilər. Yenidən cəhd etmək üçün /restart yazın."  # {Locked="/restart"}
-connection.timeout: "Agent vaxtında cavab vermədi. Yenidən cəhd etmək üçün /restart yazın."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Ləğv edildi."

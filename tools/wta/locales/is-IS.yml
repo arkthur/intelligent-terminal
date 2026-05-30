@@ -121,8 +121,6 @@ connection.starting: "Ræsi agent..."
 connection.reconnecting: "Endurtengi..."
 connection.connecting_activity: "Tengist agent…"
 connection.lost: "Tengingin við agent rofnaði. Sláðu inn /restart til að tengjast aftur."  # {Locked="/restart"}
-connection.start_failed: "Ekki náðist í agent — hann gæti enn verið að ræsa. Sláðu inn /restart til að reyna aftur."  # {Locked="/restart"}
-connection.timeout: "Agent svaraði ekki í tæka tíð. Sláðu inn /restart til að reyna aftur."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Hætt við."

@@ -148,8 +148,6 @@ connection.starting: "Ագենտը գործարկվում է..."
 connection.reconnecting: "Վերմիանում..."
 connection.connecting_activity: "Միանում է ագենտին…"
 connection.lost: "Ագենտի հետ կապը կորել է։ Մուտքագրեք /restart՝ նորից միանալու համար։"  # {Locked="/restart"}
-connection.start_failed: "Չհաջողվեց կապ հաստատել ագենտի հետ — հնարավոր է՝ այն դեռ գործարկվում է։ Մուտքագրեք /restart՝ կրկին փորձելու համար։"  # {Locked="/restart"}
-connection.timeout: "Ագենտը ժամանակին չպատասխանեց։ Մուտքագրեք /restart՝ կրկին փորձելու համար։"  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────────────────────────────
 system.cancelled: "Չեղարկված է։"

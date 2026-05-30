@@ -121,8 +121,6 @@ connection.starting: "Memulai agen AI..."
 connection.reconnecting: "Menyambungkan kembali..."
 connection.connecting_activity: "Menyambungkan ke agen AI…"
 connection.lost: "Koneksi ke agen AI terputus. Ketik /restart untuk menyambungkan kembali."  # {Locked="/restart"}
-connection.start_failed: "Tidak dapat menjangkau agen AI — agen mungkin masih dimulai. Ketik /restart untuk mencoba lagi."  # {Locked="/restart"}
-connection.timeout: "Agen AI tidak merespons tepat waktu. Ketik /restart untuk mencoba lagi."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Dibatalkan."

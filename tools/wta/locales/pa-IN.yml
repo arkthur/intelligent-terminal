@@ -132,8 +132,6 @@ connection.starting: "ਏਜੰਟ ਸ਼ੁਰੂ ਹੋ ਰਿਹਾ ਹੈ...
 connection.reconnecting: "ਮੁੜ-ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ..."
 connection.connecting_activity: "ਏਜੰਟ ਨਾਲ ਕਨੈਕਟ ਹੋ ਰਿਹਾ ਹੈ…"
 connection.lost: "ਏਜੰਟ ਨਾਲ ਕਨੈਕਸ਼ਨ ਟੁੱਟ ਗਿਆ। ਮੁੜ ਕਨੈਕਟ ਕਰਨ ਲਈ /restart ਟਾਈਪ ਕਰੋ।"  # {Locked="/restart"}
-connection.start_failed: "ਏਜੰਟ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋ ਸਕੀ — ਇਹ ਹਾਲੇ ਵੀ ਸ਼ੁਰੂ ਹੋ ਰਿਹਾ ਹੋ ਸਕਦਾ ਹੈ। ਮੁੜ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ /restart ਟਾਈਪ ਕਰੋ।"  # {Locked="/restart"}
-connection.timeout: "ਏਜੰਟ ਨੇ ਸਮੇਂ ਸਿਰ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ। ਮੁੜ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ /restart ਟਾਈਪ ਕਰੋ।"  # {Locked="/restart"}
 
 # ── ਸਿਸਟਮ ਸੁਨੇਹੇ (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "ਰੱਦ ਕੀਤਾ ਗਿਆ।"

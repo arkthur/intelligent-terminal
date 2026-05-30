@@ -121,8 +121,6 @@ connection.starting: "ኤጅንት በመጀመር..."
 connection.reconnecting: "እንደገና በመጋኘት..."
 connection.connecting_activity: "ከኤጅንት ጋር በመገናኘት ላይ…"
 connection.lost: "ከኤጅንት ጋር ያለው ግንኙነት ጠፍቷል። እንደገና ለመገናኘት /restart ብለው ይተይቡ።"  # {Locked="/restart"}
-connection.start_failed: "ኤጅንቱን ማግኘት አልተቻለም — አሁንም በመጀመር ላይ ሊሆን ይችላል። እንደገና ለመሞከር /restart ብለው ይተይቡ።"  # {Locked="/restart"}
-connection.timeout: "ኤጅንቱ በጊዜው ምላሽ አልሰጠም። እንደገና ለመሞከር /restart ብለው ይተይቡ።"  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Cancelled."

@@ -137,8 +137,6 @@ connection.starting: "កំពុងចាប់ផ្តើម AI អេជេ
 connection.reconnecting: "កំពុងតភ្ជាប់ឡើងវិញ..."
 connection.connecting_activity: "កំពុងភ្ជាប់ទៅ AI អេជេន្ត់…"
 connection.lost: "ការតភ្ជាប់ទៅ AI អេជេន្ត់បានបាត់បង់។ វាយ /restart ដើម្បីភ្ជាប់ឡើងវិញ។"  # {Locked="/restart"}
-connection.start_failed: "មិនអាចភ្ជាប់ទៅ AI អេជេន្ត់បានទេ — វាអាចកំពុងចាប់ផ្តើមនៅឡើយ។ វាយ /restart ដើម្បីព្យាយាមម្តងទៀត។"  # {Locked="/restart"}
-connection.timeout: "AI អេជេន្ត់មិនបានឆ្លើយតបទាន់ពេលទេ។ វាយ /restart ដើម្បីព្យាយាមម្តងទៀត។"  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ──────────────────────────────────────────────────────────────────
 system.cancelled: "បានបោះបង់។"

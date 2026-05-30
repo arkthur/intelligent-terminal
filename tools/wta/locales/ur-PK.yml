@@ -132,8 +132,6 @@ connection.starting: "ایجنٹ شروع ہو رہا ہے..."
 connection.reconnecting: "دوبارہ جڑ رہا ہے..."
 connection.connecting_activity: "ایجنٹ سے جڑ رہا ہے…"
 connection.lost: "ایجنٹ سے کنیکشن ختم ہو گیا۔ دوبارہ جڑنے کے لیے /restart ٹائپ کریں۔"  # {Locked="/restart"}
-connection.start_failed: "ایجنٹ تک نہیں پہنچ سکا — ممکن ہے یہ ابھی شروع ہو رہا ہو۔ دوبارہ کوشش کرنے کے لیے /restart ٹائپ کریں۔"  # {Locked="/restart"}
-connection.timeout: "ایجنٹ نے وقت پر جواب نہیں دیا۔ دوبارہ کوشش کرنے کے لیے /restart ٹائپ کریں۔"  # {Locked="/restart"}
 
 # ── نظام پیغامات (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "منسوخ کیا گیا۔"

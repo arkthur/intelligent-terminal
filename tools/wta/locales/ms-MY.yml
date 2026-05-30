@@ -121,8 +121,6 @@ connection.starting: "Memulakan ejen AI..."
 connection.reconnecting: "Menyambung semula..."
 connection.connecting_activity: "Menyambung kepada ejen AI…"
 connection.lost: "Sambungan kepada ejen AI terputus. Taip /restart untuk menyambung semula."  # {Locked="/restart"}
-connection.start_failed: "Tidak dapat mencapai ejen AI — ia mungkin masih bermula. Taip /restart untuk mencuba semula."  # {Locked="/restart"}
-connection.timeout: "Ejen AI tidak memberi respons tepat pada masanya. Taip /restart untuk mencuba semula."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Dibatalkan."

@@ -121,8 +121,6 @@ connection.starting: "A iniciar o agente..."
 connection.reconnecting: "A restabelecer ligação..."
 connection.connecting_activity: "A estabelecer ligação ao agente…"
 connection.lost: "A ligação ao agente foi perdida. Escreva /restart para restabelecer a ligação."  # {Locked="/restart"}
-connection.start_failed: "Não foi possível contactar o agente — pode ainda estar a iniciar. Escreva /restart para tentar novamente."  # {Locked="/restart"}
-connection.timeout: "O agente não respondeu a tempo. Escreva /restart para tentar novamente."  # {Locked="/restart"}
 
 # ── Mensagens do sistema (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "Cancelado."

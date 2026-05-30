@@ -132,8 +132,6 @@ connection.starting: "Агент эшкә кушыла..."
 connection.reconnecting: "Яңадан тоташу..."
 connection.connecting_activity: "Агентка тоташу…"
 connection.lost: "Агент белән тоташу югалды. Яңадан тоташу өчен /restart дип языгыз."  # {Locked="/restart"}
-connection.start_failed: "Агентка барып җитеп булмады — ул әле эшкә кушылып ятарга мөмкин. Кабат сынау өчен /restart дип языгыз."  # {Locked="/restart"}
-connection.timeout: "Агент вакытында җавап бирмәде. Кабат сынау өчен /restart дип языгыз."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Баш тартылды."

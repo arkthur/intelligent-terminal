@@ -121,8 +121,6 @@ connection.starting: "Agent starten..."
 connection.reconnecting: "Opnieuw verbinden..."
 connection.connecting_activity: "Verbinding maken met agent…"
 connection.lost: "De verbinding met de agent is verbroken. Typ /restart om opnieuw verbinding te maken."  # {Locked="/restart"}
-connection.start_failed: "Kan de agent niet bereiken — deze wordt mogelijk nog gestart. Typ /restart om het opnieuw te proberen."  # {Locked="/restart"}
-connection.timeout: "De agent heeft niet op tijd gereageerd. Typ /restart om het opnieuw te proberen."  # {Locked="/restart"}
 
 # ── Systeemberichten (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "Geannuleerd."

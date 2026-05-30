@@ -121,8 +121,6 @@ connection.starting: "Đang khởi động tác nhân AI..."
 connection.reconnecting: "Đang kết nối lại..."
 connection.connecting_activity: "Đang kết nối với tác nhân AI…"
 connection.lost: "Đã mất kết nối với tác nhân AI. Nhập /restart để kết nối lại."  # {Locked="/restart"}
-connection.start_failed: "Không thể kết nối với tác nhân AI — có thể tác nhân vẫn đang khởi động. Nhập /restart để thử lại."  # {Locked="/restart"}
-connection.timeout: "Tác nhân AI không phản hồi kịp thời. Nhập /restart để thử lại."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Đã hủy."

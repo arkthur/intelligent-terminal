@@ -4050,26 +4050,13 @@ impl App {
                 session_id,
                 message,
             } => {
-                // Normalize raw transport-failure phrasings into the clean,
-                // actionable connection-lost line. A prompt that fails because
-                // wta-master died mid-turn surfaces as e.g. `Internal error:
-                // "server shut down unexpectedly"` (observed in a real trace);
-                // the user should see "connection lost — /restart", not raw
-                // jargon, regardless of whether the `handle_io` watchdog or the
-                // in-flight prompt reported it first. Auth markers are disjoint
-                // from these, so a genuine auth error passes through untouched.
-                let message = {
-                    let l = message.to_lowercase();
-                    if l.contains("server shut down")
-                        || l.contains("shut down unexpectedly")
-                        || l.contains("broken pipe")
-                        || l.contains("transport failed")
-                    {
-                        t!("connection.lost").into_owned()
-                    } else {
-                        message
-                    }
-                };
+                // No substring classification of the error text here — keyword
+                // matching is fragile. The message is passed through as-is; the
+                // clean "connection lost" line comes from a real signal (the
+                // `handle_io` watchdog emitting connection.lost on pipe death),
+                // not from pattern-matching jargon. Auth errors flow through with
+                // their marker intact so the fallback below routes them to
+                // sign-in.
                 // Optimistic-connect fallback: if we have stashed auth info
                 // and the error is auth-related, show the auth screen instead
                 // of a dead error state.
@@ -11033,32 +11020,27 @@ mod tests {
         );
     }
 
-    /// A prompt that fails because wta-master died mid-turn surfaces as raw
-    /// transport jargon ("server shut down unexpectedly", seen in a real
-    /// trace). The user must see the clean, actionable connection-lost line.
+    /// Auth failures must reach the sign-in screen, not get flattened to a dead
+    /// `connection.lost`. The over-pipe startup path passes errors through
+    /// verbatim (main.rs does no substring classification), so the auth marker
+    /// survives to this handler's auth check.
     #[test]
-    fn transport_jargon_is_normalized_to_clean_message() {
+    fn auth_error_routes_to_signin_not_connection_lost() {
         let mut app = test_app();
         app.state = ConnectionState::Connected;
         app.handle_event(AppEvent::AgentError {
             session_id: None,
-            message: "prompt error: Internal error: \"server shut down unexpectedly\""
+            message: "new_session over master pipe failed: authentication required"
                 .to_string(),
         });
-        let clean = t!("connection.lost").into_owned();
-        let last_error = app
-            .current_tab()
-            .messages
-            .iter()
-            .rev()
-            .find_map(|m| match m {
-                ChatMessage::Error(s) => Some(s.clone()),
-                _ => None,
-            });
         assert_eq!(
-            last_error.as_deref(),
-            Some(clean.as_str()),
-            "raw transport jargon must be normalized to the clean connection-lost line"
+            app.mode,
+            AppMode::Setup,
+            "an auth failure must route to the sign-in screen"
+        );
+        assert!(
+            !matches!(app.state, ConnectionState::Failed(_)),
+            "an auth failure must not become a Failed connection-lost state"
         );
     }
 

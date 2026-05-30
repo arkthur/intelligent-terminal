@@ -121,8 +121,6 @@ connection.starting: "Gníomhaire á thosú..."
 connection.reconnecting: "Ag athcheangal..."
 connection.connecting_activity: "Ag ceangal leis an ngníomhaire…"
 connection.lost: "Cailleadh an ceangal leis an ngníomhaire. Clóscríobh /restart chun athcheangal."  # {Locked="/restart"}
-connection.start_failed: "Níorbh fhéidir an gníomhaire a shroicheadh — seans go bhfuil sé fós ag tosú. Clóscríobh /restart chun triail eile a bhaint as."  # {Locked="/restart"}
-connection.timeout: "Níor fhreagair an gníomhaire in am. Clóscríobh /restart chun triail eile a bhaint as."  # {Locked="/restart"}
 
 # ── Teachtaireachtaí córais (src/app.rs) ────────────────────────────────────
 system.cancelled: "Cealaithe."

@@ -132,8 +132,6 @@ connection.starting: "جارٍ تشغيل عامل الذكاء الاصطناع
 connection.reconnecting: "جارٍ إعادة الاتصال..."
 connection.connecting_activity: "جارٍ الاتصال بعامل الذكاء الاصطناعي…"
 connection.lost: "فُقد الاتصال بعامل الذكاء الاصطناعي. اكتب /restart لإعادة الاتصال."  # {Locked="/restart"}
-connection.start_failed: "تعذّر الوصول إلى عامل الذكاء الاصطناعي — ربما لا يزال قيد التشغيل. اكتب /restart لإعادة المحاولة."  # {Locked="/restart"}
-connection.timeout: "لم يستجب عامل الذكاء الاصطناعي في الوقت المناسب. اكتب /restart لإعادة المحاولة."  # {Locked="/restart"}
 
 # ── رسائل النظام (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "تم الإلغاء."

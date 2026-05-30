@@ -132,8 +132,6 @@ connection.starting: "מפעיל את הסוכן..."
 connection.reconnecting: "מתחבר מחדש..."
 connection.connecting_activity: "מתחבר לסוכן…"
 connection.lost: "החיבור לסוכן אבד. הקלד /restart כדי להתחבר מחדש."  # {Locked="/restart"}
-connection.start_failed: "לא ניתן היה להגיע לסוכן — ייתכן שהוא עדיין מופעל. הקלד /restart כדי לנסות שוב."  # {Locked="/restart"}
-connection.timeout: "הסוכן לא הגיב בזמן. הקלד /restart כדי לנסות שוב."  # {Locked="/restart"}
 
 # ── הודעות מערכת (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "בוטל."

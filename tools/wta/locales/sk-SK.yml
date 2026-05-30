@@ -128,8 +128,6 @@ connection.starting: "Spúšťanie agenta..."
 connection.reconnecting: "Opätovné pripájanie..."
 connection.connecting_activity: "Pripájanie k agentovi…"
 connection.lost: "Pripojenie k agentovi sa stratilo. Zadaním /restart sa znova pripojíte."  # {Locked="/restart"}
-connection.start_failed: "Agenta sa nepodarilo kontaktovať — možno sa ešte spúšťa. Zadaním /restart to skúste znova."  # {Locked="/restart"}
-connection.timeout: "Agent neodpovedal včas. Zadaním /restart to skúste znova."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Zrušené."

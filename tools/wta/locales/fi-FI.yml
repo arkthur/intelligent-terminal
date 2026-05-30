@@ -121,8 +121,6 @@ connection.starting: "Käynnistetään agenttia..."
 connection.reconnecting: "Yhdistetään uudelleen..."
 connection.connecting_activity: "Yhdistetään agenttiin…"
 connection.lost: "Yhteys agenttiin katkesi. Muodosta yhteys uudelleen kirjoittamalla /restart."  # {Locked="/restart"}
-connection.start_failed: "Agenttiin ei saatu yhteyttä — se saattaa olla vielä käynnistymässä. Yritä uudelleen kirjoittamalla /restart."  # {Locked="/restart"}
-connection.timeout: "Agentti ei vastannut ajoissa. Yritä uudelleen kirjoittamalla /restart."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Peruutettu."

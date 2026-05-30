@@ -121,8 +121,6 @@ connection.starting: "Iniciando o axente..."
 connection.reconnecting: "Reconectando..."
 connection.connecting_activity: "Conectando co axente…"
 connection.lost: "Perdeuse a conexión co axente. Escribe /restart para volver conectar."  # {Locked="/restart"}
-connection.start_failed: "Non se puido contactar co axente — pode que aínda se estea iniciando. Escribe /restart para tentalo de novo."  # {Locked="/restart"}
-connection.timeout: "O axente non respondeu a tempo. Escribe /restart para tentalo de novo."  # {Locked="/restart"}
 
 # ── Mensaxes do sistema (src/app.rs) ────────────────────────────────────────
 system.cancelled: "Cancelado."

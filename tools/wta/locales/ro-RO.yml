@@ -121,8 +121,6 @@ connection.starting: "Se pornește agentul..."
 connection.reconnecting: "Reconectare..."
 connection.connecting_activity: "Se conectează la agent…"
 connection.lost: "Conexiunea la agent s-a pierdut. Tastați /restart pentru reconectare."  # {Locked="/restart"}
-connection.start_failed: "Agentul nu a putut fi contactat — este posibil să încă pornească. Tastați /restart pentru a reîncerca."  # {Locked="/restart"}
-connection.timeout: "Agentul nu a răspuns la timp. Tastați /restart pentru a reîncerca."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Anulat."

@@ -117,8 +117,6 @@ connection.starting: "正在啟動智能體..."
 connection.reconnecting: "正在重新連線..."
 connection.connecting_activity: "正在連線到智能體…"
 connection.lost: "與智能體的連線已中斷。輸入 /restart 以重新連線。"  # {Locked="/restart"}
-connection.start_failed: "無法連線到智能體 — 它可能仍在啟動。輸入 /restart 以重試。"  # {Locked="/restart"}
-connection.timeout: "智能體未及時回應。輸入 /restart 以重試。"  # {Locked="/restart"}
 
 # ── 系統訊息 (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "已取消。"

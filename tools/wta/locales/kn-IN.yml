@@ -132,8 +132,6 @@ connection.starting: "ಏಜೆಂಟ್ ಪ್ರಾರಂಭವಾಗುತ್
 connection.reconnecting: "ಮರುಸಂಪರ್ಕಗೊಳ್ಳುತ್ತಿದೆ..."
 connection.connecting_activity: "ಏಜೆಂಟ್‌ಗೆ ಸಂಪರ್ಕಗೊಳ್ಳುತ್ತಿದೆ…"
 connection.lost: "ಏಜೆಂಟ್‌ಗೆ ಸಂಪರ್ಕ ಕಳೆದುಹೋಯಿತು. ಮರುಸಂಪರ್ಕಿಸಲು /restart ಟೈಪ್ ಮಾಡಿ."  # {Locked="/restart"}
-connection.start_failed: "ಏಜೆಂಟ್ ಅನ್ನು ತಲುಪಲಾಗಲಿಲ್ಲ — ಅದು ಇನ್ನೂ ಪ್ರಾರಂಭವಾಗುತ್ತಿರಬಹುದು. ಮರುಪ್ರಯತ್ನಿಸಲು /restart ಟೈಪ್ ಮಾಡಿ."  # {Locked="/restart"}
-connection.timeout: "ಏಜೆಂಟ್ ಸಮಯಕ್ಕೆ ಪ್ರತಿಕ್ರಿಯಿಸಲಿಲ್ಲ. ಮರುಪ್ರಯತ್ನಿಸಲು /restart ಟೈಪ್ ಮಾಡಿ."  # {Locked="/restart"}
 
 # ── ಸಿಸ್ಟಮ್ ಸಂದೇಶಗಳು (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "ರದ್ದುಮಾಡಲಾಗಿದೆ."

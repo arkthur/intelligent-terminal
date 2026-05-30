@@ -121,8 +121,6 @@ connection.starting: "Agent wird gestartet..."
 connection.reconnecting: "Verbindung wird wiederhergestellt..."
 connection.connecting_activity: "Verbindung mit dem Agenten wird hergestellt…"
 connection.lost: "Die Verbindung mit dem Agenten wurde getrennt. Geben Sie /restart ein, um die Verbindung wiederherzustellen."  # {Locked="/restart"}
-connection.start_failed: "Der Agent konnte nicht erreicht werden — er wird möglicherweise noch gestartet. Geben Sie /restart ein, um es erneut zu versuchen."  # {Locked="/restart"}
-connection.timeout: "Der Agent hat nicht rechtzeitig geantwortet. Geben Sie /restart ein, um es erneut zu versuchen."  # {Locked="/restart"}
 
 # ── Systemnachrichten (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "Abgebrochen."

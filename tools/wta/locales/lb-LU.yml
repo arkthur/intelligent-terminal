@@ -121,8 +121,6 @@ connection.starting: "Agent gëtt gestart..."
 connection.reconnecting: "Gëtt nei verbonnen..."
 connection.connecting_activity: "Verbindung mam Agent gëtt hiergestallt…"
 connection.lost: "D'Verbindung mam Agent ass verluer gaangen. Tippt /restart fir nei ze verbannen."  # {Locked="/restart"}
-connection.start_failed: "Den Agent konnt net erreecht ginn — e kéint nach amgaang sinn ze starten. Tippt /restart fir nach eng Kéier ze probéieren."  # {Locked="/restart"}
-connection.timeout: "Den Agent huet net mat Zäit geäntwert. Tippt /restart fir nach eng Kéier ze probéieren."  # {Locked="/restart"}
 
 # ── System-Messagen (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Ofgebrach."

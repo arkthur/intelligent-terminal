@@ -132,8 +132,6 @@ connection.starting: "ఏజెంట్ ప్రారంభమవుతోం
 connection.reconnecting: "మళ్ళీ కనెక్ట్ అవుతోంది..."
 connection.connecting_activity: "ఏజెంట్‌కు కనెక్ట్ అవుతోంది…"
 connection.lost: "ఏజెంట్‌తో కనెక్షన్ కోల్పోయింది. మళ్లీ కనెక్ట్ చేయడానికి /restart అని టైప్ చేయండి."  # {Locked="/restart"}
-connection.start_failed: "ఏజెంట్‌ను చేరుకోలేకపోయింది — అది ఇంకా ప్రారంభమవుతుండవచ్చు. మళ్లీ ప్రయత్నించడానికి /restart అని టైప్ చేయండి."  # {Locked="/restart"}
-connection.timeout: "ఏజెంట్ సకాలంలో స్పందించలేదు. మళ్లీ ప్రయత్నించడానికి /restart అని టైప్ చేయండి."  # {Locked="/restart"}
 
 # ── సిస్టమ్ సందేశాలు (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "రద్దు చేయబడింది."

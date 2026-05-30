@@ -121,8 +121,6 @@ connection.starting: "กำลังเริ่มเอเจนต์..."
 connection.reconnecting: "กำลังเชื่อมต่อใหม่..."
 connection.connecting_activity: "กำลังเชื่อมต่อกับเอเจนต์…"
 connection.lost: "การเชื่อมต่อกับเอเจนต์ขาดหายไป พิมพ์ /restart เพื่อเชื่อมต่อใหม่"  # {Locked="/restart"}
-connection.start_failed: "ไม่สามารถติดต่อเอเจนต์ได้ — เอเจนต์อาจยังคงเริ่มทำงานอยู่ พิมพ์ /restart เพื่อลองอีกครั้ง"  # {Locked="/restart"}
-connection.timeout: "เอเจนต์ไม่ตอบสนองภายในเวลาที่กำหนด พิมพ์ /restart เพื่อลองอีกครั้ง"  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "ยกเลิกแล้ว"

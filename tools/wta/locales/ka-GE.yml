@@ -132,8 +132,6 @@ connection.starting: "აგენტის გაშვება..."
 connection.reconnecting: "ხელახლა დაკავშირება..."
 connection.connecting_activity: "აგენტთან დაკავშირება მიმდინარეობს…"
 connection.lost: "აგენტთან კავშირი დაიკარგა. ხელახლა დასაკავშირებლად აკრიფეთ /restart."  # {Locked="/restart"}
-connection.start_failed: "აგენტთან დაკავშირება ვერ მოხერხდა — ის შესაძლოა ჯერ კიდევ ირთვება. ხელახლა საცდელად აკრიფეთ /restart."  # {Locked="/restart"}
-connection.timeout: "აგენტმა დროულად არ უპასუხა. ხელახლა საცდელად აკრიფეთ /restart."  # {Locked="/restart"}
 
 # ── სისტემური შეტყობინებები (src/app.rs) ────────────────────────────────────
 system.cancelled: "გაუქმებულია."

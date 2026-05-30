@@ -121,8 +121,6 @@ connection.starting: "Ügynök indítása..."
 connection.reconnecting: "Újrakapcsolódás..."
 connection.connecting_activity: "Kapcsolódás az ügynökhöz…"
 connection.lost: "Megszakadt a kapcsolat az ügynökkel. Az újrakapcsolódáshoz írja be: /restart."  # {Locked="/restart"}
-connection.start_failed: "Nem sikerült elérni az ügynököt — lehet, hogy még indul. Az újbóli próbálkozáshoz írja be: /restart."  # {Locked="/restart"}
-connection.timeout: "Az ügynök nem válaszolt időben. Az újbóli próbálkozáshoz írja be: /restart."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Megszakítva."

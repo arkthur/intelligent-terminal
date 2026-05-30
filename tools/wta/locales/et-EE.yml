@@ -121,8 +121,6 @@ connection.starting: "Agendi käivitamine..."
 connection.reconnecting: "Taasühendamine..."
 connection.connecting_activity: "Agendiga ühenduse loomine…"
 connection.lost: "Ühendus agendiga katkes. Uuesti ühendamiseks tippige /restart."  # {Locked="/restart"}
-connection.start_failed: "Agendiga ei õnnestunud ühendust saada — see võib alles käivituda. Uuesti proovimiseks tippige /restart."  # {Locked="/restart"}
-connection.timeout: "Agent ei vastanud õigel ajal. Uuesti proovimiseks tippige /restart."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Tühistatud."

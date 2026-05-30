@@ -132,8 +132,6 @@ connection.starting: "ଏଜେଣ୍ଟ ଆରମ୍ଭ ହେଉଛି..."
 connection.reconnecting: "ପୁଣି ସଂଯୋଗ ହେଉଛି..."
 connection.connecting_activity: "ଏଜେଣ୍ଟ ସହ ସଂଯୋଗ ହେଉଛି…"
 connection.lost: "ଏଜେଣ୍ଟ ସହିତ ସଂଯୋଗ ହରାଇଗଲା। ପୁଣି ସଂଯୋଗ କରିବାକୁ /restart ଟାଇପ୍ କରନ୍ତୁ।"  # {Locked="/restart"}
-connection.start_failed: "ଏଜେଣ୍ଟକୁ ପହଞ୍ଚି ପାରିଲା ନାହିଁ — ଏହା ଏବେ ମଧ୍ୟ ଆରମ୍ଭ ହେଉଥାଇପାରେ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ /restart ଟାଇପ୍ କରନ୍ତୁ।"  # {Locked="/restart"}
-connection.timeout: "ଏଜେଣ୍ଟ ସମୟରେ ପ୍ରତିକ୍ରିୟା ଦେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ /restart ଟାଇପ୍ କରନ୍ତୁ।"  # {Locked="/restart"}
 
 # ── ସିଷ୍ଟମ ସନ୍ଦେଶ (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "ବାତିଲ ହୋଇଛି।"

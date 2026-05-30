@@ -121,8 +121,6 @@ connection.starting: "Starting agent..."
 connection.reconnecting: "Reconnecting..."
 connection.connecting_activity: "Connecting to agent…"
 connection.lost: "Connection to the agent was lost. Type /restart to reconnect."  # {Locked="/restart"}
-connection.start_failed: "Couldn't reach the agent — it may still be starting. Type /restart to retry."  # {Locked="/restart"}
-connection.timeout: "The agent didn't respond in time. Type /restart to retry."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Cancelled."

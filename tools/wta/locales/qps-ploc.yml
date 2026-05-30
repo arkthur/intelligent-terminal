@@ -123,8 +123,6 @@ connection.starting: "[Ŝţåŕţïñğ åğéñţ...!!]"
 connection.reconnecting: "[Ŕéçöññéçţïñğ...!!]"
 connection.connecting_activity: "[Çöññéçţïñğ ţö åğéñţ…!!]"
 connection.lost: "[Çöññéçţïöñ ţö ţĥé åğéñţ ŵåś ĺöśţ. Ţýṗé /restart ţö ŕéçöññéçţ.!!]"  # {Locked="/restart"}
-connection.start_failed: "[Çöûĺďñ'ţ ŕéåçĥ ţĥé åğéñţ — ïţ ḿåý śţïĺĺ ßé śţåŕţïñğ. Ţýṗé /restart ţö ŕéţŕý.!!]"  # {Locked="/restart"}
-connection.timeout: "[Ţĥé åğéñţ ďïďñ'ţ ŕéśṗöñď ïñ ţïḿé. Ţýṗé /restart ţö ŕéţŕý.!!]"  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "[Çåñçéĺĺéď.!!]"

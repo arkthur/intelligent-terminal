@@ -121,8 +121,6 @@ connection.starting: "Startē aģentu..."
 connection.reconnecting: "Atkārtoti savienojas..."
 connection.connecting_activity: "Savienojas ar aģentu…"
 connection.lost: "Savienojums ar aģentu tika zaudēts. Ierakstiet /restart, lai izveidotu savienojumu atkārtoti."  # {Locked="/restart"}
-connection.start_failed: "Neizdevās sasniegt aģentu — iespējams, tas vēl tiek startēts. Ierakstiet /restart, lai mēģinātu vēlreiz."  # {Locked="/restart"}
-connection.timeout: "Aģents neatbildēja laikus. Ierakstiet /restart, lai mēģinātu vēlreiz."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Atcelts."

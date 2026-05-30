@@ -121,8 +121,6 @@ connection.starting: "Paleidžiamas agentas..."
 connection.reconnecting: "Jungiamasi iš naujo..."
 connection.connecting_activity: "Jungiamasi prie agento…"
 connection.lost: "Ryšys su agentu nutrūko. Įveskite /restart, kad prisijungtumėte iš naujo."  # {Locked="/restart"}
-connection.start_failed: "Nepavyko pasiekti agento — jis galbūt vis dar paleidžiamas. Įveskite /restart, kad bandytumėte dar kartą."  # {Locked="/restart"}
-connection.timeout: "Agentas laiku neatsakė. Įveskite /restart, kad bandytumėte dar kartą."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Atšaukta."

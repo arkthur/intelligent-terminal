@@ -132,8 +132,6 @@ connection.starting: "ഏജന്റ് ആരംഭിക്കുന്നു
 connection.reconnecting: "വീണ്ടും കണക്ട് ചെയ്യുന്നു..."
 connection.connecting_activity: "ഏജന്റുമായി കണക്റ്റ് ചെയ്യുന്നു…"
 connection.lost: "ഏജന്റുമായുള്ള കണക്ഷൻ നഷ്ടപ്പെട്ടു. വീണ്ടും കണക്റ്റ് ചെയ്യാൻ /restart ടൈപ്പ് ചെയ്യുക."  # {Locked="/restart"}
-connection.start_failed: "ഏജന്റിലേക്ക് എത്തിച്ചേരാനായില്ല — അത് ഇപ്പോഴും ആരംഭിക്കുകയായിരിക്കാം. വീണ്ടും ശ്രമിക്കാൻ /restart ടൈപ്പ് ചെയ്യുക."  # {Locked="/restart"}
-connection.timeout: "ഏജന്റ് സമയത്തിനുള്ളിൽ പ്രതികരിച്ചില്ല. വീണ്ടും ശ്രമിക്കാൻ /restart ടൈപ്പ് ചെയ്യുക."  # {Locked="/restart"}
 
 # ── സിസ്റ്റം സന്ദേശങ്ങള്‍ (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "റദ്ദാക്കി."

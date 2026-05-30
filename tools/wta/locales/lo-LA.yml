@@ -121,8 +121,6 @@ connection.starting: "ກຳລັງເລີ່ມ agent..."
 connection.reconnecting: "ກຳລັງເຊື່ອມຕໍ່ໃໝ່..."
 connection.connecting_activity: "ກຳລັງເຊື່ອມຕໍ່ຫາ agent…"
 connection.lost: "ການເຊື່ອມຕໍ່ຫາ agent ຂາດຫາຍໄປ. ພິມ /restart ເພື່ອເຊື່ອມຕໍ່ໃໝ່."  # {Locked="/restart"}
-connection.start_failed: "ບໍ່ສາມາດຕິດຕໍ່ agent ໄດ້ — ມັນອາດຍັງກຳລັງເລີ່ມຢູ່. ພິມ /restart ເພື່ອລອງໃໝ່."  # {Locked="/restart"}
-connection.timeout: "agent ບໍ່ຕອບສະໜອງທັນເວລາ. ພິມ /restart ເພື່ອລອງໃໝ່."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Cancelled."

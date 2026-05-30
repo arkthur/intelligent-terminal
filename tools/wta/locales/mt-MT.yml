@@ -121,8 +121,6 @@ connection.starting: "L-aġent qed jibda..."
 connection.reconnecting: "Qed jerġa' jikkonnettja..."
 connection.connecting_activity: "Qed tikkonnettja mal-aġent…"
 connection.lost: "Il-konnessjoni mal-aġent intilfet. Ittajpja /restart biex terġa' tikkonnettja."  # {Locked="/restart"}
-connection.start_failed: "Ma setax jintlaħaq l-aġent — jista' jkun għadu qed jibda. Ittajpja /restart biex terġa' tipprova."  # {Locked="/restart"}
-connection.timeout: "L-aġent ma weġibx fil-ħin. Ittajpja /restart biex terġa' tipprova."  # {Locked="/restart"}
 
 # ── Messaġġi tas-sistema (src/app.rs) ────────────────────────────────────────
 system.cancelled: "Ikkanċellat."

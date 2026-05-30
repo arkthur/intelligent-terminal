@@ -132,8 +132,6 @@ connection.starting: "एजेंट सुरू जाता..."
 connection.reconnecting: "परतून जोडता..."
 connection.connecting_activity: "एजेंटाक जोडटा…"
 connection.lost: "एजेंटाशी जोडणी तुटली. परतून जोडपाक /restart टायप करात."  # {Locked="/restart"}
-connection.start_failed: "एजेंटाक पावंक शकले ना — तो अजून सुरू जायत आसूंक शकता. परत प्रयत्न करपाक /restart टायप करात."  # {Locked="/restart"}
-connection.timeout: "एजेंटान वेळार प्रतिसाद दिलो ना. परत प्रयत्न करपाक /restart टायप करात."  # {Locked="/restart"}
 
 # ── सिस्टम संदेश (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "रद्द केलें."

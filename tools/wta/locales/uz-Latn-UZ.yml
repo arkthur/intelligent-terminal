@@ -132,8 +132,6 @@ connection.starting: "Agent ishga tushirilmoqda..."
 connection.reconnecting: "Qayta ulanilmoqda..."
 connection.connecting_activity: "Agentga ulanilmoqda…"
 connection.lost: "Agent bilan ulanish uzildi. Qayta ulanish uchun /restart deb yozing."  # {Locked="/restart"}
-connection.start_failed: "Agent bilan bogʻlanib boʻlmadi — u hali ishga tushayotgan boʻlishi mumkin. Qayta urinish uchun /restart deb yozing."  # {Locked="/restart"}
-connection.timeout: "Agent oʻz vaqtida javob bermadi. Qayta urinish uchun /restart deb yozing."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Bekor qilindi."

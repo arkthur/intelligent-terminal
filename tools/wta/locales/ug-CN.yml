@@ -141,8 +141,6 @@ connection.starting: "AI ئاگېنتى ئىشقا چۈشۈرۈلۈۋاتىدۇ.
 connection.reconnecting: "قايتا باغلىنىۋاتىدۇ..."
 connection.connecting_activity: "AI ئاگېنتىغا باغلىنىۋاتىدۇ…"
 connection.lost: "AI ئاگېنتى بىلەن بولغان باغلىنىش ئۈزۈلدى. قايتا باغلىنىش ئۈچۈن /restart دەپ كىرگۈزۈڭ."  # {Locked="/restart"}
-connection.start_failed: "AI ئاگېنتىغا يېتەلمىدى — ئۇ يەنىلا قوزغىلىۋاتقان بولۇشى مۇمكىن. قايتا سىناش ئۈچۈن /restart دەپ كىرگۈزۈڭ."  # {Locked="/restart"}
-connection.timeout: "AI ئاگېنتى ۋاقتىدا جاۋاب قايتۇرمىدى. قايتا سىناش ئۈچۈن /restart دەپ كىرگۈزۈڭ."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ──────────────────────────────────────────────────────────────
 system.cancelled: "بېكىت قىلىندى."

@@ -121,8 +121,6 @@ connection.starting: "Startar agenten..."
 connection.reconnecting: "Återansluter..."
 connection.connecting_activity: "Ansluter till agenten…"
 connection.lost: "Anslutningen till agenten bröts. Skriv /restart för att återansluta."  # {Locked="/restart"}
-connection.start_failed: "Det gick inte att nå agenten — den kanske fortfarande startar. Skriv /restart för att försöka igen."  # {Locked="/restart"}
-connection.timeout: "Agenten svarade inte i tid. Skriv /restart för att försöka igen."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Avbröts."

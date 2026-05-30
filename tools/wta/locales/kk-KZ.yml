@@ -132,8 +132,6 @@ connection.starting: "Агент іске қосылуда..."
 connection.reconnecting: "Қайта қосылуда..."
 connection.connecting_activity: "Агентке қосылуда…"
 connection.lost: "Агентпен байланыс жоғалды. Қайта қосылу үшін /restart деп теріңіз."  # {Locked="/restart"}
-connection.start_failed: "Агентке қосылу мүмкін болмады — ол әлі іске қосылып жатқан болуы мүмкін. Қайталау үшін /restart деп теріңіз."  # {Locked="/restart"}
-connection.timeout: "Агент уақытында жауап бермеді. Қайталау үшін /restart деп теріңіз."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Бас тартылды."
