@@ -4050,6 +4050,26 @@ impl App {
                 session_id,
                 message,
             } => {
+                // Normalize raw transport-failure phrasings into the clean,
+                // actionable connection-lost line. A prompt that fails because
+                // wta-master died mid-turn surfaces as e.g. `Internal error:
+                // "server shut down unexpectedly"` (observed in a real trace);
+                // the user should see "connection lost — /restart", not raw
+                // jargon, regardless of whether the `handle_io` watchdog or the
+                // in-flight prompt reported it first. Auth markers are disjoint
+                // from these, so a genuine auth error passes through untouched.
+                let message = {
+                    let l = message.to_lowercase();
+                    if l.contains("server shut down")
+                        || l.contains("shut down unexpectedly")
+                        || l.contains("broken pipe")
+                        || l.contains("transport failed")
+                    {
+                        t!("connection.lost").into_owned()
+                    } else {
+                        message
+                    }
+                };
                 // Optimistic-connect fallback: if we have stashed auth info
                 // and the error is auth-related, show the auth screen instead
                 // of a dead error state.
@@ -11010,6 +11030,35 @@ mod tests {
         assert_eq!(
             errors, 1,
             "consecutive transport errors must collapse to one line"
+        );
+    }
+
+    /// A prompt that fails because wta-master died mid-turn surfaces as raw
+    /// transport jargon ("server shut down unexpectedly", seen in a real
+    /// trace). The user must see the clean, actionable connection-lost line.
+    #[test]
+    fn transport_jargon_is_normalized_to_clean_message() {
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+        app.handle_event(AppEvent::AgentError {
+            session_id: None,
+            message: "prompt error: Internal error: \"server shut down unexpectedly\""
+                .to_string(),
+        });
+        let clean = t!("connection.lost").into_owned();
+        let last_error = app
+            .current_tab()
+            .messages
+            .iter()
+            .rev()
+            .find_map(|m| match m {
+                ChatMessage::Error(s) => Some(s.clone()),
+                _ => None,
+            });
+        assert_eq!(
+            last_error.as_deref(),
+            Some(clean.as_str()),
+            "raw transport jargon must be normalized to the clean connection-lost line"
         );
     }
 
