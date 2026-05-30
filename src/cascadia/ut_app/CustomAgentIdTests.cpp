@@ -6,9 +6,9 @@
 // Tests for `DeriveCustomAgentId` (src/cascadia/inc/CustomAgentId.h).
 //
 // This is the function used by the AI Agents settings page to turn a
-// user-supplied command line (e.g. `mybot.cmd --acp`, `"C:\Program
-// Files\mybot\mybot.cmd" --acp`) into the short token that becomes the
-// suffix of the stored agent id (e.g. `custom:mybot`). Every downstream
+// user-supplied command line (e.g. `helper.cmd --acp`, `"C:\Program
+// Files\helper\helper.cmd" --acp`) into the short token that becomes the
+// suffix of the stored agent id (e.g. `custom:helper`). Every downstream
 // consumer that keys on the prefixed id (EffectiveAcpAgent policy gate,
 // command-line resolver, custom-edit/delete UI gates) depends on this
 // derivation; regressing this function silently breaks the save/reload
@@ -66,42 +66,42 @@ namespace TerminalAppUnitTests
 
     void CustomAgentIdTests::BareName()
     {
-        Check(L"qwen", L"qwen");
+        Check(L"helper", L"helper");
     }
 
     void CustomAgentIdTests::NameWithExe()
     {
-        Check(L"qwen.exe", L"qwen");
+        Check(L"helper.exe", L"helper");
     }
 
     void CustomAgentIdTests::NameWithCmd()
     {
-        Check(L"qwen.cmd", L"qwen");
+        Check(L"helper.cmd", L"helper");
     }
 
     void CustomAgentIdTests::NameWithBat()
     {
-        Check(L"qwen.bat", L"qwen");
+        Check(L"helper.bat", L"helper");
     }
 
     void CustomAgentIdTests::ExtensionStripIsCaseInsensitive()
     {
-        Check(L"qwen.EXE", L"qwen");
-        Check(L"qwen.Cmd", L"qwen");
-        Check(L"qwen.BAT", L"qwen");
-        Check(L"qwen.cMd --acp", L"qwen");
+        Check(L"helper.EXE", L"helper");
+        Check(L"helper.Cmd", L"helper");
+        Check(L"helper.BAT", L"helper");
+        Check(L"helper.cMd --acp", L"helper");
     }
 
     void CustomAgentIdTests::NameWithArgs()
     {
-        Check(L"qwen.cmd --acp", L"qwen");
-        Check(L"qwen --acp --stdio", L"qwen");
+        Check(L"helper.cmd --acp", L"helper");
+        Check(L"helper --acp --stdio", L"helper");
     }
 
     void CustomAgentIdTests::UnquotedPath()
     {
-        Check(L"C:\\tools\\qwen.cmd", L"qwen");
-        Check(L"C:\\tools\\qwen.cmd --acp", L"qwen");
+        Check(L"C:\\tools\\helper.cmd", L"helper");
+        Check(L"C:\\tools\\helper.cmd --acp", L"helper");
         Check(L"D:\\local-bin\\my-agent.exe", L"my-agent");
     }
 
@@ -109,12 +109,12 @@ namespace TerminalAppUnitTests
     {
         // Full path containing spaces, properly quoted — the whole quoted
         // region is the executable.
-        Check(L"\"C:\\Program Files\\qwen\\qwen.cmd\"", L"qwen");
+        Check(L"\"C:\\Program Files\\helper\\helper.cmd\"", L"helper");
     }
 
     void CustomAgentIdTests::QuotedPathWithSpacesAndArgs()
     {
-        Check(L"\"C:\\Program Files\\qwen\\qwen.cmd\" --acp", L"qwen");
+        Check(L"\"C:\\Program Files\\helper\\helper.cmd\" --acp", L"helper");
         Check(L"\"C:\\Program Files (x86)\\my agent\\my-agent.exe\" --stdio --acp",
               L"my-agent");
     }
@@ -122,21 +122,21 @@ namespace TerminalAppUnitTests
     void CustomAgentIdTests::ForwardSlashPath()
     {
         // POSIX-style forward slashes (some users paste paths like this).
-        Check(L"/usr/bin/qwen", L"qwen");
-        Check(L"C:/tools/qwen.cmd --acp", L"qwen");
+        Check(L"/usr/bin/helper", L"helper");
+        Check(L"C:/tools/helper.cmd --acp", L"helper");
     }
 
     void CustomAgentIdTests::LeadingWhitespace()
     {
-        Check(L"   qwen", L"qwen");
-        Check(L"  qwen.cmd --acp", L"qwen");
-        Check(L"\tqwen.cmd", L"qwen");
+        Check(L"   helper", L"helper");
+        Check(L"  helper.cmd --acp", L"helper");
+        Check(L"\thelper.cmd", L"helper");
     }
 
     void CustomAgentIdTests::TabSeparator()
     {
         // Tab between exe and args.
-        Check(L"qwen.cmd\t--acp", L"qwen");
+        Check(L"helper.cmd\t--acp", L"helper");
     }
 
     void CustomAgentIdTests::Empty()
@@ -155,7 +155,7 @@ namespace TerminalAppUnitTests
     {
         // Missing closing quote — take everything after the opening quote.
         // Whatever the user typed is at least a recognizable token, not a crash.
-        Check(L"\"C:\\Program Files\\qwen\\qwen.cmd", L"qwen");
+        Check(L"\"C:\\Program Files\\helper\\helper.cmd", L"helper");
     }
 
     void CustomAgentIdTests::QuoteOnlyIsEmpty()
@@ -192,8 +192,8 @@ namespace TerminalAppUnitTests
     {
         // The function strips at the *last* `\` or `/` (find_last_of), so
         // mixed paths are handled.
-        Check(L"C:/foo\\bar/qwen.cmd", L"qwen");
-        Check(L"C:\\foo/bar\\qwen.exe", L"qwen");
+        Check(L"C:/foo\\bar/helper.cmd", L"helper");
+        Check(L"C:\\foo/bar\\helper.exe", L"helper");
     }
 
     void CustomAgentIdTests::NoExtensionStripWhenTokenEqualsExtension()
@@ -208,8 +208,8 @@ namespace TerminalAppUnitTests
     {
         // We only strip .exe / .cmd / .bat. Other extensions are part of
         // the id (e.g. PowerShell scripts).
-        Check(L"qwen.ps1", L"qwen.ps1");
-        Check(L"qwen.py", L"qwen.py");
-        Check(L"qwen.sh", L"qwen.sh");
+        Check(L"helper.ps1", L"helper.ps1");
+        Check(L"helper.py", L"helper.py");
+        Check(L"helper.sh", L"helper.sh");
     }
 }

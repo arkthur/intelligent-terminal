@@ -4,8 +4,8 @@
 // CustomAgentId.h — derive a short, stable identifier from a user-supplied
 // command line for a "custom" AI agent (the ACP / delegate agent slot).
 //
-// The settings UI lets the user paste an arbitrary command (e.g. `mybot.cmd
-// --acp`, `"C:\Program Files\mybot\mybot.cmd" --acp`, or just `mybot`).
+// The settings UI lets the user paste an arbitrary command (e.g. `helper.cmd
+// --acp`, `"C:\Program Files\helper\helper.cmd" --acp`, or just `helper`).
 // The settings model stores this command verbatim in AcpCustomCommand /
 // DelegateCustomCommand. But the agent *id* itself (AcpAgent /
 // DelegateAgent) needs to be a single short token so that the rest of the
