@@ -125,6 +125,30 @@ system.cancelled: "Cancelado."
 system.no_prompt_in_flight: "Non hai ningún aviso en curso."
 system.authentication_failed: "A autenticación fallou"
 system.command_copied_retry: "Comando copiado — execúteo noutro terminal e prema Intro para reintentar"  # {Locked="Enter"}
+# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
+system.agent_busy: "O axente está ocupado nesta lapela — agarde a que remate a solicitude actual."
+# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
+system.resuming_session: "Retomando a sesión %{session_id}..."
+# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
+system.unknown_command: "Comando descoñecido \"%{command}\" — enviado como solicitude. Escriba /help para ver a lista."
+# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
+system.busy_use_stop: "Agarde a que remate a solicitude actual, ou use /stop primeiro."
+# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
+system.cannot_focus_session: "Non se pode enfocar a sesión %{session_id}: semella activa, pero aínda non hai ningún GUID de panel vinculado. Ténteo de novo nun momento."
+# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
+system.cannot_resume_no_load_session: "Non se pode retomar no panel de axente: %{agent} non anunciou a capacidade ACP `loadSession`. Prema Enter (sen Shift) para retomala nun novo panel de terminal."
+# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
+system.cannot_resume_no_resume_flag: "Non se pode retomar a sesión de %{agent}: este axente non ten unha marca de estilo `--resume`. Prema Shift+Enter para tentar retomala dentro do panel de axente mediante ACP."
+# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
+system.cannot_resume_unknown_agent: "Non se pode retomar a sesión %{session_id}: o seu axente de orixe é descoñecido para esta compilación."
+# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
+system.cannot_resume_phantom_via_flag: "Non se pode retomar a sesión de %{agent} %{session_id}: iniciouse pero nunca acumulou ningunha conversa, polo que %{agent} rexeitaría a continuación. Eliminando a fila."
+# Same case as above but via ACP loadSession (Shift+Enter path).
+system.cannot_resume_phantom_via_load: "Non se pode retomar a sesión de %{agent} %{session_id}: iniciouse pero nunca acumulou ningunha conversa, polo que %{agent} rexeitaría a carga. Eliminando a fila."
+# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
+system.fallback.this_agent: "este axente"
+# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
+system.fallback.connected_agent: "o axente conectado"
 
 # ── Saída de CLI en tempo de execución (src/main.rs) ────────────────────────────────────
 output.no_windows: "Non se atoparon fiestras."
@@ -171,3 +195,7 @@ time.hour_singular: "hai %{count} hora"
 time.hours_other: "hai %{count} horas"
 time.day_singular: "hai %{count} día"
 time.days_other: "hai %{count} días"
+
+# ── Execución de recomendacións (src/coordinator.rs) ───────────────────────────
+# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
+system.choice_execution_failed: "Fallou a opción %{choice}: %{error}"

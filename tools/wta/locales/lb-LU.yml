@@ -125,6 +125,30 @@ system.cancelled: "Ofgebrach."
 system.no_prompt_in_flight: "Keen Prompt ënnerwee."
 system.authentication_failed: "Authentifizéierung gescheitert"
 system.command_copied_retry: "Kommando kopéiert — féiert et an engem aneren Terminal aus, da dréckt Enter fir nach eng Kéier ze probéieren"  # {Locked="Enter"}
+# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
+system.agent_busy: "Den Agent ass op dësem Tab beschäftegt — waart bis den aktuelle Prompt fäerdeg ass."
+# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
+system.resuming_session: "Sessioun %{session_id} gëtt weidergefouert..."
+# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
+system.unknown_command: "Onbekannte Commande \"%{command}\" — als Prompt geschéckt. Tippt /help fir d’Lëscht."
+# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
+system.busy_use_stop: "Waart bis den aktuelle Prompt fäerdeg ass, oder benotzt fir d’éischt /stop."
+# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
+system.cannot_focus_session: "Sessioun %{session_id} kann net fokusséiert ginn: si schéngt aktiv ze sinn, mee et ass nach kee Fënster-GUID gebonnen. Probéiert et gläich nach eng Kéier."
+# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
+system.cannot_resume_no_load_session: "Kann net am Agent-Fënster weiderfueren: %{agent} huet d’ACP `loadSession`-Fäegkeet net ugekënnegt. Dréckt Enter (ouni Shift) fir amplaz an engem neien Terminal-Fënster weiderzefueren."
+# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
+system.cannot_resume_no_resume_flag: "Kann %{agent}-Sessioun net weiderfueren: dësen Agent huet kee `--resume`-ähnleche Fändel. Dréckt Shift+Enter fir amplaz am Agent-Fënster iwwer ACP weiderzefueren."
+# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
+system.cannot_resume_unknown_agent: "Kann Sessioun %{session_id} net weiderfueren: hire Quell-Agent ass dësem Build onbekannt."
+# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
+system.cannot_resume_phantom_via_flag: "Kann %{agent}-Sessioun %{session_id} net weiderfueren: si gouf gestart, mee et ass ni e Gespréich entstanen, dofir géif %{agent} selwer d’Weiderféierung refuséieren. Rei gëtt ewechgeholl."
+# Same case as above but via ACP loadSession (Shift+Enter path).
+system.cannot_resume_phantom_via_load: "Kann %{agent}-Sessioun %{session_id} net weiderfueren: si gouf gestart, mee et ass ni e Gespréich entstanen, dofir géif %{agent} d’Luede refuséieren. Rei gëtt ewechgeholl."
+# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
+system.fallback.this_agent: "dësen Agent"
+# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
+system.fallback.connected_agent: "den ugeschlossenen Agent"
 
 # ── CLI-Ausgang zur Laufzäit (src/main.rs) ────────────────────────────────────
 output.no_windows: "Keng Fënsteren fonnt."
@@ -171,3 +195,7 @@ time.hour_singular: "virun %{count} Stonn"
 time.hours_other: "virun %{count} Stonnen"
 time.day_singular: "virun %{count} Dag"
 time.days_other: "virun %{count} Deeg"
+
+# ── Ausféierung vun der Recommandatioun (src/coordinator.rs) ───────────────────────────
+# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
+system.choice_execution_failed: "Wiel %{choice} ass feelgeschloen: %{error}"

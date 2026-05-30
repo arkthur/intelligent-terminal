@@ -125,6 +125,30 @@ system.cancelled: "Peruutettu."
 system.no_prompt_in_flight: "Ei käynnissä olevaa kehotetta."
 system.authentication_failed: "Todennus epäonnistui"
 system.command_copied_retry: "Komento kopioitu — suorita se toisessa terminaalissa ja paina sitten Enter yrittääksesi uudelleen"  # {Locked="Enter"}
+# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
+system.agent_busy: "Agentti on varattu tässä välilehdessä — odota, että nykyinen kehote valmistuu."
+# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
+system.resuming_session: "Jatketaan istuntoa %{session_id}..."
+# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
+system.unknown_command: "Tuntematon komento \"%{command}\" — lähetetty kehotteena. Näytä luettelo kirjoittamalla /help."
+# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
+system.busy_use_stop: "Odota, että nykyinen kehote valmistuu, tai käytä ensin /stop."
+# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
+system.cannot_focus_session: "Istuntoon %{session_id} ei voi kohdistaa: se näyttää olevan käytössä, mutta ruudun GUID-tunnusta ei ole vielä sidottu. Yritä hetken kuluttua uudelleen."
+# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
+system.cannot_resume_no_load_session: "Agenttiruudussa ei voi jatkaa: %{agent} ei ilmoittanut ACP `loadSession` -ominaisuutta. Jatka sen sijaan uudessa pääteruudussa painamalla Enter (ilman Shift-näppäintä)."
+# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
+system.cannot_resume_no_resume_flag: "%{agent}-istuntoa ei voi jatkaa: tällä agentilla ei ole `--resume`-tyylistä lippua. Kokeile jatkamista agenttiruudussa ACP:n kautta painamalla Shift+Enter."
+# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
+system.cannot_resume_unknown_agent: "Istuntoa %{session_id} ei voi jatkaa: sen lähdeagenttia ei tunneta tässä koontiversiossa."
+# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
+system.cannot_resume_phantom_via_flag: "%{agent}-istuntoa %{session_id} ei voi jatkaa: se käynnistettiin, mutta siihen ei koskaan kertynyt keskustelua, joten %{agent} itse hylkäisi jatkamisen. Poistetaan rivi."
+# Same case as above but via ACP loadSession (Shift+Enter path).
+system.cannot_resume_phantom_via_load: "%{agent}-istuntoa %{session_id} ei voi jatkaa: se käynnistettiin, mutta siihen ei koskaan kertynyt keskustelua, joten %{agent} hylkäisi latauksen. Poistetaan rivi."
+# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
+system.fallback.this_agent: "tämä agentti"
+# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
+system.fallback.connected_agent: "yhdistetty agentti"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Ikkunoita ei löytynyt."
@@ -171,3 +195,7 @@ time.hour_singular: "%{count} tunti sitten"
 time.hours_other: "%{count} tuntia sitten"
 time.day_singular: "%{count} päivä sitten"
 time.days_other: "%{count} päivää sitten"
+
+# ── Suosituksen suorittaminen (src/coordinator.rs) ───────────────────────────
+# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
+system.choice_execution_failed: "Valinta %{choice} epäonnistui: %{error}"

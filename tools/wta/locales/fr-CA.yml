@@ -125,6 +125,30 @@ system.cancelled: "Annulé."
 system.no_prompt_in_flight: "Aucune invite en cours."
 system.authentication_failed: "Échec de l'authentification"
 system.command_copied_retry: "Commande copiée — exécutez-la dans un autre terminal, puis appuyez sur Enter pour réessayer"  # {Locked="Enter"}
+# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
+system.agent_busy: "L’agent est occupé dans cet onglet — attendez que l’invite actuelle soit terminée."
+# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
+system.resuming_session: "Reprise de la session %{session_id}..."
+# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
+system.unknown_command: "Commande inconnue \"%{command}\" — envoyée comme invite. Tapez /help pour afficher la liste."
+# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
+system.busy_use_stop: "Attendez que l’invite actuelle soit terminée, ou utilisez d’abord /stop."
+# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
+system.cannot_focus_session: "Impossible de cibler la session %{session_id} : elle semble active, mais aucun GUID de volet n’est encore lié. Réessayez dans un instant."
+# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
+system.cannot_resume_no_load_session: "Impossible de reprendre dans le volet de l’agent : %{agent} n’a pas annoncé la capacité ACP `loadSession`. Appuyez sur Enter (sans Shift) pour reprendre plutôt dans un nouveau volet de terminal."
+# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
+system.cannot_resume_no_resume_flag: "Impossible de reprendre la session %{agent} : cet agent n’a pas d’indicateur de type `--resume`. Appuyez sur Shift+Enter pour tenter une reprise dans le volet de l’agent via ACP."
+# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
+system.cannot_resume_unknown_agent: "Impossible de reprendre la session %{session_id} : son agent source est inconnu de cette version."
+# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
+system.cannot_resume_phantom_via_flag: "Impossible de reprendre la session %{agent} %{session_id} : elle a été démarrée, mais n’a jamais accumulé de conversation; %{agent} rejetterait donc lui-même la reprise. Suppression de la ligne."
+# Same case as above but via ACP loadSession (Shift+Enter path).
+system.cannot_resume_phantom_via_load: "Impossible de reprendre la session %{agent} %{session_id} : elle a été démarrée, mais n’a jamais accumulé de conversation; %{agent} rejetterait donc le chargement. Suppression de la ligne."
+# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
+system.fallback.this_agent: "cet agent"
+# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
+system.fallback.connected_agent: "l’agent connecté"
 
 # ── Sortie CLI d'exécution (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Aucune fenêtre trouvée."
@@ -181,3 +205,7 @@ commands.new.summary: "Démarrer une nouvelle session ACP (efface l’historique
 commands.restart.summary: "Redémarrer l’agent"
 commands.stop.summary: "Annuler la requête en cours"
 commands.sessions.summary: "Ouvrir le sélecteur de sessions précédentes (Ctrl+Shift+/)"
+
+# ── Exécution des recommandations (src/coordinator.rs) ───────────────────────────
+# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
+system.choice_execution_failed: "Le choix %{choice} a échoué : %{error}"

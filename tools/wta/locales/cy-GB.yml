@@ -125,6 +125,30 @@ system.cancelled: "Wedi'i ganslo."
 system.no_prompt_in_flight: "Dim anogaeth ar y gweill."
 system.authentication_failed: "Methwyd â dilysu"
 system.command_copied_retry: "Gorchymyn wedi'i gopïo — rhedwch ef mewn terfynell arall, yna pwyswch Enter i ailgeisio"  # {Locked="Enter"}
+# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
+system.agent_busy: "Mae’r asiant yn brysur ar y tab hwn — arhoswch i’r anogiad presennol orffen."
+# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
+system.resuming_session: "Yn ailddechrau sesiwn %{session_id}..."
+# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
+system.unknown_command: "Gorchymyn anhysbys \"%{command}\" — anfonwyd fel anogiad. Teipiwch /help am y rhestr."
+# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
+system.busy_use_stop: "Arhoswch i’r anogiad presennol orffen, neu defnyddiwch /stop yn gyntaf."
+# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
+system.cannot_focus_session: "Methu canolbwyntio ar sesiwn %{session_id}: mae’n ymddangos yn fyw ond nid oes GUID cwarel wedi’i rwymo eto. Rhowch gynnig arall arni mewn eiliad."
+# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
+system.cannot_resume_no_load_session: "Methu ailddechrau mewn cwarel asiant: ni hysbysebodd %{agent} y gallu ACP `loadSession`. Pwyswch Enter (heb Shift) i ailddechrau mewn cwarel terfynell newydd yn lle hynny."
+# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
+system.cannot_resume_no_resume_flag: "Methu ailddechrau sesiwn %{agent}: nid oes gan yr asiant hwn faner arddull `--resume`. Pwyswch Shift+Enter i geisio ailddechrau y tu mewn i’r cwarel asiant drwy ACP yn lle hynny."
+# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
+system.cannot_resume_unknown_agent: "Methu ailddechrau sesiwn %{session_id}: mae ei asiant ffynhonnell yn anhysbys i’r adeilad hwn."
+# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
+system.cannot_resume_phantom_via_flag: "Methu ailddechrau sesiwn %{agent} %{session_id}: cafodd ei dechrau ond ni chasglodd unrhyw sgwrs erioed, felly byddai %{agent} ei hun yn gwrthod yr ailddechrau. Yn tynnu’r rhes."
+# Same case as above but via ACP loadSession (Shift+Enter path).
+system.cannot_resume_phantom_via_load: "Methu ailddechrau sesiwn %{agent} %{session_id}: cafodd ei dechrau ond ni chasglodd unrhyw sgwrs erioed, felly byddai %{agent} yn gwrthod y llwytho. Yn tynnu’r rhes."
+# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
+system.fallback.this_agent: "yr asiant hwn"
+# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
+system.fallback.connected_agent: "yr asiant cysylltiedig"
 
 # ── Allbwn CLI amser rhedeg (src/main.rs) ────────────────────────────────────
 output.no_windows: "Ni chanfuwyd unrhyw ffenestri."
@@ -170,3 +194,7 @@ time.hour_singular: "%{count} awr yn ôl"
 time.hours_other: "%{count} awr yn ôl"
 time.day_singular: "%{count} diwrnod yn ôl"
 time.days_other: "%{count} diwrnod yn ôl"
+
+# ── Gweithredu argymhelliad (src/coordinator.rs) ───────────────────────────
+# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
+system.choice_execution_failed: "Methodd dewis %{choice}: %{error}"

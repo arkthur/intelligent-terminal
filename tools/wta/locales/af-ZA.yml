@@ -125,6 +125,30 @@ system.cancelled: "Gekanselleer."
 system.no_prompt_in_flight: "Geen opdrag onderweg nie."
 system.authentication_failed: "Stawing het misluk"
 system.command_copied_retry: "Opdrag gekopieer — voer dit in 'n ander terminaal uit, druk dan Enter om weer te probeer"  # {Locked="Enter"}
+# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
+system.agent_busy: "Agent is besig op hierdie oortjie — wag totdat die huidige opdrag klaar is."
+# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
+system.resuming_session: "Hervat sessie %{session_id}..."
+# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
+system.unknown_command: "Onbekende opdrag \"%{command}\" — as opdrag gestuur. Tik /help vir die lys."
+# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
+system.busy_use_stop: "Wag totdat die huidige opdrag klaar is, of gebruik eers /stop."
+# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
+system.cannot_focus_session: "Kan nie op sessie %{session_id} fokus nie: dit lyk aktief, maar geen paneel-GUID is nog gebind nie. Probeer oor ’n oomblik weer."
+# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
+system.cannot_resume_no_load_session: "Kan nie in agentpaneel hervat nie: %{agent} het nie die ACP `loadSession`-vermoë aangekondig nie. Druk Enter (sonder Shift) om eerder in ’n nuwe terminaalpaneel te hervat."
+# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
+system.cannot_resume_no_resume_flag: "Kan nie %{agent}-sessie hervat nie: hierdie agent het geen `--resume`-styl vlag nie. Druk Shift+Enter om eerder via ACP binne die agentpaneel te probeer hervat."
+# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
+system.cannot_resume_unknown_agent: "Kan nie sessie %{session_id} hervat nie: die bronagent is onbekend aan hierdie bouweergawe."
+# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
+system.cannot_resume_phantom_via_flag: "Kan nie %{agent}-sessie %{session_id} hervat nie: dit is begin maar het nooit enige gesprek opgebou nie, dus sou %{agent} self die hervat verwerp. Verwyder die ry."
+# Same case as above but via ACP loadSession (Shift+Enter path).
+system.cannot_resume_phantom_via_load: "Kan nie %{agent}-sessie %{session_id} hervat nie: dit is begin maar het nooit enige gesprek opgebou nie, dus sou %{agent} die laai verwerp. Verwyder die ry."
+# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
+system.fallback.this_agent: "hierdie agent"
+# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
+system.fallback.connected_agent: "die gekoppelde agent"
 
 # ── CLI-uitvoer tydens uitvoering (src/main.rs) ────────────────────────────────────
 output.no_windows: "Geen vensters gevind nie."
@@ -170,3 +194,7 @@ time.hour_singular: "%{count} uur gelede"
 time.hours_other: "%{count} uur gelede"
 time.day_singular: "%{count} dag gelede"
 time.days_other: "%{count} dae gelede"
+
+# ── Aanbevelingsuitvoering (src/coordinator.rs) ───────────────────────────
+# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
+system.choice_execution_failed: "Keuse %{choice} het misluk: %{error}"

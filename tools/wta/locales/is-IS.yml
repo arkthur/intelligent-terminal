@@ -125,6 +125,30 @@ system.cancelled: "Hætt við."
 system.no_prompt_in_flight: "Engin fyrirspurn í gangi."
 system.authentication_failed: "Auðkenning mistókst"
 system.command_copied_retry: "Skipun afrituð — keyrðu hana í öðrum terminal og ýttu á Enter til að reyna aftur"  # {Locked="Enter"}
+# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
+system.agent_busy: "Agentinn er upptekinn á þessum flipa — bíddu þar til núverandi kvaðning lýkur."
+# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
+system.resuming_session: "Held áfram með setu %{session_id}..."
+# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
+system.unknown_command: "Óþekkt skipun \"%{command}\" — send sem kvaðning. Sláðu inn /help til að sjá listann."
+# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
+system.busy_use_stop: "Bíddu þar til núverandi kvaðning lýkur, eða notaðu /stop fyrst."
+# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
+system.cannot_focus_session: "Ekki er hægt að færa fókus á setu %{session_id}: hún virðist virk en ekkert GUID rúðu er enn bundið. Reyndu aftur eftir augnablik."
+# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
+system.cannot_resume_no_load_session: "Ekki er hægt að halda áfram í agent-rúðu: %{agent} auglýsti ekki ACP `loadSession`-getuna. Ýttu á Enter (án Shift) til að halda áfram í nýrri terminal-rúðu í staðinn."
+# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
+system.cannot_resume_no_resume_flag: "Ekki er hægt að halda áfram með %{agent}-setu: þessi agent er ekki með `--resume`-líkt flagg. Ýttu á Shift+Enter til að reyna að halda áfram inni í agent-rúðunni í gegnum ACP í staðinn."
+# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
+system.cannot_resume_unknown_agent: "Ekki er hægt að halda áfram með setu %{session_id}: uppruna-agent hennar er óþekktur í þessari smíði."
+# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
+system.cannot_resume_phantom_via_flag: "Ekki er hægt að halda áfram með %{agent}-setu %{session_id}: hún var ræst en safnaði aldrei neinu samtali, þannig að %{agent} myndi sjálfur hafna áframhaldi. Fjarlægi röðina."
+# Same case as above but via ACP loadSession (Shift+Enter path).
+system.cannot_resume_phantom_via_load: "Ekki er hægt að halda áfram með %{agent}-setu %{session_id}: hún var ræst en safnaði aldrei neinu samtali, þannig að %{agent} myndi hafna hleðslunni. Fjarlægi röðina."
+# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
+system.fallback.this_agent: "þessi agent"
+# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
+system.fallback.connected_agent: "tengdi agentinn"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Engir gluggar fundust."
@@ -171,3 +195,7 @@ time.hour_singular: "fyrir %{count} klukkustund síðan"
 time.hours_other: "fyrir %{count} klukkustundum síðan"
 time.day_singular: "fyrir %{count} degi síðan"
 time.days_other: "fyrir %{count} dögum síðan"
+
+# ── Framkvæmd ráðleggingar (src/coordinator.rs) ───────────────────────────
+# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
+system.choice_execution_failed: "Val %{choice} mistókst: %{error}"
