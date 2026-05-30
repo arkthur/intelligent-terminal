@@ -9,6 +9,7 @@
 #include "EnumEntry.h"
 #include "../inc/AgentRegistry.h"
 #include "../inc/AgentHooksStatus.h"
+#include "../inc/CustomAgentId.h"
 #include "../inc/WtaProcess.h"
 
 #include <json/json.h>
@@ -67,47 +68,9 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     winrt::hstring AIAgentsViewModel::_DeriveId(const winrt::hstring& command)
     {
-        // Extract the executable token. If the command begins with a double-quote
-        // (e.g. "C:\Program Files\qwen\qwen.cmd" --acp), treat everything up to
-        // the next double-quote as the executable; otherwise split on the first
-        // whitespace. This ensures full paths containing spaces are handled.
-        auto str = winrt::to_string(command);
-        // Trim leading whitespace so a stray leading space doesn't confuse the parser.
-        const auto firstNonSpace = str.find_first_not_of(" \t");
-        if (firstNonSpace == std::string::npos)
-        {
-            return winrt::hstring{};
-        }
-        str.erase(0, firstNonSpace);
-
-        std::string token;
-        if (!str.empty() && str.front() == '"')
-        {
-            const auto closing = str.find('"', 1);
-            token = (closing != std::string::npos) ? str.substr(1, closing - 1) : str.substr(1);
-        }
-        else
-        {
-            const auto pos = str.find_first_of(" \t");
-            token = (pos != std::string::npos) ? str.substr(0, pos) : str;
-        }
-
-        auto slash = token.rfind('\\');
-        if (slash == std::string::npos) slash = token.rfind('/');
-        if (slash != std::string::npos) token = token.substr(slash + 1);
-
-        // Case-insensitive trailing-extension strip.
-        for (const auto* ext : { ".exe", ".cmd", ".bat" })
-        {
-            const auto extLen = strlen(ext);
-            if (token.size() > extLen &&
-                _stricmp(token.c_str() + token.size() - extLen, ext) == 0)
-            {
-                token = token.substr(0, token.size() - extLen);
-                break;
-            }
-        }
-        return winrt::to_hstring(token);
+        // Delegate to the header-only helper shared with the unit tests.
+        return ::Microsoft::Terminal::Settings::Model::DeriveCustomAgentId(
+            std::wstring_view{ command });
     }
 
     void AIAgentsViewModel::_AppendAddNewEntry(IObservableVector<Editor::AgentEntry>& list)
