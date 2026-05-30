@@ -8,9 +8,11 @@
 // timestamp format, log path, and error-handling semantics stay in lock-
 // step.
 //
-// Output: `%LOCALAPPDATA%\IntelligentTerminal\logs\wta-agent-pane.log`,
-// one ISO8601 UTC line per call with millisecond precision so timestamps
-// correlate with `wta-main_*.log` down to the millisecond.
+// Output: the WTA log directory + `wta-agent-pane.log`, one ISO8601 UTC line
+// per call with millisecond precision so timestamps correlate with
+// `wta-main_*.log` down to the millisecond. The log directory is resolved by
+// `_intelligentTerminalLogDir()` below to match wta's Rust
+// `runtime_paths::intelligent_terminal_local_root()`.
 //
 // Header-only `inline` so each translation unit that includes this picks
 // up its own copy of the symbol without ODR conflicts.
@@ -27,22 +29,25 @@
 #include <string>
 #include <system_error>
 
+#include "../inc/IntelligentTerminalPaths.h"
+
 namespace winrt::TerminalApp::implementation
 {
+    // The WTA log directory, resolved by the shared
+    // `IntelligentTerminal::LogDir()` (package LocalCache\Local when packaged)
+    // so this logger, the bug-report-zip action, and the Rust side all agree.
+    inline std::filesystem::path _intelligentTerminalLogDir()
+    {
+        return ::IntelligentTerminal::LogDir();
+    }
+
     inline void _agentPaneLog(const std::string& msg)
     {
-        wchar_t localAppData[MAX_PATH];
-        if (GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH) == 0)
+        std::filesystem::path logDir = _intelligentTerminalLogDir();
+        if (logDir.empty())
         {
             return;
         }
-        // Build a `filesystem::path` from the raw wstring. `std::ofstream`'s
-        // wstring overload is a MSVC extension; the standard ctor only
-        // accepts `const char*`, `std::string`, and `std::filesystem::path`.
-        // Going via `path` keeps the code portable.
-        std::filesystem::path logDir{ std::wstring(localAppData) };
-        logDir /= L"IntelligentTerminal";
-        logDir /= L"logs";
 
         // No-throw overload — this is a diagnostic logger; we never want
         // a filesystem hiccup (race with a concurrent rmdir, permission

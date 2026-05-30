@@ -1830,14 +1830,15 @@ namespace winrt::TerminalApp::implementation
         {
             co_return;
         }
-        wil::unique_cotaskmem_string localAppDataRaw;
-        if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppDataRaw)) || !localAppDataRaw)
+        const std::filesystem::path desktop{ desktopRaw.get() };
+        // Resolve the WTA log dir the same way the Rust side and the agent-pane
+        // logger do (package LocalCache\Local when packaged) so the bug report
+        // captures the logs that are actually being written.
+        const std::filesystem::path logsDir = _intelligentTerminalLogDir();
+        if (logsDir.empty())
         {
             co_return;
         }
-
-        const std::filesystem::path desktop{ desktopRaw.get() };
-        const std::filesystem::path logsDir = std::filesystem::path(localAppDataRaw.get()) / L"IntelligentTerminal" / L"logs";
 
         // create_directories is a no-op if the path already exists. We do this so
         // tar always has *something* to archive, even on a brand-new install where

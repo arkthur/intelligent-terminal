@@ -129,24 +129,54 @@ once the session later connects.
 
 **Diag log**: `wta-ensure-host.log` in the WTA log directory — shows event flow, classification, and autofix triggers.
 
-## Logs
+## Logs & runtime data layout
 
-WTA writes structured logs to:
+WTA runtime data lives under the **package-private** store, split by lifetime
+into two roots (both resolved in `runtime_paths.rs`, both falling back to the
+same bare path when the process has no package identity):
 
 ```
-C:\Users\<user>\AppData\Local\IntelligentTerminal\logs\
+# Packaged (every production wta process — helper is a conpty child of the
+# packaged WindowsTerminal.exe, master is spawned in-package by SharedWta):
+
+  …\Packages\<PackageFamilyName>\LocalState\IntelligentTerminal\   <- STATE root
+      prompts\                      (prompt overrides)             intelligent_terminal_root()
+      agent-pane-sessions.jsonl     (session origin index)
+      master-pipe.txt               (helper↔master rendezvous)
+
+  …\Packages\<PackageFamilyName>\LocalCache\Local\IntelligentTerminal\  <- LOCAL/cache root
+      logs\                         (all wta-*.log files)          intelligent_terminal_local_root()
+      hook-bundle-staging\ …        (hook-installer staging)
+
+# Unpackaged (dev builds run straight out of the Cargo target dir, tests):
+# BOTH roots collapse to the legacy bare %LOCALAPPDATA%\IntelligentTerminal\.
 ```
 
-The path is built off the `LOCALAPPDATA` env var, which is **not** redirected
-into the package sandbox on Win10/11 (the env-var virtualization that
-hides the regular LOCALAPPDATA was a UWP-era behavior; current Windows
-keeps the env var pointing at the real `\AppData\Local\`). Packaged and
-unpackaged wta processes therefore share the same log directory.
+Rationale for the split: **State** = persistent, must-survive, package-private
+data → `LocalState` (alongside the WT app's own `settings.json` / `state.json`).
+**Local/cache** = transient, regenerable diagnostics → `LocalCache\Local`, the
+cache store that doesn't roam / back up.
 
-The sandbox path
-`%LOCALAPPDATA%\Packages\IntelligentTerminal_<id>\LocalCache\Local\IntelligentTerminal\logs`
-exists as a transparent virtualization of the same directory (NTFS reparse
-points) — both paths return the same files.
+Both roots are package-private — removed on uninstall and isolated between the
+dev-sideload family (`IntelligentTerminal_rd9vj3e6a2mbr`) and the store family
+(`Microsoft.IntelligentTerminal_8wekyb3d8bbwe`) — instead of sharing one bare
+`%LOCALAPPDATA%\IntelligentTerminal` directory. The family name comes from
+`GetCurrentPackageFamilyName` (windows-sys); the `Packages\<pfn>\LocalState` and
+`…\LocalCache\Local` paths are what WinRT `ApplicationData.Current.LocalFolder`
+/ `LocalCacheFolder` resolve to, so we construct them directly rather than
+pulling in the WinRT projection.
+
+**Other writers of the same dirs** (kept in lock-step with the Rust roots):
+- C++ `AgentPaneLog.h` (`_intelligentTerminalLogDir()`) — `wta-agent-pane.log`
+  and the bug-report-zip action, both → the LocalCache\Local `logs\`.
+- PowerShell hooks (`send-event.ps1`) — `hook-trace.log` → the dir handed down
+  by wta-master via the `WTA_HOOK_LOG_DIR` env var (PowerShell can't resolve the
+  package-private path itself).
+
+> Earlier builds wrote everything to the bare `%LOCALAPPDATA%\IntelligentTerminal`
+> regardless of identity (the `LOCALAPPDATA` env var is **not** redirected into
+> the sandbox on Win10/11). There is no migration — old data is left in place
+> and simply ignored.
 
 Log level is controlled by `WTA_LOG` env var (default: `info`; set `debug`
 for the noisy traces).

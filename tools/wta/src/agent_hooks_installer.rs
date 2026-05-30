@@ -1658,7 +1658,8 @@ fn gemini_extension_dir(home: &Path) -> PathBuf {
 /// sweeps it so a clean uninstall doesn't leave the materialized copy
 /// behind.
 fn legacy_staging_dirs(cli: CliKind) -> Vec<PathBuf> {
-    let Some(root) = crate::runtime_paths::intelligent_terminal_root() else {
+    // Staging copies are transient cache → the `LocalCache\Local` root.
+    let Some(root) = crate::runtime_paths::intelligent_terminal_local_root() else {
         return Vec::new();
     };
     let mut dirs = Vec::new();
@@ -1926,7 +1927,8 @@ fn maybe_stage_bundle_for_claude(source: &Path) -> Option<PathBuf> {
     if !is_under_windows_apps(source) {
         return None;
     }
-    let root = crate::runtime_paths::intelligent_terminal_root()?;
+    // Staging copy is transient cache → the `LocalCache\Local` root.
+    let root = crate::runtime_paths::intelligent_terminal_local_root()?;
     let staged = root.join(STAGING_SUBDIR).join(CliKind::Claude.dir_name());
     match restage_bundle_dir(source, &staged) {
         Ok(()) => {
@@ -2390,7 +2392,7 @@ mod tests {
     /// uninstall doesn't leave the MSIX workaround copy behind.
     #[test]
     fn legacy_staging_dirs_includes_active_claude_staging() {
-        let Some(root) = crate::runtime_paths::intelligent_terminal_root() else {
+        let Some(root) = crate::runtime_paths::intelligent_terminal_local_root() else {
             // No LOCALAPPDATA on this host (extremely unusual) — nothing to
             // assert. The function would return an empty Vec in that case
             // and the sweep would log a warning, which is the documented

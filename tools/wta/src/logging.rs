@@ -19,7 +19,9 @@ pub(crate) fn default_filter_directive(debug_assertions: bool) -> &'static str {
 }
 
 pub fn init(process: &str) -> WorkerGuard {
-    let log_dir = crate::runtime_paths::intelligent_terminal_root()
+    // Logs are transient diagnostics → the cache (`LocalCache\Local`) root,
+    // not the persistent `LocalState` state root.
+    let log_dir = crate::runtime_paths::intelligent_terminal_local_root()
         .map(|r| r.join("logs"))
         .unwrap_or_else(|| std::env::temp_dir().join("IntelligentTerminal").join("logs"));
     let _ = std::fs::create_dir_all(&log_dir);
