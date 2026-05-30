@@ -2602,8 +2602,26 @@ impl App {
         // npm-installed CLIs (`copilot.cmd`, `claude.cmd`, `gemini.cmd`)
         // need cmd.exe's PATHEXT resolution to launch from a bare name
         // (`CreateProcess` returns 0x80070002 for `.cmd` shims).
+        //
+        // Loading banner (issue #135): the agent CLIs take 1–3s of
+        // Node.js cold-start + JSONL history parse before they paint
+        // anything, so the new tab was blank with no feedback. Prepend
+        // a blinking ANSI banner (`SGR 1;36;5` = bold cyan slow-blink)
+        // so the user sees immediate animated feedback in the new
+        // pane while the CLI cold-starts. The CLI's alt-screen TUI
+        // takes over once it boots and overwrites this line cleanly,
+        // so the banner leaves no residue on success. On CLI launch
+        // failure the banner stays put together with cmd.exe's error
+        // message — that's a feature, not a bug (the short id helps
+        // the user file a useful report). The trailing `\x1b[0m`
+        // reset guarantees any post-failure output isn't tinted /
+        // blinking.
         let cwd_string = s.cwd.to_string_lossy().to_string();
-        let launch_commandline = format!("cmd /c {}", commandline);
+        let short_key: String = key.chars().take(8).collect();
+        let launch_commandline = format!(
+            "cmd /c echo \x1b[1;36;5mResuming {} session {}...\x1b[0m && {}",
+            cli_id, short_key, commandline
+        );
         let mut argv = vec![
             "new-tab".to_string(),
             "-c".to_string(),
@@ -10110,10 +10128,21 @@ mod tests {
         );
         // The CLI invocation is still wrapped in `cmd /c` so .cmd shims
         // resolve via PATHEXT, but the legacy `cd /d` prefix is gone —
-        // cwd is threaded through wtcli's `-d` flag now.
+        // cwd is threaded through wtcli's `-d` flag now. Issue #135:
+        // a blinking ANSI loading banner (`SGR 1;36;5` = bold cyan
+        // slow-blink) is prepended so the user sees immediate animated
+        // feedback while the CLI cold-starts; the CLI's alt-screen TUI
+        // overwrites it on success.
         assert!(
-            argv.contains("cmd /c claude --resume abc-123"),
-            "argv: {}",
+            argv.contains(
+                "cmd /c echo \x1b[1;36;5mResuming claude session abc-123...\x1b[0m"
+            ),
+            "expected blinking loading banner echo; argv: {:?}",
+            argv
+        );
+        assert!(
+            argv.contains("&& claude --resume abc-123"),
+            "expected resume command chained after banner; argv: {}",
             argv
         );
         assert!(
