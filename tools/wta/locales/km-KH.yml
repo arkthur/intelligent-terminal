@@ -184,13 +184,11 @@ error.wtcli_wait_for_failed: "wtcli wait-for បរាជ័យ: %{stderr}"
 # {Locked="CLI","PATH","wt-agent-hooks","wta","wta hooks status","%LOCALAPPDATA%","IntelligentTerminal","wta-install-hooks.log"} - tool/CLI names, env vars, log file names
 hooks.bundle_source: "bundle source: %{source}%{path_suffix}"
 hooks.cli_not_on_path: "✗ CLI មិននៅលើ PATH"
-# Shown when a shell hook is successfully installed
 hooks.installed: "✓ បានតំឡើង"
 # Badge in hooks-status table when the extension install path is outdated
 hooks.marketplace_path_stale: "⚠ ផ្លូវ marketplace ហួសសម័យ"
 # Badge when the shell hook extension is installed but the user has disabled it
 hooks.installed_but_disabled: "⚠ បានតំឡើងប៉ុន្តែត្រូវបានបិទ"
-# Shown when a shell hook is not yet installed
 hooks.not_installed: "✗ មិនត្រូវបានតំឡើង"
 hooks.uninstall_skipped: "រំលង (CLI មិននៅលើ PATH)"
 hooks.install_attempted: "wt-agent-hooks install attempted (idempotent). Run `wta hooks status` to inspect the result. Trace log: %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
@@ -205,5 +203,4 @@ time.day_singular: "%{count} ថ្ងៃមុន"
 time.days_other: "%{count} ថ្ងៃមុន"
 
 # ── ការអនុវត្តអនុសាសន៍ (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "ជម្រើស %{choice} បានបរាជ័យ: %{error}"

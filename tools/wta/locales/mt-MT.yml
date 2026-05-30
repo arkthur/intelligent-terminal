@@ -125,29 +125,17 @@ system.cancelled: "Ikkanċellat."
 system.no_prompt_in_flight: "L-ebda prompt fl-arja."
 system.authentication_failed: "L-awtentikazzjoni falliet"
 system.command_copied_retry: "Kmand ikkupjat — ħaddmu f'terminal ieħor, imbagħad agħfas Enter biex terġa' tipprova"  # {Locked="Enter"}
-# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
 system.agent_busy: "L-aġent huwa okkupat fuq din it-tab — stenna sakemm jintemm il-prompt kurrenti."
-# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
 system.resuming_session: "Qed tkompli s-sessjoni %{session_id}..."
-# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
 system.unknown_command: "Kmand mhux magħruf \"%{command}\" — intbagħat bħala prompt. Ittajpja /help għal-lista."
-# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
 system.busy_use_stop: "Stenna sakemm jintemm il-prompt kurrenti, jew uża /stop l-ewwel."
-# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
 system.cannot_focus_session: "Ma tistax tiffoka s-sessjoni %{session_id}: tidher live iżda għad m’hemm l-ebda GUID tal-panew marbut. Erġa’ pprova fi ftit."
-# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
 system.cannot_resume_no_load_session: "Ma tistax tkompli fil-panew tal-aġent: %{agent} ma ħabbarx il-kapaċità ACP `loadSession`. Agħfas Enter (mingħajr Shift) biex minflok tkompli f’panew tat-terminal ġdid."
-# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
 system.cannot_resume_no_resume_flag: "Ma tistax tkompli s-sessjoni ta’ %{agent}: dan l-aġent m’għandux flag stil `--resume`. Agħfas Shift+Enter biex tipprova tkompli ġewwa l-panew tal-aġent permezz ta’ ACP minflok."
-# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
 system.cannot_resume_unknown_agent: "Ma tistax tkompli s-sessjoni %{session_id}: l-aġent tas-sors tagħha mhuwiex magħruf għal din il-build."
-# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
 system.cannot_resume_phantom_via_flag: "Ma tistax tkompli s-sessjoni ta’ %{agent} %{session_id}: inbdiet iżda qatt ma akkumulat konverżazzjoni, għalhekk %{agent} innifsu jirrifjuta t-tkomplija. Qed titneħħa r-ringiela."
-# Same case as above but via ACP loadSession (Shift+Enter path).
 system.cannot_resume_phantom_via_load: "Ma tistax tkompli s-sessjoni ta’ %{agent} %{session_id}: inbdiet iżda qatt ma akkumulat konverżazzjoni, għalhekk %{agent} jirrifjuta t-tagħbija. Qed titneħħa r-ringiela."
-# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
 system.fallback.this_agent: "dan l-aġent"
-# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
 system.fallback.connected_agent: "l-aġent konness"
 
 # ── Output CLI waqt l-eżekuzzjoni (src/main.rs) ────────────────────────────────────
@@ -196,5 +184,4 @@ time.day_singular: "%{count} ġurnata ilu"
 time.days_other: "%{count}-il ġurnata ilu"
 
 # ── Eżekuzzjoni tar-rakkomandazzjoni (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "L-għażla %{choice} falliet: %{error}"

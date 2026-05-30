@@ -196,5 +196,4 @@ time.day_singular: "%{count} ଦିନ ପୂର୍ବରୁ"
 time.days_other: "%{count} ଦିନ ପୂର୍ବରୁ"
 
 # ── ସୁପାରିଶ କାର୍ଯ୍ୟକରଣ (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "ପସନ୍ଦ %{choice} ବିଫଳ ହେଲା: %{error}"

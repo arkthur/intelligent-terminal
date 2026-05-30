@@ -195,13 +195,11 @@ error.wtcli_wait_for_failed: "wtcli wait-for ձախողվեց՝ %{stderr}"
 # {Locked="CLI","PATH","wt-agent-hooks","wta","wta hooks status","%LOCALAPPDATA%","IntelligentTerminal","wta-install-hooks.log"} - tool/CLI names, env vars, log file names
 hooks.bundle_source: "փաթեթի աղբյուր՝ %{source}%{path_suffix}"
 hooks.cli_not_on_path: "✗ CLI-ն PATH-ում չէ"
-# Shown when a shell hook is successfully installed
 hooks.installed: "✓ տեղադրված է"
 # Badge in hooks-status table when the extension install path is outdated
 hooks.marketplace_path_stale: "⚠ marketplace ճանապարհը հնացած է"
 # Badge when the shell hook extension is installed but the user has disabled it
 hooks.installed_but_disabled: "⚠ տեղադրված է, բայց անջատված է"
-# Shown when a shell hook is not yet installed
 hooks.not_installed: "✗ տեղադրված չէ"
 hooks.uninstall_skipped: "բաց թողվեց (CLI-ն PATH-ում չէ)"
 hooks.install_attempted: "wt-agent-hooks տեղադրման փորձ կատարվեց (իդեմպոտենտ)։ Գործարկեք `wta hooks status` արդյունքը ստուգելու համար։ Հետագծման մատյան՝ %LOCALAPPDATA%\\IntelligentTerminal\\logs\\wta-install-hooks.log"
@@ -215,5 +213,4 @@ time.day_singular: "1 օր առաջ"
 time.days_other: "%{count} օր առաջ"
 
 # ── Խորհրդատվության կատարում (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "Ընտրությունը %{choice} ձախողվեց. %{error}"

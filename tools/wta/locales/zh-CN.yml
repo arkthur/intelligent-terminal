@@ -190,5 +190,4 @@ commands.stop.summary: "取消进行中的提示"
 commands.sessions.summary: "打开历史会话选择器（Ctrl+Shift+/）"
 
 # ── 建议执行 (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "选项 %{choice} 执行失败：%{error}"

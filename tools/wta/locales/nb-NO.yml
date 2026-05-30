@@ -125,29 +125,17 @@ system.cancelled: "Avbrutt."
 system.no_prompt_in_flight: "Ingen forespørsel pågår."
 system.authentication_failed: "Autentisering mislyktes"
 system.command_copied_retry: "Kommando kopiert — kjør den i en annen terminal og trykk Enter for å prøve igjen"  # {Locked="Enter"}
-# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
 system.agent_busy: "Agenten er opptatt i denne fanen — vent til gjeldende ledetekst er ferdig."
-# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
 system.resuming_session: "Fortsetter økten %{session_id}..."
-# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
 system.unknown_command: "Ukjent kommando \"%{command}\" — sendt som ledetekst. Skriv /help for listen."
-# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
 system.busy_use_stop: "Vent til gjeldende ledetekst er ferdig, eller bruk /stop først."
-# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
 system.cannot_focus_session: "Kan ikke fokusere økten %{session_id}: den ser ut til å være aktiv, men ingen rute-GUID er bundet ennå. Prøv igjen om et øyeblikk."
-# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
 system.cannot_resume_no_load_session: "Kan ikke fortsette i agentruten: %{agent} annonserte ikke ACP `loadSession`-funksjonen. Trykk Enter (uten Shift) for å fortsette i en ny terminalrute i stedet."
-# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
 system.cannot_resume_no_resume_flag: "Kan ikke fortsette %{agent}-økten: denne agenten har ikke noe `--resume`-lignende flagg. Trykk Shift+Enter for å prøve å fortsette inne i agentruten via ACP i stedet."
-# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
 system.cannot_resume_unknown_agent: "Kan ikke fortsette økten %{session_id}: kildeagenten er ukjent for denne byggen."
-# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
 system.cannot_resume_phantom_via_flag: "Kan ikke fortsette %{agent}-økten %{session_id}: den ble startet, men samlet aldri opp noen samtale, så %{agent} ville selv avvise fortsettelsen. Fjerner raden."
-# Same case as above but via ACP loadSession (Shift+Enter path).
 system.cannot_resume_phantom_via_load: "Kan ikke fortsette %{agent}-økten %{session_id}: den ble startet, men samlet aldri opp noen samtale, så %{agent} ville avvise innlastingen. Fjerner raden."
-# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
 system.fallback.this_agent: "denne agenten"
-# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
 system.fallback.connected_agent: "den tilkoblede agenten"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
@@ -197,5 +185,4 @@ time.day_singular: "%{count} dag siden"
 time.days_other: "%{count} dager siden"
 
 # ── Utføring av anbefaling (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "Valg %{choice} mislyktes: %{error}"

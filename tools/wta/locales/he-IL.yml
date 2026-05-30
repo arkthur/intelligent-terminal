@@ -195,5 +195,4 @@ time.day_singular: "לפני יום אחד"
 time.days_other: "לפני %{count} ימים"
 
 # ── ביצוע המלצה (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "הבחירה %{choice} נכשלה: %{error}"

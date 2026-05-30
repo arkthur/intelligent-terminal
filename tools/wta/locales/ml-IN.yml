@@ -196,5 +196,4 @@ time.day_singular: "%{count} ദിവസം മുമ്പ്"
 time.days_other: "%{count} ദിവസങ്ങൾ മുമ്പ്"
 
 # ── ശുപാർശ നടപ്പാക്കൽ (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "തിരഞ്ഞെടുപ്പ് %{choice} പരാജയപ്പെട്ടു: %{error}"

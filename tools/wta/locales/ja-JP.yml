@@ -190,5 +190,4 @@ commands.stop.summary: "実行中のプロンプトをキャンセル"
 commands.sessions.summary: "過去のセッション ピッカーを開く（Ctrl+Shift+/）"
 
 # ── 推奨事項の実行 (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "選択肢 %{choice} が失敗しました: %{error}"

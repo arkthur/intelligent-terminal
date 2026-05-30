@@ -185,5 +185,4 @@ time.day_singular: "%{count} hari yang lalu"
 time.days_other: "%{count} hari yang lalu"
 
 # ── Eksekusi rekomendasi (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "Pilihan %{choice} gagal: %{error}"

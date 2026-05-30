@@ -125,29 +125,17 @@ system.cancelled: "Cancel·lat."
 system.no_prompt_in_flight: "No hi ha cap indicació en curs."
 system.authentication_failed: "L'autenticació ha fallat"
 system.command_copied_retry: "Orde copiada — executeu-la en un altre terminal i premeu Enter per a tornar a provar"  # {Locked="Enter"}
-# Shown when the user presses Enter to submit a new prompt while the agent is still processing the previous one on the same tab.
 system.agent_busy: "L’agent està ocupat en esta pestanya — espereu que acabe la indicació actual."
-# Shown briefly while ACP `loadSession` rehydrates a previous conversation. %{session_id} is an opaque id (e.g. UUID); not translated.
 system.resuming_session: "S’està reprenent la sessió %{session_id}..."
-# Slash-command fallback when the user types an unknown /command. %{command} is the raw token (e.g. "foo"). {Locked="/help"} — slash-command name.
 system.unknown_command: "Orde desconeguda \"%{command}\" — s’ha enviat com a indicació. Escriviu /help per a vore la llista."
-# Shown when the user runs /new while a prompt is still in flight. {Locked="/stop"} — slash-command name.
 system.busy_use_stop: "Espereu que acabe la indicació actual, o feu /stop primer."
-# Shown when Enter on a Session-management row says Live but no terminal pane is bound yet (cold-startup race). %{session_id} is an opaque id.
 system.cannot_focus_session: "No es pot enfocar la sessió %{session_id}: pareix activa, però encara no hi ha cap GUID de panell vinculat. Torneu-ho a provar d’ací a un moment."
-# Shown when Shift+Enter tries to resume a session in a new agent pane but the connected agent did not advertise the ACP `loadSession` capability. %{agent} is the agent display name (e.g. "Copilot"). {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
 system.cannot_resume_no_load_session: "No es pot reprendre al panell d’agent: %{agent} no ha anunciat la capacitat ACP `loadSession`. Premeu Enter (sense Shift) per a reprendre-la en un panell de terminal nou."
-# Shown when Enter tries to resume a session via the agent's own --resume flag, but that agent's CLI has no resume flag (e.g. Codex). %{agent} is the agent display name. {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
 system.cannot_resume_no_resume_flag: "No es pot reprendre la sessió de %{agent}: este agent no té cap indicador d’estil `--resume`. Premeu Shift+Enter per a provar de reprendre-la dins del panell d’agent mitjançant ACP."
-# Shown when Enter on a Session-management row references an agent that this build of WTA doesn't recognize. %{session_id} is an opaque id.
 system.cannot_resume_unknown_agent: "No es pot reprendre la sessió %{session_id}: l’agent d’origen és desconegut per a esta compilació."
-# Shown when Enter on a Session-management row matches an on-disk session that was started but never accumulated any conversation. %{agent} = display name, %{session_id} = opaque id.
 system.cannot_resume_phantom_via_flag: "No es pot reprendre la sessió de %{agent} %{session_id}: es va iniciar però no va acumular cap conversa, de manera que %{agent} rebutjaria la represa. S’elimina la fila."
-# Same case as above but via ACP loadSession (Shift+Enter path).
 system.cannot_resume_phantom_via_load: "No es pot reprendre la sessió de %{agent} %{session_id}: es va iniciar però no va acumular cap conversa, de manera que %{agent} rebutjaria la càrrega. S’elimina la fila."
-# Fallback noun used inside the cannot_resume_* messages above when the source agent is unknown (e.g. a custom agent).
 system.fallback.this_agent: "este agent"
-# Fallback noun used inside cannot_resume_no_load_session when the connected agent display name is empty.
 system.fallback.connected_agent: "l’agent connectat"
 
 # ── Eixida de CLI en temps d'execució (src/main.rs) ────────────────────────────────────
@@ -197,5 +185,4 @@ time.day_singular: "fa %{count} dia"
 time.days_other: "fa %{count} dies"
 
 # ── Execució de recomanacions (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "L’opció %{choice} ha fallat: %{error}"

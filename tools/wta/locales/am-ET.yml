@@ -184,5 +184,4 @@ time.day_singular: "%{count} ቀን በፊት"
 time.days_other: "%{count} ቀናት በፊት"
 
 # ── የምክር አፈጻጸም (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "ምርጫ %{choice} አልተሳካም፦ %{error}"

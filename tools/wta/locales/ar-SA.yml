@@ -195,5 +195,4 @@ time.day_singular: "منذ يوم واحد"
 time.days_other: "منذ %{count} يومًا"
 
 # ── تنفيذ التوصية (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "فشل الاختيار %{choice}: %{error}"

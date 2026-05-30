@@ -190,5 +190,4 @@ commands.stop.summary: "진행 중인 프롬프트 취소"
 commands.sessions.summary: "기록된 세션 선택기 열기(Ctrl+Shift+/)"
 
 # ── 추천 실행 (src/coordinator.rs) ───────────────────────────
-# Shown when a recommendation card's choice fails to execute. %{choice} = numeric choice index, %{error} = error message string from the underlying failure.
 system.choice_execution_failed: "선택 %{choice} 실패: %{error}"
