@@ -18,6 +18,7 @@
 #include <array>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <regex>
 #include <string>
 #include <string_view>
@@ -39,6 +40,23 @@ namespace Microsoft::Terminal::ShellIntegration
         bool alreadyInstalled{ false }; // true when skipped because already configured
         std::wstring errorMessage;
     };
+
+    namespace details
+    {
+        // Process-wide serialization for the profile-rewriting Install/Uninstall
+        // entry points. The profile file is a *process-wide* resource (one
+        // $PROFILE per user, edited by every TerminalPage instance / window
+        // in this process), so we cannot rely on per-instance mutexes.
+        // Without this lock, two TerminalPage instances reacting to settings
+        // changes in parallel could read the same baseline, each compute a
+        // new file body, and the second writer would clobber the first and
+        // potentially drop user-authored lines.
+        inline std::mutex& ProfileFileMutex() noexcept
+        {
+            static std::mutex m;
+            return m;
+        }
+    }
 
     // Discover the PowerShell $PROFILE path.
     // Uses SHGetKnownFolderPath for the Documents folder instead of spawning
@@ -378,6 +396,10 @@ if (-not $Global:__ShellInteg_Installed) {
             return { false, false, L"Profile path is empty" };
         }
 
+        // Serialize all profile-file mutations across the process; see
+        // ProfileFileMutex() for rationale.
+        std::lock_guard<std::mutex> profileGuard{ details::ProfileFileMutex() };
+
         const std::filesystem::path profilePath{ profilePathW };
         const auto profileDir = profilePath.parent_path();
         const auto scriptPath = profileDir / ShellIntegrationScriptFileName();
@@ -532,6 +554,10 @@ if (-not $Global:__ShellInteg_Installed) {
         {
             return { false, false, L"Profile path is empty" };
         }
+
+        // Serialize all profile-file mutations across the process; see
+        // ProfileFileMutex() for rationale.
+        std::lock_guard<std::mutex> profileGuard{ details::ProfileFileMutex() };
 
         const std::filesystem::path profilePath{ profilePathW };
 
