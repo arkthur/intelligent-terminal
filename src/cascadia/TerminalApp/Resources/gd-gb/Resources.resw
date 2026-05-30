@@ -6,15 +6,15 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Fàilte gu Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Fàilte gu Tèirmineal Glic</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Suidhich an neach-cuideachaidh bunaiteach agad gus do chuideachadh le mearachdan a mhìneachadh, àitheantan a dhrèachdadh, agus gnìomhan a dhì-ghlasadh dìreach far a bheil thu ag obair. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Faigh a-mach barrachd mu Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Faigh a-mach barrachd mu Tèirmineal Glic</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Fuirich san t-sruth le do neach-gnìomha AI bunaiteach</value>
@@ -36,8 +36,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Fàilte gu Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Fàilte gu Tèirmineal Glic</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Tagh dè a tha thu airson a shuidheachadh an-dràsta. 'S urrainn dhut na roghainnean seo atharrachadh aig àm sam bith. </value>
@@ -68,8 +68,8 @@
     <value>Riènrachadh sheiseanan</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Thoir cead do Intelligent Terminal inbhe nan neach-gnìomha a tha a' ruith no beòthail agad a leantainn.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Thoir cead do Tèirmineal Glic inbhe nan neach-gnìomha a tha a' ruith no beòthail agad a leantainn.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Ma chuireas tu seo air thèid hooks co-aonachaidh a stàladh gus seiseanan a leantainn thar nan neach-gnìomha agad.</value>
@@ -134,8 +134,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Briog {0} gus a’ mhearachd a chàradh</value>
+    <value>Briog no brùth {0} gus càradh a mholadh iarraidh air a’ ghnìomhaire</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Càradh deiseil. Brùth {0} airson lèirmheas</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Fosgail leòsan a’ ghnìomhaire gus an càradh a mholadh a lèirmheas</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Chaidh mearachd a lorg. Briog no brùth {0} gus iarraidh air a’ ghnìomhaire AI breithneachadh a dhèanamh agus càradh a mholadh.</value>

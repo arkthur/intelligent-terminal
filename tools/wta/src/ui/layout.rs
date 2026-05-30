@@ -38,7 +38,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         return;
     }
 
-    // Agents view (F2) takes over the full pane area; chat / input / debug
+    // agent session view takes over the full pane area; chat / input / debug
     // panel are not drawn in this mode. Per-tab: the active tab's
     // TabSession owns the open state and selection cursor. Disjoint-field
     // borrow (agent_sessions vs. tab_sessions[id]) lets us pass both refs
@@ -49,6 +49,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
         let load_state = app.history_load_state;
         let activity_frame = app.activity_frame as usize;
         let cli_filter = app.current_cli_filter();
+        let origin_filter = app.sessions_origin_filter;
         let tab = app.tab_sessions.entry(tab_id).or_default();
         // Show the loading shimmer while we're waiting on the very first
         // `session/list` response from master. `open_agents_view_for_tab`
@@ -73,6 +74,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
             load_state,
             activity_frame,
             cli_filter.as_ref(),
+            origin_filter,
             awaiting_first_snapshot,
         );
         return;
@@ -220,7 +222,7 @@ pub fn render(frame: &mut Frame, app: &mut App) {
 }
 
 pub fn input_cursor_position(app: &App, area: Rect) -> Option<Position> {
-    // Agents view / Setup view: no input box, so no cursor.
+    // agent session view / Setup view: no input box, so no cursor.
     if app.current_tab().current_view == View::Agents || app.mode == AppMode::Setup {
         return None;
     }

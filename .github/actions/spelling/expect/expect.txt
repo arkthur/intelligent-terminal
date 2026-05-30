@@ -962,6 +962,7 @@ maxval
 maxversiontested
 MAXWORD
 maybenull
+mbr
 MBUTTON
 MBUTTONDBLCLK
 MBUTTONDOWN

@@ -63,7 +63,16 @@ try {
     # try/catch and would otherwise leak into the parent CLI transcript.
     # A persistent failure (read-only / no disk) surfaces via unbounded
     # log growth, which is a visible signal.
-    $traceDir = Join-Path $env:LOCALAPPDATA 'IntelligentTerminal\logs'
+    # Prefer the package-private log dir handed down by wta-master via
+    # WTA_HOOK_LOG_DIR — it points at the LocalCache\Local store this script
+    # can't resolve on its own (it only sees the un-redirected %LOCALAPPDATA%
+    # and doesn't know the package family name). Fall back to the bare path
+    # when the var is absent (unpackaged dev runs / older wta).
+    $traceDir = if ($env:WTA_HOOK_LOG_DIR) {
+        $env:WTA_HOOK_LOG_DIR
+    } else {
+        Join-Path $env:LOCALAPPDATA 'IntelligentTerminal\logs'
+    }
     if (-not (Test-Path -LiteralPath $traceDir)) {
         New-Item -ItemType Directory -Path $traceDir -Force -ErrorAction SilentlyContinue | Out-Null
     }
@@ -199,7 +208,7 @@ try {
     # Pass our pane GUID via -p so wtcli stamps the event with this pane's
     # session_id. Without -p, wtcli falls back to GetActivePane() which is
     # whichever pane the user is currently focused on — that gives every row
-    # in the F2 list the same (focused) pane GUID, so Enter on any live row
+    # in the session management list the same (focused) pane GUID, so Enter on any live row
     # focuses the focused pane instead of its own pane.
     $paneArg = ''
     if ($env:WT_SESSION) {

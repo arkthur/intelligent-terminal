@@ -385,11 +385,12 @@ impl PromptTimingState {
             prompt.submitted_at_unix_s,
             "prompt_received",
             &format!(
-                "queue_delay={} preview={:?}",
+                "queue_delay={}",
                 format_elapsed(Some(prompt.submitted_at_unix_s), Some(now)),
-                preview
             ),
         );
+        // User prompt preview — trace only.
+        acp_trace_content(&format!("turn {} preview={:?}", prompt.id, preview));
     }
 
     fn mark_context_ready(&self, session_id: &str, prompt_len: usize) {
@@ -565,12 +566,13 @@ impl PromptTimingState {
                 let submitted_at_unix_s = active.submitted_at_unix_s;
                 let title_preview = title.map(prompt_preview).unwrap_or_default();
                 let details = format!(
-                    "title={:?} since_prompt_sent={}",
-                    title_preview,
+                    "since_prompt_sent={}",
                     format_elapsed(active.prompt_sent_at_unix_s, Some(now))
                 );
                 drop(guard);
                 prompt_timing_log(turn_id, submitted_at_unix_s, "first_tool_call", &details);
+                // Tool-call title is agent-generated content — trace only.
+                acp_trace_content(&format!("turn {turn_id} first_tool_call title={title_preview:?}"));
             }
         }
     }
@@ -586,8 +588,7 @@ impl PromptTimingState {
             let turn_id = active.id;
             let submitted_at_unix_s = active.submitted_at_unix_s;
             let details = format!(
-                "description={:?} since_prompt_sent={}",
-                prompt_preview(description),
+                "since_prompt_sent={}",
                 format_elapsed(active.prompt_sent_at_unix_s, Some(now))
             );
             drop(guard);
@@ -597,6 +598,11 @@ impl PromptTimingState {
                 "permission_requested",
                 &details,
             );
+            // Permission description is agent-generated content — trace only.
+            acp_trace_content(&format!(
+                "turn {turn_id} permission_requested description={:?}",
+                prompt_preview(description)
+            ));
         }
     }
 
@@ -733,7 +739,6 @@ impl PromptTimingState {
                 format_elapsed(Some(active_prompt.submitted_at_unix_s), Some(now))
             ),
             format!("event_count={}", active_prompt.event_count),
-            format!("preview={:?}", active_prompt.preview),
         ];
 
         if let Some(error) = error {
@@ -746,6 +751,11 @@ impl PromptTimingState {
             "prompt_complete",
             &details.join(" "),
         );
+        // User prompt preview — trace only.
+        acp_trace_content(&format!(
+            "turn {} complete preview={:?}",
+            active_prompt.id, active_prompt.preview
+        ));
 
         // Telemetry: emit the prompt-complete signal with aggregate metrics.
         // Use the monotonic `Instant` (captured alongside `prompt_sent_at_unix_s`
@@ -1303,6 +1313,14 @@ fn acp_log(msg: &str) {
     tracing::debug!(target: "acp", "{}", msg);
 }
 
+/// Log potentially-sensitive content (user prompt / agent message text,
+/// previews, full ACP payloads) at **trace only**, so it never lands in
+/// shipping (`info`) or default-troubleshooting (`debug`) logs. Enable with
+/// `WTA_LOG=trace` when a human is deliberately deep-debugging.
+fn acp_trace_content(msg: &str) {
+    tracing::trace!(target: "acp.content", "{}", msg);
+}
+
 fn acp_log_built_prompt(
     user_text: &str,
     pane_context: Option<&PaneContext>,
@@ -1316,7 +1334,9 @@ fn acp_log_built_prompt(
         prompt_source,
         "planner_prompt_begin"
     );
-    tracing::debug!(target: "acp", "planner_prompt_text:\n{}", prompt_text);
+    // Full assembled prompt = user text + captured terminal buffer + cwd.
+    // Sensitive — trace only.
+    acp_trace_content(&format!("planner_prompt_text:\n{}", prompt_text));
     tracing::debug!(target: "acp", "planner_prompt_end");
 }
 
@@ -1351,10 +1371,13 @@ fn log_turn_trace(
         kind = %kind,
         include_template,
         prompt_len = prompt_text.len(),
-        body_head = %head,
-        body_tail = %tail,
         "turn_sent"
     );
+    // The prompt body snippets carry user text / template content — trace only.
+    acp_trace_content(&format!(
+        "turn {turn} body_head={head:?} body_tail={tail:?}",
+        turn = prompt_id
+    ));
 }
 
 /// Take `max_chars` from either end of `text` and inline newlines as
@@ -1522,8 +1545,10 @@ impl acp::Client for WtaClient {
         &self,
         args: acp::RequestPermissionRequest,
     ) -> acp::Result<acp::RequestPermissionResponse> {
-        acp_log(&format!(
-            "request_permission: {:?}",
+        acp_log("request_permission received");
+        // Tool-call title is agent-generated content — trace only.
+        acp_trace_content(&format!(
+            "request_permission title: {:?}",
             args.tool_call.fields.title
         ));
         let session_id = args.session_id.0.to_string();
@@ -1580,11 +1605,15 @@ impl acp::Client for WtaClient {
     }
 
     async fn session_notification(&self, args: acp::SessionNotification) -> acp::Result<()> {
-        acp_log(&format!("session_notification: {:?}", args.update));
+        let kind = session_update_kind(&args.update);
+        acp_log(&format!("session_notification: kind={}", kind));
+        // The full update carries agent message/thought text, tool-call
+        // content, plan bodies, and replayed user-message chunks — trace only.
+        acp_trace_content(&format!("session_notification update: {:?}", args.update));
         let sid = args.session_id.0.to_string();
         self.state
             .prompt_timing
-            .observe_session_update(&sid, session_update_kind(&args.update));
+            .observe_session_update(&sid, kind);
         match args.update {
             acp::SessionUpdate::UserMessageChunk(chunk) => {
                 // Replayed historical user prompt from `session/load`.
@@ -1686,7 +1715,12 @@ impl acp::Client for WtaClient {
         args: acp::CreateTerminalRequest,
     ) -> acp::Result<acp::CreateTerminalResponse> {
         acp_log(&format!(
-            "create_terminal called: cmd={} args={:?}",
+            "create_terminal called: arg_count={}",
+            args.args.len()
+        ));
+        // Agent-requested command line can carry user/file content — trace only.
+        acp_trace_content(&format!(
+            "create_terminal cmd={} args={:?}",
             args.command, args.args
         ));
         let env: Vec<(String, String)> = args
@@ -1857,7 +1891,7 @@ impl acp::Client for WtaClient {
 /// `_meta.wta.pane_session_id`, and broadcasts it via
 /// `intellterm.wta/session_added` notifications. Other helpers
 /// listening on those broadcasts use it to populate `alive_mirror`
-/// pane bindings so cross-helper Focus actions (F2 Enter on a row
+/// pane bindings so cross-helper Focus actions (session management Enter on a row
 /// owned by a sibling helper) have a real WT pane GUID to target.
 ///
 /// No-op when `WT_SESSION` is unset/empty (e.g. when running outside
@@ -1885,7 +1919,7 @@ fn inject_wta_pane_meta(meta: &mut Option<acp::Meta>) {
 /// `load_session_rx` arm of `run_acp_client_over_pipe`.
 ///
 /// Two cases:
-///   * `old_sid = Some` (mid-life F2 load failure): restore the prior
+///   * `old_sid = Some` (mid-life session management load failure): restore the prior
 ///     binding so the pane keeps a usable session. The user sees a
 ///     `TabError` and their existing session is still alive.
 ///   * `old_sid = None` (boot-time load failure with no bootstrap):
@@ -1903,7 +1937,7 @@ async fn handle_load_failure(
     error_message: String,
 ) {
     if let Some(old) = old_sid {
-        // Mid-life F2 load failure path: restore prior binding.
+        // Mid-life session management load failure path: restore prior binding.
         let mut g = tab_to_session.lock().await;
         g.insert(tab_id.clone(), old.clone());
         drop(g);
@@ -1943,7 +1977,7 @@ async fn handle_load_failure(
                 g.insert(tab_id.clone(), new_sid.clone());
             }
             // Index the fallback session as an agent-pane origin so
-            // F2 can show it as a Historical row on next cold start
+            // session management view can show it as a Historical row on next cold start
             // (it is now a real, persistent session).
             let pane_session_id = std::env::var("WT_SESSION").unwrap_or_default();
             let pane_for_index = if pane_session_id.is_empty() {
@@ -2058,16 +2092,16 @@ pub async fn run_acp_client_over_pipe(
         loop {
             match tokio::net::windows::named_pipe::ClientOptions::new().open(&pipe_name) {
                 Ok(pipe) => {
-                    if attempt > 0 {
-                        tracing::info!(
-                            target: "helper",
-                            step = "pipe_connect",
-                            pipe = %pipe_name,
-                            attempts = attempt + 1,
-                            "master pipe connected after retry"
-                        );
-                    }
-                    startup_probe.log(&format!("master pipe connected (attempt {})", attempt + 1));
+                    // Always log the connect milestone at info (not just on
+                    // retry) so a clean helper→master connect is visible in
+                    // release logs, not only failures/retries.
+                    tracing::info!(
+                        target: "helper",
+                        step = "pipe_connect",
+                        pipe = %pipe_name,
+                        attempts = attempt + 1,
+                        "master pipe connected"
+                    );
                     break pipe;
                 }
                 Err(e) => {
@@ -2127,14 +2161,35 @@ pub async fn run_acp_client_over_pipe(
     startup_probe.log("ACP client connection created (over pipe)");
 
     let io_probe = startup_probe.clone();
+    let io_event_tx = event_tx.clone();
     tokio::task::spawn_local(async move {
         io_probe.log("ACP handle_io task started (over pipe)");
-        if let Err(e) = handle_io.await {
-            io_probe.log(&format!("ACP handle_io failed: {:#}", e));
-            eprintln!("helper ACP I/O failed: {:#}", e);
-        } else {
-            io_probe.log("ACP handle_io completed (over pipe)");
+        // The I/O loop only ends when the pipe to wta-master is gone. Crucially,
+        // a *killed* master resolves this as **Ok(())** (clean EOF on the pipe),
+        // not Err — confirmed from a real trace where `taskkill` on wta-master
+        // produced "ACP handle_io completed", after which the UI sat on
+        // `Connected` until the next prompt failed with "server shut down
+        // unexpectedly". So BOTH arms must signal connection loss; keying only on
+        // Err (the original F3 fix) would miss the common case.
+        match handle_io.await {
+            Err(e) => {
+                tracing::warn!(target: "helper", error = %format!("{:#}", e), "ACP I/O loop to master failed");
+            }
+            Ok(()) => {
+                io_probe.log("ACP handle_io completed (over pipe)");
+                tracing::warn!(target: "helper", "ACP I/O loop to master ended — pipe closed (master gone)");
+            }
         }
+        // Either way the transport is dead. Emit an AgentError so the state
+        // machine leaves `Connected`, the user sees a clear "connection lost —
+        // /restart" line, and autofix stops firing into a dead transport (F3).
+        // `session_id: None` → current (only) tab. A near-simultaneous in-flight
+        // prompt error is collapsed by the AgentError handler's dedup. On normal
+        // shutdown the helper process is being torn down, so this event is moot.
+        let _ = io_event_tx.send(AppEvent::AgentError {
+            session_id: None,
+            message: t!("connection.lost").into_owned(),
+        });
     });
 
     // Initialize — same as the child-process path. We use a 60s timeout
@@ -2155,12 +2210,34 @@ pub async fn run_acp_client_over_pipe(
     let init_resp = tokio::time::timeout(std::time::Duration::from_secs(60), init_future)
         .await
         .map_err(|_| {
+            tracing::error!(
+                target: "helper",
+                step = "acp_initialize",
+                pipe = %pipe_name,
+                "ACP initialize over master pipe timed out after 60s — wta-master did not respond"
+            );
             anyhow::anyhow!(
                 "ACP initialize over master pipe timed out after 60s — \
              wta-master did not respond"
             )
         })?
-        .map_err(|e| anyhow::anyhow!("initialize over master pipe failed: {}", e))?;
+        .map_err(|e| {
+            tracing::error!(
+                target: "helper",
+                step = "acp_initialize",
+                pipe = %pipe_name,
+                error = %e,
+                "ACP initialize over master pipe failed"
+            );
+            anyhow::anyhow!("initialize over master pipe failed: {}", e)
+        })?;
+    // Connection milestone at info so a clean handshake is visible in release.
+    tracing::info!(
+        target: "helper",
+        step = "acp_initialize",
+        pipe = %pipe_name,
+        "ACP initialized over master pipe"
+    );
     startup_probe.log(&format!(
         "Agent init response received (over pipe): {:?}",
         init_resp
@@ -2179,7 +2256,7 @@ pub async fn run_acp_client_over_pipe(
     // The call is fire-and-forget: if list_sessions fails (e.g. an
     // older master without `unstable_session_list`) the alive mirror
     // just stays empty and `alive_loaded` stays false, which keeps
-    // F2 routing on the legacy path.
+    // session management routing on the legacy path.
     match conn.list_sessions(acp::ListSessionsRequest::new()).await {
         Ok(resp) => {
             let items: Vec<crate::session_registry::SessionInfo> = resp
@@ -2215,9 +2292,9 @@ pub async fn run_acp_client_over_pipe(
     // helper was spawned with `--initial-load-session-id`, in which case
     // we skip the bootstrap entirely and let the boot-time `load_session`
     // (queued by main.rs as an `AppEvent::WtEvent`) be the helper's
-    // first session. Skipping the bootstrap avoids the F2 duplicate-row
+    // first session. Skipping the bootstrap avoids the session management duplicate-row
     // bug: master used to register both the bootstrap and the loaded
-    // sid (both bound to the same WT pane) and the F2 view showed two
+    // sid (both bound to the same WT pane) and the session management view showed two
     // Live rows for the same agent pane.
     let cwd = std::env::current_dir().unwrap_or_default();
     let (session_id, available_models, current_model_id, has_bootstrap) =
@@ -2382,9 +2459,9 @@ pub async fn run_acp_client_over_pipe(
     let conn = Arc::new(conn);
 
     // Periodic 5s tick that fans out an AppEvent::SessionsChanged to
-    // force a refetch in any open F2 view. Belt-and-suspenders against
+    // force a refetch in any open session management view. Belt-and-suspenders against
     // missed `intellterm.wta/sessions/changed` broadcasts. Cheap:
-    // refetch only fires for tabs whose snapshot.is_some() (i.e. F2 is
+    // refetch only fires for tabs whose snapshot.is_some() (i.e. session management view is
     // currently open).
     let mut periodic_refetch = tokio::time::interval(std::time::Duration::from_secs(5));
     periodic_refetch.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -2618,7 +2695,7 @@ pub async fn run_acp_client_over_pipe(
                     // about to rehydrate, so the registry row for the
                     // resumed sid carries `pane_session_id = <this
                     // pane's GUID>` and cross-helper Focus actions
-                    // (F2 Enter on the resumed row in a sibling
+                    // (session management Enter on the resumed row in a sibling
                     // window's tab) can resolve to a real WT pane to
                     // focus. Without this the row appears live but
                     // pane_session_id stays None, and the focus
@@ -3010,23 +3087,22 @@ async fn run_inner(
     // process without orphaning the old one.
     let (kill_req_tx, kill_req_rx) = tokio::sync::oneshot::channel::<()>();
     let mut kill_req_tx = Some(kill_req_tx);
-    let child_probe = startup_probe.clone();
     tokio::task::spawn_local(async move {
         let mut kill_req_rx = kill_req_rx;
         tokio::select! {
             _ = &mut kill_req_rx => {
                 if let Err(e) = child.kill().await {
-                    child_probe.log(&format!("Agent kill failed: {}", e));
+                    tracing::warn!(target: "acp", error = %e, "agent kill failed (restart)");
                 } else {
-                    child_probe.log("Agent process killed (restart)");
+                    tracing::info!(target: "acp", "agent process killed (restart)");
                 }
                 // Reap to avoid zombies on Unix; on Windows it's a no-op.
                 let _ = child.wait().await;
             }
             status = child.wait() => {
                 match status {
-                    Ok(s) => child_probe.log(&format!("Agent process exited: {}", s)),
-                    Err(e) => child_probe.log(&format!("Agent wait failed: {}", e)),
+                    Ok(s) => tracing::info!(target: "acp", ?s, "agent process exited"),
+                    Err(e) => tracing::warn!(target: "acp", error = %e, "agent wait failed"),
                 }
             }
         }
@@ -3051,8 +3127,9 @@ async fn run_inner(
     tokio::task::spawn_local(async move {
         io_probe.log("ACP handle_io task started");
         if let Err(e) = handle_io.await {
-            io_probe.log(&format!("ACP handle_io failed: {:#}", e));
-            eprintln!("ACP I/O error: {:#}", e);
+            // I/O loop ending with an error means the ACP connection to the
+            // agent CLI is dead — connection-fatal, log at warn (ships).
+            tracing::warn!(target: "acp", error = %format!("{:#}", e), "ACP I/O loop failed");
         } else {
             io_probe.log("ACP handle_io completed");
         }
@@ -3083,6 +3160,13 @@ async fn run_inner(
     )
     .await
     .map_err(|_| {
+        tracing::error!(
+            target: "acp",
+            step = "acp_initialize",
+            timeout_secs = init_timeout_secs,
+            agent = %agent_label,
+            "ACP initialize timed out — agent CLI did not respond"
+        );
         anyhow::anyhow!(
             "ACP initialize timed out after {} s — '{}' did not respond. \
              First-run npx adapters download ~5MB; check network. \
@@ -3092,7 +3176,10 @@ async fn run_inner(
             agent_label
         )
     })?
-    .map_err(|e| anyhow::anyhow!("initialize failed: {}", e))?;
+    .map_err(|e| {
+        tracing::error!(target: "acp", step = "acp_initialize", error = %e, "ACP initialize failed");
+        anyhow::anyhow!("initialize failed: {}", e)
+    })?;
 
     // Log the agent's initialize response for debugging
     startup_probe.log(&format!("Agent init response received: {:?}", init_resp));
@@ -4004,7 +4091,7 @@ mod tests {
     /// `session/load` path must inject `_meta.wta.pane_session_id`
     /// alongside the request so master's `SessionInfo.pane_session_id`
     /// for the resumed sid points at THIS pane's GUID. Without the
-    /// binding the row in a sibling window's F2 list appears live but
+    /// binding the row in a sibling window's session management list appears live but
     /// `decide_enter_action` returns `NotResumable { LiveWithoutPane }`
     /// and the user sees "Cannot focus session …: it appears live but
     /// no pane GUID is bound yet."

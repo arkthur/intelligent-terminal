@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Intelligent Terminal-ಗೆ ಸ್ವಾಗತ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>ಇಂಟೆಲಿಜೆಂಟ್ ಟರ್ಮಿನಲ್-ಗೆ ಸ್ವಾಗತ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>ದೋಷಗಳನ್ನು ವಿವರಿಸಲು, ಆಜ್ಞೆಗಳನ್ನು ಡ್ರಾಫ್ಟ್ ಮಾಡಲು ಮತ್ತು ಕಾರ್ಯಗಳನ್ನು ಅನ್‌ಬ್ಲಾಕ್ ಮಾಡಲು ಸಹಾಯ ಮಾಡಲು ನಿಮ್ಮ ಅಂತರ್ನಿರ್ಮಿತ ಸಹಾಯಕವನ್ನು ಹೊಂದಿಸಿ, ನೀವು ಕೆಲಸ ಮಾಡುವ ಸ್ಥಳದಲ್ಲಿಯೇ. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Intelligent Terminal ಕುರಿತು ಇನ್ನಷ್ಟು ತಿಳಿಯಿರಿ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>ಇಂಟೆಲಿಜೆಂಟ್ ಟರ್ಮಿನಲ್ ಕುರಿತು ಇನ್ನಷ್ಟು ತಿಳಿಯಿರಿ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>ನಿಮ್ಮ ಅಂತರ್ನಿರ್ಮಿತ AI ಏಜೆಂಟ್‌ನೊಂದಿಗೆ ಪ್ರವಾಹದಲ್ಲಿ ಇರಿ</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Intelligent Terminal-ಗೆ ಸ್ವಾಗತ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>ಇಂಟೆಲಿಜೆಂಟ್ ಟರ್ಮಿನಲ್-ಗೆ ಸ್ವಾಗತ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>ಈಗ ಏನನ್ನು ಹೊಂದಿಸಬೇಕೆಂದು ಆಯ್ಕೆಮಾಡಿ. ನೀವು ಇವುಗಳನ್ನು ಯಾವುದೇ ಸಮಯದಲ್ಲಿ ಬದಲಾಯಿಸಬಹುಡು. </value>
@@ -181,9 +181,8 @@
     <value>ಸೆಶನ್ ನಿರ್ವಹಣೆ</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Intelligent Terminal ಗೆ ನಿಮ್ಮ ಚಾಲನೆಯಲ್ಲಿರುವ ಅಥವಾ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳ ಸ್ಥಿತಿಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಲು ಅನುಮತಿ ನೀಡಿ.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <value>ಇಂಟೆಲಿಜೆಂಟ್ ಟರ್ಮಿನಲ್ ಗೆ ನಿಮ್ಮ ಚಾಲನೆಯಲ್ಲಿರುವ ಅಥವಾ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳ ಸ್ಥಿತಿಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಲು ಅನುಮತಿ ನೀಡಿ.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ ಇದನ್ನು ಸಕ್ರಿಯಗೊಳಿಸುವುದರಿಂದ ನಿಮ್ಮ ಏಜೆಂಟ್‌ಗಳಾದ್ಯಂತ ಸೆಶನ್‌ಗಳನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಲು ಇಂಟಿಗ್ರೇಶನ್ hooks ಇನ್‌ಸ್ಟಾಲ್ ಆಗುತ್ತವೆ.</value>
@@ -248,8 +247,16 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>ದೋಷವನ್ನು ಸರಿಪಡಿಸಲು {0} ಕ್ಲಿಕ್ ಮಾಡಿ</value>
+    <value>ಸೂಚಿತ ಪರಿಹಾರವನ್ನು ಏಜೆಂಟ್‌ಗೆ ಕೇಳಲು {0} ಅನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ ಅಥವಾ ಒತ್ತಿರಿ</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>ಸರಿಪಡಿಸುವಿಕೆ ಸಿದ್ಧ. ಪರಿಶೀಲಿಸಲು {0} ಒತ್ತಿರಿ</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>ಸೂಚಿತ ಪರಿಹಾರವನ್ನು ಪರಿಶೀಲಿಸಲು ಏಜೆಂಟ್ ಫಲಕವನ್ನು ತೆರೆಯಿರಿ</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>ದೋಷ ಪತ್ತೆಯಾಗಿದೆ. AI ಏಜೆಂಟ್‌ಗೆ ವಿಶ್ಲೇಷಿಸಿ ಪರಿಹಾರ ಸೂಚಿಸಲು ಕೇಳಲು {0} ಅನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ ಅಥವಾ ಒತ್ತಿರಿ.</value>

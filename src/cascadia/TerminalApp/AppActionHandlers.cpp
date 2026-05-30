@@ -1707,6 +1707,14 @@ namespace winrt::TerminalApp::implementation
         args.Handled(true);
     }
 
+    void TerminalPage::_HandleOpenBackgroundAgent(const IInspectable& /*sender*/,
+                                                  const ActionEventArgs& args)
+    {
+        OutputDebugStringW(L"[AgentPane] _HandleOpenBackgroundAgent called\n");
+        _OpenBackgroundAgentTab();
+        args.Handled(true);
+    }
+
     void TerminalPage::_HandleOpenAgentSessions(const IInspectable& /*sender*/,
                                                 const ActionEventArgs& args)
     {
@@ -1766,13 +1774,27 @@ namespace winrt::TerminalApp::implementation
         }
         using AS = winrt::TerminalApp::implementation::AgentPaneContent::AutofixState;
         const auto state = impl->GetAutofixState();
-        if (state == AS::Armed)
+        // Open or focus the active tab's agent pane (shared by Detected and
+        // Review). Opening it makes the helper observe pane_open=true and
+        // flip the bar to Idle on its own.
+        const auto openAgentPaneForReview = [&]() {
+            const auto agentPane = activeTab->FindAgentPane();
+            if (agentPane && !agentPane->IsHidden())
+            {
+                if (agentContent.IsSessionsView())
+                {
+                    _RequestAgentStateForTab(activeTab, "chat", std::nullopt);
+                }
+            }
+            else
+            {
+                _OpenOrReuseAgentPane(/*intoSessionsView*/ false, L"Autofix");
+            }
+        };
+        if (state == AS::Detected)
         {
-            _TriggerAutofix(activeTab, L"Hotkey");
-            args.Handled(true);
-        }
-        else if (state == AS::Detected)
-        {
+            // "Ask the agent for a fix": open the pane, then fire the LLM.
+            openAgentPaneForReview();
             Json::Value evt;
             evt["type"] = "event";
             evt["method"] = "autofix_execute_from_detected";
@@ -1785,6 +1807,12 @@ namespace winrt::TerminalApp::implementation
             ProtocolVtSequenceReceived.raise(
                 *this,
                 winrt::to_hstring(Json::writeString(wb, evt)));
+            args.Handled(true);
+        }
+        else if (state == AS::Review)
+        {
+            // Result is ready in the pane chat — just open it for review.
+            openAgentPaneForReview();
             args.Handled(true);
         }
     }
@@ -1802,14 +1830,15 @@ namespace winrt::TerminalApp::implementation
         {
             co_return;
         }
-        wil::unique_cotaskmem_string localAppDataRaw;
-        if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppDataRaw)) || !localAppDataRaw)
+        const std::filesystem::path desktop{ desktopRaw.get() };
+        // Archive the WTA log *root* (`...\logs`), not the per-version subdir,
+        // so the bug report captures every version's logs plus the flat
+        // hook-trace.log — the whole `logs\` tree is tarred recursively below.
+        const std::filesystem::path logsDir = ::IntelligentTerminal::LogDir();
+        if (logsDir.empty())
         {
             co_return;
         }
-
-        const std::filesystem::path desktop{ desktopRaw.get() };
-        const std::filesystem::path logsDir = std::filesystem::path(localAppDataRaw.get()) / L"IntelligentTerminal" / L"logs";
 
         // create_directories is a no-op if the path already exists. We do this so
         // tar always has *something* to archive, even on a brand-new install where

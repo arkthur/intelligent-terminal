@@ -1,6 +1,6 @@
 # Títulos da tela de configuração
-# {Locked="Intelligent Terminal"} - nome do produto, não traduzir
-setup.title.first_run: "Bem-vindo ao Intelligent Terminal!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Bem-vindo ao Terminal Inteligente!"
 setup.title.agent_missing: "Agente não encontrado"
 setup.title.agent_error: "Falha na conexão com o agente"
 setup.title.switch_agent: "Trocar agente"
@@ -8,13 +8,13 @@ setup.title.not_available: "Agente não disponível"
 setup.title.sign_in: "Login necessário"
 
 # %{agent} é substituído pelo nome de exibição do agente em tempo de execução.
-setup.subtitle.copilot_missing: "Seu agente \"%{agent}\" não está instalado. Siga as etapas abaixo para instalá-lo. Para trocar de agente, vá para Configurações do Intelligent Terminal > Agente."
-setup.subtitle.agent_missing: "Seu agente \"%{agent}\" não está instalado. Reinstale-o manualmente e tente novamente. Para trocar de agente, vá para Configurações do Intelligent Terminal > Agente."
-setup.subtitle.copilot_auth: "Seu agente \"%{agent}\" requer autenticação. Siga as etapas abaixo para entrar. Para trocar de agente, vá para Configurações do Intelligent Terminal > Agente."
-setup.subtitle.agent_auth: "Seu agente \"%{agent}\" requer autenticação. Entre pelo agente e selecione \"Já entrei\" abaixo. Para trocar de agente, vá para Configurações do Intelligent Terminal > Agente."
+setup.subtitle.copilot_missing: "Seu agente \"%{agent}\" não está instalado. Siga as etapas abaixo para instalá-lo. Para trocar de agente, vá para Configurações do Terminal Inteligente > Agente."
+setup.subtitle.agent_missing: "Seu agente \"%{agent}\" não está instalado. Reinstale-o manualmente e tente novamente. Para trocar de agente, vá para Configurações do Terminal Inteligente > Agente."
+setup.subtitle.copilot_auth: "Seu agente \"%{agent}\" requer autenticação. Siga as etapas abaixo para entrar. Para trocar de agente, vá para Configurações do Terminal Inteligente > Agente."
+setup.subtitle.agent_auth: "Seu agente \"%{agent}\" requer autenticação. Entre pelo agente e selecione \"Já entrei\" abaixo. Para trocar de agente, vá para Configurações do Terminal Inteligente > Agente."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Escolha a CLI de agente padrão que você deseja usar no Intelligent Terminal. Você pode"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Escolha a CLI de agente padrão que você deseja usar no Terminal Inteligente. Você pode"
 setup.description.fre_line2: "acessar as configurações para configurar e preparar seu espaço de trabalho."
 
 setup.option.install: "Instalar %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Pressione Enter para entrar, Esc para voltar"  # {Locked="E
 
 # ── Visualização do chat (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Pensando…"
-# {Locked="Intelligent Terminal"} - nome do produto, não traduzir
-chat.welcome_title: "Bem-vindo ao Intelligent Terminal!"
-chat.welcome_disclaimer: "O Intelligent Terminal usa IA. Verifique se há erros."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Bem-vindo ao Terminal Inteligente!"
+chat.welcome_disclaimer: "O Terminal Inteligente usa IA. Verifique se há erros."
 chat.plan_header: "Plano:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -119,6 +119,8 @@ layout.welcome_hint: "  (Ctrl+Shift+. para mostrar/ocultar o painel do agente �
 # ── Estado da conexão ────────────────────────────────────────────────────────────
 connection.starting: "Iniciando agente..."
 connection.reconnecting: "Reconectando..."
+connection.connecting_activity: "Conectando ao agente…"
+connection.lost: "A conexão com o agente foi perdida. Digite /restart para reconectar."  # {Locked="/restart"}
 
 # ── Mensagens do sistema (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "Cancelado."
