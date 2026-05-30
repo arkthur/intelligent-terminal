@@ -1961,6 +1961,16 @@ namespace winrt::TerminalApp::implementation
 
         co_await winrt::resume_background();
 
+        // Acquire a strong reference *before* touching any member state so a
+        // page destroyed while this coroutine was queued doesn't leave us
+        // chasing freed members. Mirrors the pattern in
+        // _ReconcileShellIntegration.
+        auto self = weak.get();
+        if (!self)
+        {
+            co_return;
+        }
+
         namespace SI = ::Microsoft::Terminal::ShellIntegration;
 
         // Publish "user clicked Install -> desired = true" BEFORE attempting
