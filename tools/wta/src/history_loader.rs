@@ -2,7 +2,7 @@
 //
 // Discover historical CLI agent sessions by scanning each CLI's on-disk
 // log/state layout. Used to seed the AgentSessionRegistry with `Historical`
-// entries on App startup so users can resume past sessions from F2.
+// entries on App startup so users can resume past sessions from session management view.
 //
 // Layouts (verified 2026-05):
 //   Copilot:  ~/.copilot/session-state/<UUID>/{workspace.yaml,events.jsonl}
@@ -434,7 +434,7 @@ fn load_copilot(home: &Path) -> Vec<AgentSession> {
         // process eagerly creates `~/.copilot/session-state/<UUID>/workspace.yaml`
         // even before the user types anything. If the user never interacts,
         // no `events.jsonl` is ever written. These dirs would otherwise
-        // appear at the very top of F2 after each WT restart (most-recent
+        // appear at the very top of session management view after each WT restart (most-recent
         // last_activity), masking real historical sessions. Treat the
         // existence of a non-empty `events.jsonl` as the marker for "user
         // actually did something here".
@@ -517,7 +517,7 @@ fn load_claude(home: &Path) -> Vec<AgentSession> {
             // `claude --resume <id>` rejects it with
             // `No conversation found with session ID: <id>`. Mirror the
             // Copilot ghost-session filter so these rows never appear in
-            // the F2 view, where Enter would dead-end with that error.
+            // the session management view, where Enter would dead-end with that error.
             if !claude_session_has_real_content(&path) { continue; }
             let last_activity = path.metadata().and_then(|m| m.modified()).ok()
                 .unwrap_or(SystemTime::UNIX_EPOCH);
@@ -575,7 +575,7 @@ fn load_gemini(home: &Path) -> Vec<AgentSession> {
             // Drop phantom Gemini sessions: opening `gemini` and
             // exiting without exchanging a turn leaves a JSONL on
             // disk containing only the session header line(s) —
-            // pressing Enter on the row in F2 would launch
+            // pressing Enter on the row in session management view would launch
             // `gemini --resume <id>` which Gemini rejects (and the
             // synthetic title `gemini <8-char>` from `short_id`
             // exposes the lack of content anyway). Mirrors the
@@ -963,7 +963,7 @@ fn read_cwd_from_claude_jsonl(path: &Path) -> Option<PathBuf> {
 /// only `permission-mode`, `file-history-snapshot`, `last-prompt`, and
 /// meta/slash-command user records is rejected with
 /// `No conversation found with session ID: <id>`. Filtering those
-/// "phantom" JSONL files out of the loader prevents Enter on an F2 row
+/// "phantom" JSONL files out of the loader prevents Enter on a session management row
 /// from dead-ending in that error.
 ///
 /// Streams the JSONL line-by-line (bounded by [`CLASSIFY_SCAN_BYTES_CAP`])
@@ -1244,13 +1244,13 @@ mod tests {
 
     #[test]
     fn copilot_loader_skips_ephemeral_session_with_no_events() {
-        // Reproduces the "ghost session at top of F2" bug: every time WT
+        // Reproduces the "ghost session at top of session management view" bug: every time WT
         // (or wta itself) spawns a Copilot CLI process — e.g. as the
         // back-end for an agent pane or for a `?prompt` delegate — that
         // process eagerly creates `~/.copilot/session-state/<UUID>/workspace.yaml`
         // (171 bytes of stub metadata) before the user types anything.
         // If the user never interacts, no `events.jsonl` is ever written.
-        // These dirs would otherwise dominate the top of F2 (most-recent
+        // These dirs would otherwise dominate the top of session management view (most-recent
         // last_activity) on the next WT restart. Loader must skip them.
         let home = tmp_root("copilot-ghost");
         let base = home.join(".copilot").join("session-state");
@@ -1362,7 +1362,7 @@ mod tests {
         // caveat, the slash-command echo + its captured stdout, and a
         // last-prompt footer. `claude --resume <id>` rejects these with
         // `No conversation found with session ID: <id>`, so the row
-        // would dead-end on Enter in the F2 session-management view.
+        // would dead-end on Enter in the session management view.
         // Loader must skip them; only the real session should appear.
         let home = tmp_root("claude-phantom");
         let projects = home.join(".claude").join("projects");
@@ -1430,7 +1430,7 @@ mod tests {
         // (TITLE_TAIL_BYTES = 64 KB) could be entirely consumed by a
         // single such record, never reaching the first real
         // user/assistant message — misclassifying a genuinely
-        // resumable session as a phantom and pruning it from F2.
+        // resumable session as a phantom and pruning it from session management view.
         //
         // The streaming refactor (`stream_jsonl_lines` capped at
         // `CLASSIFY_SCAN_BYTES_CAP`) reads line-by-line and
@@ -1477,7 +1477,7 @@ mod tests {
         // between `read_dir` and the classify scan), the classifier
         // must return `true` so the caller keeps the row. Returning
         // `false` would let transient I/O failures silently drop
-        // real Claude / Gemini sessions out of F2.
+        // real Claude / Gemini sessions out of session management view.
         //
         // We exercise the I/O-error branch by pointing at paths
         // that don't exist — `fs::File::open` fails the same way it
@@ -1643,7 +1643,7 @@ mod tests {
         // common shape is ACP-launched `claude` that the user exits
         // without typing — Claude writes no JSONL at all). This is
         // exactly the path the lenient probe gets wrong, leaving the
-        // row stuck Ended in F2.
+        // row stuck Ended in session management view.
         use crate::agent_sessions::CliSource;
         let home = tmp_root("strict-probe-missing");
         for cli in [CliSource::Claude, CliSource::Copilot, CliSource::Gemini] {
@@ -1791,7 +1791,7 @@ mod tests {
         // opening `gemini` and exiting immediately leaves a JSONL
         // on disk containing only the session header line (228 bytes)
         // — or sometimes two duplicate header lines (456 bytes). The
-        // loader used to surface these in F2 with the synthetic title
+        // loader used to surface these in session management view with the synthetic title
         // `gemini <8-char>` (because `first_user_text_jsonl` returned
         // None), and Enter on them would launch
         // `gemini --resume <id>` and dead-end.

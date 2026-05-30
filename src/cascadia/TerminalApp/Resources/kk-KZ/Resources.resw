@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Intelligent Terminal-ға қош келдіңіз</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Зияткер терминал-ға қош келдіңіз</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Қателерді түсіндіруге, пәрмендер жобалауға және тұрып қалған тапсырмаларды жұмыс орныңызда шешуге көмектесетін кірістірілген көмекшіні орнатыңыз. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Intelligent Terminal туралы толығырақ біліңіз</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Зияткер терминал туралы толығырақ біліңіз</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Кірістірілген AI агентімен жұмыс ырғағын сақтаңыз</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Intelligent Terminal-ға қош келдіңіз</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Зияткер терминал-ға қош келдіңіз</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Қазір нені реттегіңіз келетінін таңдаңыз. Бұларды кез келген уақытта өзгертуге болады. </value>
@@ -181,8 +181,8 @@
     <value>Сеансты басқару</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Intelligent Terminal-ға жұмыс істеп тұрған немесе белсенді агенттеріңіздің күйін бақылауға рұқсат беріңіз.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Зияткер терминал-ға жұмыс істеп тұрған немесе белсенді агенттеріңіздің күйін бақылауға рұқсат беріңіз.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Мұны қосу агенттеріңіз бойынша сеанстарды бақылау үшін интеграция hooks орнатады.</value>
@@ -247,8 +247,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Қатені түзету үшін {0} түймесін басыңыз</value>
+    <value>Агенттен ұсынылған түзетуді сұрау үшін {0} түймесін шертіңіз немесе басыңыз</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Түзету дайын. Қарап шығу үшін {0} түймесін басыңыз</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Ұсынылған түзетуді қарап шығу үшін агент тақтасын ашыңыз</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Қате анықталды. AI агентіне диагностикалауды және түзету ұсынуды сұрау үшін {0} түймесін шертіңіз немесе басыңыз.</value>

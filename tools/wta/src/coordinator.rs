@@ -431,7 +431,7 @@ async fn execute_choice(
                     None => format!("Opening {}.", target_label),
                 }));
                 let commandline = runtime
-                    .map(|runtime| build_delegate_launch_commandline(runtime, input))
+                    .map(|runtime| build_delegate_launch_commandline(runtime, Some(input)))
                     .transpose()?;
                 let pane_id = match target {
                     OpenTarget::Tab => {
@@ -660,12 +660,22 @@ pub fn build_delegate_commandline(
     runtime: &DelegateAgentRuntime,
     input: &str,
 ) -> Result<String> {
-    build_delegate_launch_commandline(runtime, input)
+    build_delegate_launch_commandline(runtime, Some(input))
+}
+
+/// Build the commandline for launching a delegate agent interactively, with
+/// no startup prompt. The agent's own CLI/TUI fills the new tab and waits for
+/// user input. Used by the "open background agent" hotkey (Alt+Shift+B), the
+/// no-prompt sibling of `?<prompt>` delegation.
+pub fn build_delegate_interactive_commandline(
+    runtime: &DelegateAgentRuntime,
+) -> Result<String> {
+    build_delegate_launch_commandline(runtime, None)
 }
 
 fn build_delegate_launch_commandline(
     runtime: &DelegateAgentRuntime,
-    input: &str,
+    input: Option<&str>,
 ) -> Result<String> {
     let commandline = runtime.commandline.trim();
     if commandline.is_empty() {
@@ -689,12 +699,17 @@ fn build_delegate_launch_commandline(
     };
     let resolved_ref = with_model.as_str();
 
-    let raw = match runtime.prompt_delivery {
-        DelegatePromptDelivery::LaunchThenSend => resolved_ref.to_string(),
-        DelegatePromptDelivery::LaunchWithStartupPrompt => {
-            ensure_non_empty("input", input)?;
-            build_delegate_startup_prompt_commandline(resolved_ref, input)?
-        }
+    let raw = match input {
+        // Interactive (no prompt): launch the bare agent CLI regardless of
+        // the configured prompt-delivery mode.
+        None => resolved_ref.to_string(),
+        Some(input) => match runtime.prompt_delivery {
+            DelegatePromptDelivery::LaunchThenSend => resolved_ref.to_string(),
+            DelegatePromptDelivery::LaunchWithStartupPrompt => {
+                ensure_non_empty("input", input)?;
+                build_delegate_startup_prompt_commandline(resolved_ref, input)?
+            }
+        },
     };
     // .cmd/.bat shims (e.g. npm-installed CLIs) can't be launched directly
     // via CreateProcess — wrap with cmd /c so the command interpreter finds them.
@@ -1051,7 +1066,8 @@ fn extract_balanced_json_object(text: &str) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_delegate_launch_commandline, default_delegate_agent_runtimes, parse_autofix_response,
+        build_delegate_interactive_commandline, build_delegate_launch_commandline,
+        default_delegate_agent_runtimes, parse_autofix_response,
         parse_recommendation_set, resolve_created_pane_id,
         validate_recommendation_set_for_coordinator_target, AutofixDecision,
         DelegatePromptDelivery, OpenTarget, RecommendedAction,
@@ -1080,7 +1096,7 @@ mod tests {
             .expect("copilot runtime should exist");
 
         let commandline =
-            build_delegate_launch_commandline(&runtime, "Fix the build and report back").unwrap();
+            build_delegate_launch_commandline(&runtime, Some("Fix the build and report back")).unwrap();
 
         assert!(!commandline.contains("--model"));
         // May be wrapped as "cmd /c copilot ..." if copilot.exe isn't on PATH.
@@ -1144,7 +1160,7 @@ mod tests {
 
         let commandline = build_delegate_launch_commandline(
             &runtime,
-            "Fix the Rust build error and run cargo build",
+            Some("Fix the Rust build error and run cargo build"),
         )
         .unwrap();
 
@@ -1152,6 +1168,27 @@ mod tests {
         assert!(commandline.contains("copilot"));
         assert!(commandline.contains("--model claude-haiku-4.5"));
         assert!(commandline.contains("-i \"Fix the Rust build error and run cargo build\""));
+    }
+
+    #[test]
+    fn delegate_interactive_commandline_omits_startup_prompt() {
+        let runtime = default_delegate_agent_runtimes(
+            Some("copilot --model claude-haiku-4.5"),
+            Some("copilot --acp --stdio --model gpt-5.2"),
+            None,
+        )
+        .into_iter()
+        .find(|runtime| runtime.id == "copilot")
+        .expect("copilot runtime should exist");
+
+        let commandline = build_delegate_interactive_commandline(&runtime).unwrap();
+
+        // May be wrapped as "cmd /c copilot ..." if copilot.exe isn't on PATH.
+        assert!(commandline.contains("copilot"));
+        // Model is still applied for the interactive launch.
+        assert!(commandline.contains("--model claude-haiku-4.5"));
+        // No startup-prompt flag is appended when there's no prompt.
+        assert!(!commandline.contains("-i "));
     }
 
     #[test]
@@ -1168,7 +1205,7 @@ mod tests {
         .expect("copilot runtime should exist");
 
         let commandline =
-            build_delegate_launch_commandline(&runtime, "Inspect the repo and summarize").unwrap();
+            build_delegate_launch_commandline(&runtime, Some("Inspect the repo and summarize")).unwrap();
 
         assert_eq!(
             commandline,

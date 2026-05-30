@@ -55,7 +55,7 @@ WindowEmperor (one WT process, N AppHosts/windows)
   +-- AppHost[] → TerminalWindow → TerminalPage
         |-- CommandPalette (? / & prefixes)
         |-- Per-tab agent pane: ConptyConnection ───► wta-helper (conpty child)
-        |                                            (one helper per agent pane)
+        |                                            (one helper per tab, pre-warmed)
         +-- Protocol bridge (TerminalPage.Protocol.cpp)
 
 External: Agent → wtcli → COM (IProtocolServer) → TerminalProtocolComServer → WindowEmperor
@@ -70,6 +70,19 @@ helper events (`agent_state_changed`, `agent_status`, `autofix_state`,
 `close_agent_pane`) carry `tab_id` so C++ can route via
 `_FindTabByStableId` instead of fanning out across every pane / window.
 See `doc/specs/Multi-window-agent-pane.md` §7.
+
+**Helper is pre-warmed per tab.** Every new tab spawns a stashed agent
+pane on creation (`_InitializeTab` → `_AutoCreateHiddenAgentPaneShared`
+with `autoStash=true`, `--start-stashed`), so the helper is running and
+its ACP session connects in the background from the start — even if the
+user never opens the pane. This is what lets autofix work on a tab the
+user hasn't interacted with. The agent CLI itself is spawned once by
+`wta-master` at startup and shared across all helpers (each helper's
+`initialize` is a cached replay; only `session/new` round-trips to the
+CLI). `--start-stashed` only seeds `pane_open=false`; it does not defer
+the handshake. The pre-warm is skipped when wta is unavailable, GPO
+blocks all agents, or the tab arrived with an agent pane via cross-window
+drag-in (`agentLeavesSeen > 0`). See `TabManagement.cpp:366`.
 
 **Agent pane toggle = stash, not destroy.** `Ctrl+Shift+.` /
 `Ctrl+Shift+/` / the bottom-bar button toggle via
@@ -101,30 +114,69 @@ Detects command failures in other panes and auto-suggests fixes via the agent.
 
 **Pipeline**: Shell emits `OSC 133;D;<exit_code>` → `TerminalPage` raises `ProtocolVtSequenceReceived` → COM server forwards to clients → WTA (via `wtcli listen --json`) classifies → `maybe_trigger_autofix()`.
 
-**Requirements**: PowerShell shell integration (OSC 133 marks), agent pane open, `wtcli` on PATH.
+**Requirements**: PowerShell shell integration (OSC 133 marks), a helper
+whose ACP session has reached `Connected`, `wtcli` on PATH. The pane does
+**not** need to be visible — the per-tab pre-warmed helper (see
+Architecture) makes autofix work on a stashed pane. But a failure that
+lands before the helper's session connects (cold start of master/agent
+CLI, in-flight `session/new`, or a `Failed` agent) is **dropped**:
+`trigger_autofix_inner` early-returns when `state != Connected`
+(`app.rs:6820`). The bottom-bar notification banner still shows; only the
+autofix pill / LLM call is skipped, and the failure is not re-triggered
+once the session later connects.
 
 **Key code**: `tools/wta/src/app.rs` (`classify_wt_event`, `maybe_trigger_autofix`), `TerminalPage.cpp:2650-2740` (event handlers), `TerminalProtocolComServer.cpp` (`_ensurePageEventsRegistered`).
 
 **Diag log**: `wta-ensure-host.log` in the WTA log directory — shows event flow, classification, and autofix triggers.
 
-## Logs
+## Logs & runtime data layout
 
-WTA writes structured logs to:
+WTA runtime data lives under the **package-private** store, split by lifetime
+into two roots (both resolved in `runtime_paths.rs`, both falling back to the
+same bare path when the process has no package identity):
 
 ```
-C:\Users\<user>\AppData\Local\IntelligentTerminal\logs\
+# Packaged (every production wta process — helper is a conpty child of the
+# packaged WindowsTerminal.exe, master is spawned in-package by SharedWta):
+
+  …\Packages\<PackageFamilyName>\LocalState\IntelligentTerminal\   <- STATE root
+      prompts\                      (prompt overrides)             intelligent_terminal_root()
+      agent-pane-sessions.jsonl     (session origin index)
+      master-pipe.txt               (helper↔master rendezvous)
+
+  …\Packages\<PackageFamilyName>\LocalCache\Local\IntelligentTerminal\  <- LOCAL/cache root
+      logs\                         (all wta-*.log files)          intelligent_terminal_local_root()
+      hook-bundle-staging\ …        (hook-installer staging)
+
+# Unpackaged (dev builds run straight out of the Cargo target dir, tests):
+# BOTH roots collapse to the legacy bare %LOCALAPPDATA%\IntelligentTerminal\.
 ```
 
-The path is built off the `LOCALAPPDATA` env var, which is **not** redirected
-into the package sandbox on Win10/11 (the env-var virtualization that
-hides the regular LOCALAPPDATA was a UWP-era behavior; current Windows
-keeps the env var pointing at the real `\AppData\Local\`). Packaged and
-unpackaged wta processes therefore share the same log directory.
+Rationale for the split: **State** = persistent, must-survive, package-private
+data → `LocalState` (alongside the WT app's own `settings.json` / `state.json`).
+**Local/cache** = transient, regenerable diagnostics → `LocalCache\Local`, the
+cache store that doesn't roam / back up.
 
-The sandbox path
-`%LOCALAPPDATA%\Packages\IntelligentTerminal_<id>\LocalCache\Local\IntelligentTerminal\logs`
-exists as a transparent virtualization of the same directory (NTFS reparse
-points) — both paths return the same files.
+Both roots are package-private — removed on uninstall and isolated between the
+dev-sideload family (`IntelligentTerminal_rd9vj3e6a2mbr`) and the store family
+(`Microsoft.IntelligentTerminal_8wekyb3d8bbwe`) — instead of sharing one bare
+`%LOCALAPPDATA%\IntelligentTerminal` directory. The family name comes from
+`GetCurrentPackageFamilyName` (windows-sys); the `Packages\<pfn>\LocalState` and
+`…\LocalCache\Local` paths are what WinRT `ApplicationData.Current.LocalFolder`
+/ `LocalCacheFolder` resolve to, so we construct them directly rather than
+pulling in the WinRT projection.
+
+**Other writers of the same dirs** (kept in lock-step with the Rust roots):
+- C++ `AgentPaneLog.h` (`_intelligentTerminalLogDir()`) — `wta-agent-pane.log`
+  and the bug-report-zip action, both → the LocalCache\Local `logs\`.
+- PowerShell hooks (`send-event.ps1`) — `hook-trace.log` → the dir handed down
+  by wta-master via the `WTA_HOOK_LOG_DIR` env var (PowerShell can't resolve the
+  package-private path itself).
+
+> Earlier builds wrote everything to the bare `%LOCALAPPDATA%\IntelligentTerminal`
+> regardless of identity (the `LOCALAPPDATA` env var is **not** redirected into
+> the sandbox on Win10/11). There is no migration — old data is left in place
+> and simply ignored.
 
 Log level is controlled by `WTA_LOG` env var (default: `info`; set `debug`
 for the noisy traces).

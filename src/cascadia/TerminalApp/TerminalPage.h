@@ -355,8 +355,6 @@ namespace winrt::TerminalApp::implementation
         void _WireAgentPaneEvents(const winrt::TerminalApp::AgentPaneContent& content,
                                   const winrt::com_ptr<Tab>& ownerTab);
 
-        void _TriggerAutofix(const winrt::com_ptr<Tab>& ownerTab, const wchar_t* triggerSource);
-
         // Hot-reload of agent/model settings. Snapshot is captured on first
         // SetSettings and after every rebuild; a diff drives teardown/rebuild
         // of the agent pane.
@@ -384,7 +382,7 @@ namespace winrt::TerminalApp::implementation
         // _OnTabSelectionChanged once a terminal tab is active.
         bool _pendingAgentRebuild{ false };
 
-        // Plan-C resume-into-new-tab bookkeeping. When the F2 session
+        // Plan-C resume-into-new-tab bookkeeping. When the session
         // manager's Enter handler on a Historical/Ended row creates a
         // new tab, it stashes the requested session id + cwd here keyed
         // by the new tab's StableId. `OnAgentStateChanged` consumes the
@@ -432,7 +430,7 @@ namespace winrt::TerminalApp::implementation
         // resume hint down to the helper: when non-empty, the spawned wta
         // process gets `--initial-load-session-id` (+ `--initial-load-cwd`)
         // on its cmdline and immediately calls `session/load` instead of
-        // creating a fresh session. Used by the F2 "Enter on Historical /
+        // creating a fresh session. Used by the "Enter on Historical /
         // Ended row" path to bundle spawn + resume atomically (replacing
         // the prior race-prone "spawn, then broadcast `load_session` VT"
         // design).
@@ -677,6 +675,8 @@ namespace winrt::TerminalApp::implementation
         winrt::hstring _DetectWtaPath() const;
         std::optional<uint32_t> _FindSourceOfAgentPaneId(const std::shared_ptr<Pane>& root);
         void _DelegatePromptToAgent(const winrt::hstring& prompt);
+        void _OpenBackgroundAgentTab();
+        void _LaunchDelegate(const std::optional<winrt::hstring>& prompt);
 
         // Note (Phase 5): the per-pane wta-process watch + Job Object members
         // and their setup/teardown methods were removed when the legacy

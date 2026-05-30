@@ -1,4 +1,4 @@
-//! Pure-function core of F2 Enter / Shift+Enter routing for the agent
+//! Pure-function core of session management Enter / Shift+Enter routing for the agent
 //! session manager.
 //!
 //! `decide_enter_action` is a closed, side-effect-free mapping from a
@@ -45,7 +45,7 @@ use crate::agent_sessions::{AgentKey, CliSource, SessionOrigin};
 /// one-dimensional `AgentStatus` so callers can express "session is
 /// alive somewhere" independently of activity (Idle/Working/...).
 ///
-/// This enum is the input we *want* the F2 view to feed in; for now,
+/// This enum is the input we *want* the session management view to feed in; for now,
 /// the caller can collapse `AgentStatus` into it (see
 /// [`liveness_from_status`]). Once `agent_sessions::AgentSession` itself
 /// splits to activity + liveness fields, this becomes a direct copy.
