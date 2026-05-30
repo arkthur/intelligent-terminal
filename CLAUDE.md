@@ -129,6 +129,52 @@ once the session later connects.
 
 **Diag log**: `wta-ensure-host.log` in the WTA log directory — shows event flow, classification, and autofix triggers.
 
+## Hooks plugin auto-upgrade
+
+When IT is installed or upgraded, the bundled `wt-agent-hooks` plugin
+(`tools/wta/wt-agent-hooks/{copilot,claude,gemini-extension}/`) needs to
+re-land into any agent CLI the user already opted into (via Settings UI /
+FRE "Install hooks" or `wta hooks install`). This is handled silently by
+`agent_hooks_installer::upgrade_installed_hooks`, fired once per
+`wta-master` startup on a blocking-pool thread.
+
+**Trigger model — bundle version is the upgrade signal.** A tiny state
+file `<LocalCache>/IntelligentTerminal/hooks-upgrade-state.json` records
+the bundle version this wta process last saw per CLI. At startup we read
+each CLI's bundle `plugin.json` / `gemini-extension.json` (cheap, <5ms)
+and compare; if all match, we return immediately (no spawns, no IO
+beyond the cache compare). Only after the user installs / upgrades IT
+does the bundle version change → cache miss → per-CLI flow runs once,
+then the state file is rewritten and the fast path resumes.
+
+**Opt-in only.** Even on cache miss, CLIs that don't already have
+`wt-agent-hooks` installed are skipped. The auto-upgrade never installs
+into a CLI the user hasn't accepted. Disabled plugins are also skipped
+(`enabled: false` in Copilot's `config.json` / `claude plugin list`).
+
+**Per-CLI strategy.** Copilot and Claude use their `plugin update`
+subcommands; before invoking them we rewrite any stale marketplace
+`source.path` to the current bundle dir (Copilot: existing
+`cleanup_stale_copilot_marketplace`; Claude: new
+`cleanup_stale_claude_marketplace`). Gemini's `extensions update`
+silently returns `NOT_UPDATABLE` when the recorded install source no
+longer exists (typical after an MSIX version-dir bump), so we peek at
+`~/.gemini/extensions/wt-agent-hooks/.gemini-extension-install.json`
+first: if `type==local` AND `source` is still under the current bundle,
+run `extensions update` in place; otherwise fall back to
+uninstall+install while preserving the `isActive` flag.
+
+**Trigger-point caveat.** The agent CLI master spawns concurrently may
+already be past its plugin-load step by the time `plugin update` writes
+the new files — so the freshly upgraded hooks may not take effect until
+the next agent restart. Acceptable because blocking master startup on a
+Node-based `plugin update` (1-30s) would hurt every IT-upgrade boot.
+
+**Diag**: `wta-install-hooks.log` (existing) plus `target=agent_hooks`
++ `target={copilot,gemini}_hooks` trace events in
+`wta-main_master.log` show every per-CLI decision (`upgrade decision`
+log line carries `installed_version`, `bundle_version`, `action`).
+
 ## Logs & runtime data layout
 
 WTA runtime data lives under the **package-private** store, split by lifetime
@@ -147,6 +193,8 @@ same bare path when the process has no package identity):
   …\Packages\<PackageFamilyName>\LocalCache\Local\IntelligentTerminal\  <- LOCAL/cache root
       logs\                         (all wta-*.log files)          intelligent_terminal_local_root()
       hook-bundle-staging\ …        (hook-installer staging)
+      hooks-upgrade-state.json      (per-CLI bundle version cache for the
+                                     hooks auto-upgrade fast-path)
 
 # Unpackaged (dev builds run straight out of the Cargo target dir, tests):
 # BOTH roots collapse to the legacy bare %LOCALAPPDATA%\IntelligentTerminal\.

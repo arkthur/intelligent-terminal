@@ -1163,6 +1163,15 @@ pub async fn run_master_mode(cli: Cli, pipe_name: String) -> Result<()> {
         ));
     }
 
+    // Kick off the auto-upgrade check on a blocking-pool thread. Fire-and-
+    // forget — the agent CLI spawn below proceeds concurrently. Fast-path
+    // cache (see `agent_hooks_installer::upgrade_installed_hooks` doc) keeps
+    // the common no-upgrade case under ~10ms; only the first run after an
+    // IT install/upgrade does any per-CLI work. Caveat: when an upgrade is
+    // actually needed, the agent CLI process master is about to spawn may
+    // miss the new hooks until its next restart.
+    tokio::task::spawn_blocking(crate::agent_hooks_installer::upgrade_installed_hooks);
+
     let local_set = LocalSet::new();
     local_set
         .run_until(async move { run_master_loop(cli, pipe_name).await })
