@@ -122,9 +122,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ បានបរាជ័យក្នុងការតំឡើងការរួមបញ្ចូល shell។ ការរកឃើញកំហុសត្រូវបានបិទ។ អ្នកអាចបើកវាឡើងវិញ ហើយសាកល្បងម្ដងទៀត ឬរក្សាទុកដើម្បីបន្តដោយគ្មានវា។</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ បានបរាជ័យក្នុងការតំឡើង session hooks និងការរួមបញ្ចូល shell។ មុខងារទាំងនេះត្រូវបានបិទ។ អ្នកអាចបើកពួកវាឡើងវិញ ហើយសាកល្បងម្ដងទៀត ឬរក្សាទុកដើម្បីបន្តដោយគ្មានពួកវា។</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>បើក</value>
   </data>

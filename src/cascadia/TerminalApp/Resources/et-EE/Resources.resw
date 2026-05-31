@@ -235,9 +235,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Kestaintegratsiooni installimine nurjus. Vigade tuvastamine on välja lülitatud. Saate selle uuesti lubada ja uuesti proovida või salvestada, et jätkata ilma selleta.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ Seansikonksude ja kestaintegratsiooni installimine nurjus. Need funktsioonid on välja lülitatud. Saate need uuesti lubada ja uuesti proovida või salvestada, et jätkata ilma nendeta.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Sees</value>
   </data>

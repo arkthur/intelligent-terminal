@@ -1075,9 +1075,6 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Die Shell-Integration konnte nicht installiert werden. Die Fehlererkennung wurde deaktiviert. Sie können sie erneut aktivieren und es noch einmal versuchen, oder speichern, um ohne sie fortzufahren.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ Sitzungshooks und Shell-Integration konnten nicht installiert werden. Diese Funktionen wurden deaktiviert. Sie können sie erneut aktivieren und es noch einmal versuchen, oder speichern, um ohne sie fortzufahren.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Ein</value>
   </data>

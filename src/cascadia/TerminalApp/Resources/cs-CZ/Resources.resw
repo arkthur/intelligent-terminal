@@ -234,9 +234,6 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Nepodařilo se nainstalovat integraci prostředí. Detekce chyb byla vypnuta. Můžete ji znovu zapnout a zkusit to znovu, nebo uložit a pokračovat bez ní.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ Nepodařilo se nainstalovat háky relací a integraci prostředí. Tyto funkce byly vypnuty. Můžete je znovu zapnout a zkusit to znovu, nebo uložit a pokračovat bez nich.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Zapnuto</value>
   </data>

@@ -235,9 +235,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Kunne ikke installere skallintegrasjon. Feiloppdaging er slått av. Du kan aktivere den på nytt og prøve igjen, eller lagre for å fortsette uten den.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ Kunne ikke installere sesjonskroker og skallintegrasjon. Disse funksjonene er slått av. Du kan aktivere dem på nytt og prøve igjen, eller lagre for å fortsette uten dem.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>På</value>
   </data>

@@ -234,9 +234,6 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Instalimi i integrimit të shell-it dështoi. Zbulimi i gabimeve është çaktivizuar. Mund ta riaktivizoni dhe të provoni përsëri, ose të ruani për të vazhduar pa të.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ Instalimi i hook-ave të sesionit dhe integrimit të shell-it dështoi. Këto veçori janë çaktivizuar. Mund t'i riaktivizoni dhe të provoni përsëri, ose të ruani për të vazhduar pa to.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Aktiv</value>
   </data>

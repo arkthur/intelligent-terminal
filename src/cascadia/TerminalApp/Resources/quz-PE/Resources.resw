@@ -121,9 +121,6 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Shell tinkiynin churay mana allinchu karqa. Pantay taripay wichqasqa karqa. Watiqmanta atichiy ruwarinapaq, utaq waqaychay mana paywan hina siginapaq.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ Sesiónpa ganchunkuna chaymanta shell tinkiynin churay mana allinchu karqa. Kay ruwaykuna wichqasqa karqa. Watiqmanta atichiy ruwarinapaq, utaq waqaychay mana paykuanwan hina siginapaq.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Kachkan</value>
   </data>

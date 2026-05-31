@@ -121,9 +121,6 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ شېل بىرلەشتۈرۈشنى ئورنىتىش مەغلۇب بولدى. خاتالىق بايقاش تاقالدى. ئۇنى قايتا ئېچىپ قايتا سىنىيالايسىز، ياكى ئۇنىڭسىز داۋاملاشتۇرۇش ئۈچۈن ساقلىيالايسىز.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ ئەڭگىمە ئىلمەكلىرى ۋە شېل بىرلەشتۈرۈشنى ئورنىتىش مەغلۇب بولدى. بۇ ئىقتىدارلار تاقالدى. ئۇلارنى قايتا ئېچىپ قايتا سىنىيالايسىز، ياكى ئۇلارسىز داۋاملاشتۇرۇش ئۈچۈن ساقلىيالايسىز.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>ئاچىق</value>
   </data>

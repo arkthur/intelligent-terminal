@@ -1115,9 +1115,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Инсталација интеграције љуске није успела. Откривање грешака је искључено. Можете га поново укључити и покушати поново, или сачувати да наставите без њега.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ Инсталација закачки сесије и интеграције љуске није успела. Ове функције су искључене. Можете их поново укључити и покушати поново, или сачувати да наставите без њих.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Укљ</value>
   </data>

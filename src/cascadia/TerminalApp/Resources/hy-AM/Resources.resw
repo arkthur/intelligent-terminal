@@ -121,9 +121,6 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Shell-ի ինտեգրացիայի տեղադրումը ձախողվեց։ Սխալների հայտնաբերումը անջատվել է։ Կարող եք նորից միացնել և նորից փորձել, կամ պահել առանց դրա շարունակելու համար։</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ Նիստի կեռիկների և shell-ի ինտեգրացիայի տեղադրումը ձախողվեց։ Այս գործառույթները անջատվել են։ Կարող եք նորից միացնել դրանք և նորից փորձել, կամ պահել առանց դրանց շարունակելու համար։</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Միաց</value>
   </data>

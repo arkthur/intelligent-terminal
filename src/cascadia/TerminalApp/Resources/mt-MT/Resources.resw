@@ -121,9 +121,6 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ L-installazzjoni tal-integrazzjoni tal-qoxra falliet. Id-detezzjoni tal-iżbalji ġiet mitfija. Tista' terġa' tixgħelha u terġa' tipprova, jew issejvja biex tkompli mingħajrha.</value>
   </data>
-  <data name="FreOverlay_InstallErrorBoth" xml:space="preserve">
-    <value>⚠ L-installazzjoni tal-hooks tas-sessjoni u l-integrazzjoni tal-qoxra falliet. Dawn il-karatteristiċi ġew mitfija. Tista' terġa' tixgħelhom u terġa' tipprova, jew issejvja biex tkompli mingħajrhom.</value>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Mixgħul</value>
   </data>
