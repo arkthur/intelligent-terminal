@@ -854,7 +854,8 @@ fn find_codex_rollout_by_id(home: &Path, id: &str) -> Option<PathBuf> {
 ///
 /// Handles the UTC shapes Codex `session_meta` emits
 /// (`YYYY-MM-DDTHH:MM:SSZ` and `YYYY-MM-DDTHH:MM:SS.fffZ`) plus the
-/// numeric offset variants (`±HH:MM`), e.g. `2026-05-27T10:53:09+08:00`.
+/// numeric colon-separated offset variants (`±HH:MM`), e.g.
+/// `2026-05-27T10:53:09+08:00`.
 /// Returns `None` for any out-of-range / overflowing / malformed input
 /// (never panics).
 fn parse_iso_to_system_time(s: &str) -> Option<SystemTime> {
