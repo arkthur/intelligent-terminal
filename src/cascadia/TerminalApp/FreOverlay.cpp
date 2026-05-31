@@ -169,7 +169,8 @@ namespace winrt::TerminalApp::implementation
 
         // Split the description on "ACP" (locked token) so it can be rendered as an inline Hyperlink.
         {
-            const std::wstring_view desc{ RS_(L"FreOverlay_AgentDescription/Text") };
+            const auto descStr = RS_(L"FreOverlay_AgentDescription/Text");
+            const std::wstring_view desc{ descStr };
             constexpr std::wstring_view token{ L"ACP" };
             const auto pos = desc.find(token);
             if (pos != std::wstring_view::npos)
