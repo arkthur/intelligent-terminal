@@ -2980,6 +2980,26 @@ impl App {
             tab.current_view = View::Agents;
             tab.agents_view.snapshot = Some(Vec::new());
             tab.agents_view.dirty = false;
+            // Force-clear `refetch_in_flight`. If a prior request hung
+            // (ext_method response never returned — observed in the wild
+            // when something stalls the helper↔master pipe mid-flight),
+            // it would leave this flag stuck `true`. Every subsequent
+            // `schedule_agents_refetch_for_tab` then early-returns on the
+            // `refetch_in_flight` guard, so neither the 5s periodic tick
+            // nor a user-driven reopen can ever fire a new request, and
+            // the view stays on the "Loading…" shimmer forever (snapshot
+            // primed `Some(Vec::new())` here keeps `awaiting_first_snapshot`
+            // true). The bottom-bar pane toggle only emits `pane_open=false`
+            // → `pane_open=true` without an intervening `view="chat"`, so
+            // `close_agents_view_for_tab` (the only other reset path) never
+            // runs in that flow — reopening the view is the user's natural
+            // "try again" gesture, so resetting here matches intent.
+            // The stale in-flight task's eventual reply (if any) will not
+            // clobber the new state: `schedule_agents_refetch_for_tab`
+            // below bumps `next_request_id`, so the old response's
+            // `request_id` no longer matches `latest_request_id` and
+            // `handle_agents_snapshot_loaded` filters it out.
+            tab.agents_view.refetch_in_flight = false;
             if tab.agents_list_state.selected().is_none() && rows_available {
                 tab.agents_list_state.select(Some(0));
             }
@@ -10039,6 +10059,49 @@ mod tests {
         }
         assert!(app.current_tab().agents_view.snapshot.is_some());
         assert!(app.current_tab().agents_view.refetch_in_flight);
+    }
+
+    /// Regression: when a prior refetch's response was lost (helper↔master
+    /// pipe stall), `refetch_in_flight` stays `true` forever and the
+    /// `schedule_agents_refetch_for_tab` early-return short-circuits every
+    /// periodic tick. Reopening the view via the bottom-bar pane toggle
+    /// does NOT emit `view="chat"`, so `close_agents_view_for_tab` (the
+    /// only reset path) never runs. `open_agents_view_for_tab` must
+    /// therefore force-clear the flag itself, otherwise the user is stuck
+    /// on the "Loading…" shimmer permanently — observed in the wild
+    /// (tab1 helper stuck for >30 min, master log showed zero
+    /// `sessions/list` from that helper post-incident).
+    #[test]
+    fn reopen_recovers_from_stuck_refetch_in_flight() {
+        let (mut app, mut master_rx) = test_app_with_master_rx();
+
+        // First open + simulate a lost response: refetch_in_flight is left
+        // `true`, snapshot is `Some(empty)` (the open-priming state that
+        // renders as the Loading shimmer).
+        app.open_agents_view_for_tab(DEFAULT_TAB_ID.to_string());
+        let _ = master_rx
+            .try_recv()
+            .expect("first open must request sessions/list");
+        assert!(app.current_tab().agents_view.refetch_in_flight);
+
+        // Reopen WITHOUT going through close_agents_view_for_tab. This
+        // models the bottom-bar pane toggle flow: pane_open=false then
+        // pane_open=true with no `view="chat"` between them, so
+        // `refetch_in_flight` stays stuck `true` going into the reopen.
+        app.open_agents_view_for_tab(DEFAULT_TAB_ID.to_string());
+
+        // The reopen must dispatch a fresh SessionsList — pre-fix it
+        // didn't, because schedule_agents_refetch_for_tab's
+        // `refetch_in_flight` early-return swallowed the call silently.
+        match master_rx
+            .try_recv()
+            .expect("reopen must request sessions/list to recover stuck state")
+        {
+            crate::protocol::acp::client::MasterExtRequest::SessionsList { .. } => {}
+            other => panic!("expected SessionsList, got {other:?}"),
+        }
+        assert!(app.current_tab().agents_view.refetch_in_flight);
+        assert!(app.current_tab().agents_view.snapshot.is_some());
     }
 
     #[test]
