@@ -235,6 +235,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ ஷெல் ஒருங்கிணைப்பை நிறுவுவதில் தோல்வி. பிழை கண்டறிதல் முடக்கப்பட்டுள்ளது. நீங்கள் அதை மீண்டும் இயக்கி மீண்டும் முயற்சிக்கலாம், அல்லது அது இல்லாமல் தொடர சேமிக்கலாம்.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>இதை கைமுறையாக சரிசெய்வது எப்படி என்பதை அறிக</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>இயக்கு</value>
   </data>

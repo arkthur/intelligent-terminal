@@ -1126,6 +1126,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Не вдалося встановити інтеграцію оболонки. Виявлення помилок вимкнено. Ви можете повторно увімкнути його та спробувати знову, або зберегти, щоб продовжити без нього.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Дізнайтеся, як виправити це вручну</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Увімк</value>
   </data>

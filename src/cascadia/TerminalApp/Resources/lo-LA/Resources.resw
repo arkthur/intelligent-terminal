@@ -122,6 +122,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ ການຕິດຕັ້ງ shell integration ລົ້ມເຫລວ. ການກວດຫາຂໍ້ຜິດພາດໄດ້ຖືກປິດແລ້ວ. ທ່ານສາມາດເປີດໃຊ້ງານມັນອີກຄັ້ງແລະລອງໃຫມ່, ຫຼືບັນທຶກເພື່ອສືບຕໍ່ໂດຍບໍ່ມີມັນ.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>ຮຽນຮູ້ວິທີແກ້ໄຂສິ່ງນີ້ດ້ວຍຕົນເອງ</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>ເປີດ</value>
   </data>

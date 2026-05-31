@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Shell integratsiyasini oʻrnatish amalga oshmadi. Xatolarni aniqlash oʻchirildi. Uni qayta yoqish va qayta urinib koʻrishingiz yoki usiz davom etish uchun saqlashingiz mumkin.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Buni qoʻlda qanday tuzatishni oʻrganing</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Yoniq</value>
   </data>

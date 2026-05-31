@@ -122,6 +122,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ D'Shell-Integratioun konnt net installéiert ginn. D'Feelerkennung gouf ausgeschalt. Dir kënnt se nees aktivéieren a nach eng Kéier probéieren, oder späicheren fir ouni se weiderzefueren.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Léiert wéi Dir dëst manuell behieft</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Un</value>
   </data>

@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Nepodarilo sa nainštalovať integráciu shellu. Detekcia chýb bola vypnutá. Môžete ju znova zapnúť a skúsiť to znova, alebo uložiť a pokračovať bez nej.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Zistite, ako to ručne opraviť</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Zapnuté</value>
   </data>

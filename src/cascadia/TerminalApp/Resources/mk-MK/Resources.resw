@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Не успеа инсталирањето на интеграција на школка. Детекцијата на грешки е исклучена. Можете повторно да ја вклучите и да се обидете повторно, или да зачувате за да продолжите без неа.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Дознајте како да го поправите ова рачно</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Вкл.</value>
   </data>

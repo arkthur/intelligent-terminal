@@ -121,6 +121,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ L-installazzjoni tal-integrazzjoni tal-qoxra falliet. Id-detezzjoni tal-iżbalji ġiet mitfija. Tista' terġa' tixgħelha u terġa' tipprova, jew issejvja biex tkompli mingħajrha.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Tgħallem kif issewwi dan manwalment</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Mixgħul</value>
   </data>

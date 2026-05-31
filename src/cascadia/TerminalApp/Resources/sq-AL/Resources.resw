@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Instalimi i integrimit të shell-it dështoi. Zbulimi i gabimeve është çaktivizuar. Mund ta riaktivizoni dhe të provoni përsëri, ose të ruani për të vazhduar pa të.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Mësoni si ta rregulloni këtë manualisht</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Aktiv</value>
   </data>

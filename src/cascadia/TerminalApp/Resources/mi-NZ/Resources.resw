@@ -121,6 +121,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ I rahua te tāuta i te whakaurunga anga. Kua whakawetohia te kitenga hapa. Ka taea e koe te whakahoki anō me te ngana anō, te tiaki rānei kia haere tonu i te kore.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Akona me pēhea te whakatika i tēnei mā te ringa</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Kā</value>
   </data>

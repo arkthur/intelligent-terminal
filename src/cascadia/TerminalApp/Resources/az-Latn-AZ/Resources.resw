@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Shell inteqrasiyasını quraşdırmaq alınmadı. Xəta aşkarlanması söndürülüb. Onu yenidən aktivləşdirib təkrar cəhd edə bilərsiniz və ya onsuz davam etmək üçün saxlaya bilərsiniz.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Bunu necə əl ilə düzəltməyi öyrənin</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Açıq</value>
   </data>

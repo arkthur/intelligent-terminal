@@ -121,6 +121,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Shell-ի ինտեգրացիայի տեղադրումը ձախողվեց։ Սխալների հայտնաբերումը անջատվել է։ Կարող եք նորից միացնել և նորից փորձել, կամ պահել առանց դրա շարունակելու համար։</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Իմացեք, թե ինչպես սա շտկել ձեռքով</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Միաց</value>
   </data>

@@ -235,6 +235,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Nepavyko įdiegti apvalkalo integracijos. Klaidų aptikimas buvo išjungtas. Galite jį vėl įjungti ir bandyti dar kartą arba išsaugoti ir tęsti be jo.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Sužinokite, kaip tai išspręsti rankiniu būdu</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Įjungta</value>
   </data>

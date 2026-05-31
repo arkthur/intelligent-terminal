@@ -121,6 +121,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ გარსის ინტეგრაციის ინსტალაცია ვერ მოხერხდა. შეცდომების აღმოჩენა გამორთულია. შეგიძლიათ ხელახლა ჩართოთ და სცადოთ თავიდან, ან შეინახოთ მის გარეშე გასაგრძელებლად.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>შეიტყვეთ, როგორ გამოასწოროთ ეს ხელით</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>ჩართ</value>
   </data>

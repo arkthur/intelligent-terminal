@@ -121,6 +121,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Αποτυχία εγκατάστασης της ενσωμάτωσης κελύφους. Ο εντοπισμός σφαλμάτων απενεργοποιήθηκε. Μπορείτε να τον ενεργοποιήσετε ξανά και να δοκιμάσετε ξανά, ή να αποθηκεύσετε για να συνεχίσετε χωρίς αυτόν.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Μάθετε πώς να το διορθώσετε με μη αυτόματο τρόπο</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Ενεργό</value>
   </data>

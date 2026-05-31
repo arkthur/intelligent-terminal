@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Nepodařilo se nainstalovat integraci prostředí. Detekce chyb byla vypnuta. Můžete ji znovu zapnout a zkusit to znovu, nebo uložit a pokračovat bez ní.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Zjistěte, jak to opravit ručně</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Zapnuto</value>
   </data>

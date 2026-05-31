@@ -121,6 +121,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ شېل بىرلەشتۈرۈشنى ئورنىتىش مەغلۇب بولدى. خاتالىق بايقاش تاقالدى. ئۇنى قايتا ئېچىپ قايتا سىنىيالايسىز، ياكى ئۇنىڭسىز داۋاملاشتۇرۇش ئۈچۈن ساقلىيالايسىز.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>بۇنى قولدا قانداق ئوڭشاشنى ئۆگىنىڭ</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>ئاچىق</value>
   </data>

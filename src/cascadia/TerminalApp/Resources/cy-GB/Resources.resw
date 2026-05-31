@@ -121,6 +121,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Methodd gosod integreiddio plisgyn. Mae canfod gwallau wedi'i ddiffodd. Gallwch ei ail-alluogi a rhoi cynnig arall arni, neu gadw i barhau hebddo.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Dysgwch sut i drwsio hyn â llaw</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Ymlaen</value>
   </data>

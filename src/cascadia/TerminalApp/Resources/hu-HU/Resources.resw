@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ A shell-integráció telepítése sikertelen. A hibaészlelés ki lett kapcsolva. Újra engedélyezheti, és megpróbálhatja újra, vagy menthet a folytatáshoz nélküle.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Útmutató a probléma manuális megoldásához</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Be</value>
   </data>

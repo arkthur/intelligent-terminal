@@ -229,6 +229,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Het installeren van shellintegratie is mislukt. Foutdetectie is uitgeschakeld. U kunt het opnieuw inschakelen en het opnieuw proberen, of opslaan om verder te gaan zonder.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Meer informatie over hoe u dit handmatig kunt oplossen</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Aan</value>
   </data>

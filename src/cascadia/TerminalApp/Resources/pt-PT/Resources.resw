@@ -229,6 +229,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Falha ao instalar a integração da shell. A deteção de erros foi desativada. Pode reativá-la e tentar novamente, ou guardar para continuar sem ela.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Saiba como corrigir isto manualmente</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Ativado</value>
   </data>

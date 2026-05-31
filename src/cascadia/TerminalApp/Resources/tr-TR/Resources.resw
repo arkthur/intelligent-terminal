@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Kabuk tümleştirmesi yüklenemedi. Hata algılama kapatıldı. Yeniden etkinleştirip tekrar deneyebilir veya bu özellik olmadan devam etmek için kaydedebilirsiniz.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Bunu el ile nasıl düzelteceğinizi öğrenin</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Açık</value>
   </data>

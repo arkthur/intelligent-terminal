@@ -234,6 +234,10 @@
   <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
     <value>⚠ Кабык интеграциясен урнату уңышсыз булды. Хата ачыклау сүндерелде. Аны яңадан кушып тырышырга яки аның бик булмавына карамастан дәвам итәр өчен саклый аласыз.</value>
   </data>
+  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Моны кулдан ничек төзәтергә икәнен өйрәнегез</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Кушулган</value>
   </data>
