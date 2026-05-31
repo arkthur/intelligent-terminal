@@ -542,6 +542,7 @@ enum HooksCliFilter {
     Copilot,
     Claude,
     Gemini,
+    Codex,
 }
 
 impl HooksCliFilter {
@@ -552,6 +553,7 @@ impl HooksCliFilter {
             HooksCliFilter::Copilot => CliScope::One(CliKind::Copilot),
             HooksCliFilter::Claude => CliScope::One(CliKind::Claude),
             HooksCliFilter::Gemini => CliScope::One(CliKind::Gemini),
+            HooksCliFilter::Codex => CliScope::One(CliKind::Codex),
         }
     }
 }

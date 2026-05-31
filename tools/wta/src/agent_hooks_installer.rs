@@ -2546,7 +2546,12 @@ fn uninstall_for_codex(home: Option<&Path>) -> CliUninstallResult {
         "codex",
         &["plugin", "marketplace", "remove", MARKETPLACE_NAME],
         "agent_hooks",
-        &["not registered", "not found"],
+        &[
+            "not registered",
+            "not found",
+            "not configured",
+            "not installed",
+        ],
     ) {
         Ok(()) => {
             result.marketplace_removed = Some(true);
@@ -2688,6 +2693,11 @@ fn read_bundled_version(cli: CliKind) -> Option<Version> {
         CliKind::Copilot | CliKind::Claude => {
             dir.join("wt-agent-hooks").join(".claude-plugin").join("plugin.json")
         }
+        CliKind::Codex => dir
+            .join("plugins")
+            .join("wt-agent-hooks")
+            .join(".codex-plugin")
+            .join("plugin.json"),
         CliKind::Gemini => dir.join("gemini-extension.json"),
     };
     read_version_field(&manifest)
@@ -2879,6 +2889,14 @@ fn decide_upgrade(
     }
     match cli {
         CliKind::Copilot | CliKind::Claude => UpgradeAction::UpdatePlugin,
+        CliKind::Codex => {
+            // Codex auto-upgrade isn't wired up yet. `upgrade_one_cli`
+            // already reads `None` for the installed state, so we never
+            // actually reach this arm — but `decide_upgrade` has unit
+            // tests that may call it directly, so keep the result
+            // conservative.
+            UpgradeAction::Skip(SkipReason::NotInstalled)
+        }
         CliKind::Gemini => {
             // Auto-update only `local` installs; `git`/`link` are user
             // configurations we don't second-guess.
@@ -2924,6 +2942,7 @@ fn gemini_source_under_bundle(source: &Path, bundle_dir: &Path) -> bool {
 struct UpgradeState {
     copilot: Option<String>,
     claude: Option<String>,
+    codex: Option<String>,
     gemini: Option<String>,
 }
 
@@ -2932,6 +2951,7 @@ impl UpgradeState {
         match cli {
             CliKind::Copilot => self.copilot.as_deref(),
             CliKind::Claude => self.claude.as_deref(),
+            CliKind::Codex => self.codex.as_deref(),
             CliKind::Gemini => self.gemini.as_deref(),
         }
     }
@@ -2940,6 +2960,7 @@ impl UpgradeState {
         match cli {
             CliKind::Copilot => self.copilot = version,
             CliKind::Claude => self.claude = version,
+            CliKind::Codex => self.codex = version,
             CliKind::Gemini => self.gemini = version,
         }
     }
@@ -2951,6 +2972,9 @@ impl UpgradeState {
         }
         if let Some(v) = &self.claude {
             m.insert("claude".into(), Value::String(v.clone()));
+        }
+        if let Some(v) = &self.codex {
+            m.insert("codex".into(), Value::String(v.clone()));
         }
         if let Some(v) = &self.gemini {
             m.insert("gemini".into(), Value::String(v.clone()));
@@ -2968,6 +2992,7 @@ impl UpgradeState {
         UpgradeState {
             copilot: get("copilot"),
             claude: get("claude"),
+            codex: get("codex"),
             gemini: get("gemini"),
         }
     }
@@ -3190,6 +3215,11 @@ fn upgrade_one_cli(cli: CliKind, home: &Path, bundle_version: Option<Version>) {
                 read_installed_claude()
             }
         }
+        CliKind::Codex => {
+            // Codex auto-upgrade isn't wired up yet (no installed-state
+            // reader). Treat as not-installed so `decide_upgrade` skips.
+            None
+        }
         CliKind::Gemini => read_installed_gemini(home),
     };
 
@@ -3215,6 +3245,17 @@ fn upgrade_one_cli(cli: CliKind, home: &Path, bundle_version: Option<Version>) {
         UpgradeAction::UpdatePlugin => match cli {
             CliKind::Copilot => upgrade_copilot(home),
             CliKind::Claude => upgrade_claude(home),
+            CliKind::Codex => {
+                // Defensive: `decide_upgrade` for Codex always returns
+                // Skip, so this arm shouldn't fire. Log and no-op so a
+                // future regression is visible without panicking on the
+                // blocking-pool thread.
+                tracing::error!(
+                    target: "agent_hooks",
+                    cli = cli.name(),
+                    "decide_upgrade returned UpdatePlugin for Codex; skipping (treat as bug)",
+                );
+            }
             CliKind::Gemini => {
                 // Defensive: `decide_upgrade` is the only producer of
                 // `UpdatePlugin` and currently only returns it for
