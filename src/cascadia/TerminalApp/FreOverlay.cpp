@@ -10,7 +10,6 @@
 #include "../inc/WtaProcess.h"
 #include "../inc/ShellIntegration.h"
 #include "../inc/RtlHelper.h"
-#include "../inc/AcpLinkInjector.h"
 
 #include <winrt/Windows.UI.Xaml.Documents.h>
 
@@ -95,13 +94,6 @@ namespace winrt::TerminalApp::implementation
         WelcomeSubtitleLink().Text(RS_(L"FreOverlay_WelcomeSubtitleLink"));
         SettingsSubtitlePrefix().Text(RS_(L"FreOverlay_SettingsSubtitlePrefix"));
         SettingsSubtitleLink().Text(RS_(L"FreOverlay_SettingsSubtitleLink"));
-
-        // Rewrite the literal substring "ACP" inside the localized agent
-        // description into a hyperlink. Shared helper in
-        // src/cascadia/inc/AcpLinkInjector.h handles split + idempotency
-        // (FRE may be re-Initialized when re-shown). Same helper is used by
-        // the AI agents settings page.
-        ::Microsoft::Terminal::AcpLink::InjectAcpLink(AgentDescription());
 
         // Set toggle On/Off labels
         AutoDetectToggle().OnContent(winrt::box_value(RS_(L"FreOverlay_ToggleOn")));

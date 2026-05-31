@@ -727,6 +727,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>Choose the agent used in the agent pane. Any compatible ACP agent will be detected.</value>
     <comment>Supplementary description for the agent pane setting. {Locked="ACP"}</comment>
   </data>
+  <data name="AIAgents_AcpReferenceLink.Content" xml:space="preserve">
+    <value>Learn more about ACP</value>
+    <comment>{Locked="ACP"} HyperlinkButton displayed below the AIAgents_AcpAgent ComboBox that links to the Agent Client Protocol reference page.</comment>
+  </data>
   <data name="AIAgents_AcpModel.Header" xml:space="preserve">
     <value>Model</value>
     <comment>Header for the setting that specifies the model used by the agent pane agent. 

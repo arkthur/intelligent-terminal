@@ -214,9 +214,13 @@
                                                FontSize="14" FontWeight="SemiBold"
                                                Foreground="White" />
                                     <TextBlock x:Uid="FreOverlay_AgentDescription"
-                                               x:Name="AgentDescription"
                                                FontSize="12" Foreground="#99FFFFFF"
                                                TextWrapping="Wrap" />
+                                    <HyperlinkButton x:Uid="FreOverlay_AcpReferenceLink"
+                                                     NavigateUri="https://aka.ms/intelligent-terminal-acpref"
+                                                     Margin="-12,0,0,0"
+                                                     Padding="12,0,12,0"
+                                                     Foreground="#FF99EBFF" />
                                     <TextBlock x:Uid="FreOverlay_AgentInstallHint"
                                                x:Name="AgentInstallHint"
                                                FontSize="12" Foreground="#99FFFFFF"

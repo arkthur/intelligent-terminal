@@ -1073,6 +1073,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <comment>{Locked="ACP"}
 In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
+  <data name="FreOverlay_AcpReferenceLink.Content" xml:space="preserve">
+    <value>Learn more about ACP</value>
+    <comment>{Locked="ACP"} HyperlinkButton displayed below FreOverlay_AgentDescription that links to the Agent Client Protocol reference page.</comment>
+  </data>
   <data name="FreOverlay_AgentInstallHint.Text" xml:space="preserve">
     <value>ℹ This agent requires Node.js and NPX, which will be installed automatically if not already present.</value>
     <comment>{Locked="Node.js","NPX"}
