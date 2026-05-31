@@ -361,6 +361,18 @@
                                            Style="{StaticResource CaptionTextBlockStyle}"
                                            Opacity="0.6"
                                            TextWrapping="Wrap" />
+                                <!--  Codex is the only CLI whose hook commands must be
+                                      individually trusted by the user before they fire.
+                                      Surface the one-line "run /hooks and approve"
+                                      reminder right under the row title so users see it
+                                      both before clicking Install (anticipation) and
+                                      after install (the row only becomes visible once
+                                      Codex has any hook state, which is the moment the
+                                      reminder is most actionable).  -->
+                                <TextBlock x:Uid="AIAgents_CodexTrustHint"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Opacity="0.6"
+                                           TextWrapping="Wrap" />
                             </StackPanel>
                             <Button Grid.Column="1"
                                     x:Uid="AIAgents_HooksRemoveButton"

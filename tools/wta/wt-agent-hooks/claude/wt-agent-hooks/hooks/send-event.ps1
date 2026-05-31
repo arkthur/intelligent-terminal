@@ -88,6 +88,7 @@ try {
         if ($env:COPILOT_SESSION_ID) { 'copilot' }
         elseif ($env:GEMINI_SESSION_ID) { 'gemini' }
         elseif ($env:CLAUDE_SESSION_ID) { 'claude' }
+        elseif ($env:CODEX_SESSION_ID) { 'codex' }
         elseif ($env:GEMINI_CLI)   { 'gemini' }
         elseif ($env:COPILOT_CLI)  { 'copilot' }
         elseif ($env:CLAUDE_PLUGIN_ROOT) { 'claude' }
@@ -130,7 +131,7 @@ try {
         $parsed = $hookData | ConvertFrom-Json
     }
 
-    # Extract agent_session_id from stdin JSON (Claude/Gemini), env (Copilot), or empty.
+    # Extract agent_session_id from stdin JSON (Claude/Gemini/Codex), env (Copilot), or empty.
     $agentSessionId = ""
     if ($parsed -and ($parsed.PSObject.Properties.Name -contains "session_id")) {
         $agentSessionId = [string]$parsed.session_id
@@ -140,6 +141,8 @@ try {
         $agentSessionId = $env:CLAUDE_SESSION_ID
     } elseif ($env:GEMINI_SESSION_ID) {
         $agentSessionId = $env:GEMINI_SESSION_ID
+    } elseif ($env:CODEX_SESSION_ID) {
+        $agentSessionId = $env:CODEX_SESSION_ID
     }
 
     # Detect CLI source — priority order:
@@ -157,6 +160,7 @@ try {
         if     ($env:COPILOT_SESSION_ID) { $CliSource = "copilot" }
         elseif ($env:GEMINI_SESSION_ID)  { $CliSource = "gemini" }
         elseif ($env:CLAUDE_SESSION_ID)  { $CliSource = "claude" }
+        elseif ($env:CODEX_SESSION_ID)   { $CliSource = "codex" }
         elseif ($env:GEMINI_CLI)         { $CliSource = "gemini" }
         elseif ($env:COPILOT_CLI)        { $CliSource = "copilot" }
         elseif ($env:CLAUDE_PLUGIN_ROOT) { $CliSource = "claude" }

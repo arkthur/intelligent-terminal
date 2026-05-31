@@ -308,3 +308,6 @@ profiles.json
 tmpclaude-*
 # Per-issue git worktrees created locally
 .worktree/
+
+# Local-only superpowers plan/spec notes (kept out of source control)
+docs/superpowers/
