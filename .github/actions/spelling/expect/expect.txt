@@ -1136,7 +1136,6 @@ nullability
 nullness
 nullonfailure
 nullopts
-Numer
 NUMSCROLL
 NUnit
 nupkg
