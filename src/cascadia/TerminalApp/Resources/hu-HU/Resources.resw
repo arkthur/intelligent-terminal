@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Üdvözli az Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Üdvözli az Intelligens Terminál</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Állítsa be a beépített asszisztenst, amely segít a hibák magyarázatában, parancsok létrehozásában és feladatok feloldásában közvetlenül ott, ahol dolgozik. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>További információ az Intelligent Terminal szolgáltatásról</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>További információ az Intelligens Terminál szolgáltatásról</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Maradjon a munka lendületében a beépített AI-ügynökkel</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Üdvözli az Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Üdvözli az Intelligens Terminál</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Válassza ki, mit szeretne most beállítani. Ezeket a beállításokat bármikor módosíthatja. </value>
@@ -181,8 +181,8 @@
     <value>Munkamenet-kezelés</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Adjon engedélyt az Intelligent Terminal számára a futó vagy aktív ügynökök állapotának nyomon követéséhez.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Adjon engedélyt az Intelligens Terminál számára a futó vagy aktív ügynökök állapotának nyomon követéséhez.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Ennek engedélyezése integrációs hooks telepítését végzi a munkamenetek ügynökök közötti nyomon követéséhez.</value>
@@ -228,17 +228,6 @@
     <value>⚠ A Node.js telepítése sikertelen. Ellenőrizze a hálózati kapcsolatot, és próbálja újra.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ A session hooks telepítése sikertelen. A munkamenet-kezelés ki lett kapcsolva. Újra engedélyezheti, és megpróbálhatja újra, vagy menthet a folytatáshoz nélküle.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ A shell-integráció telepítése sikertelen. A hibaészlelés ki lett kapcsolva. Újra engedélyezheti, és megpróbálhatja újra, vagy menthet a folytatáshoz nélküle.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Útmutató a probléma manuális megoldásához</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Be</value>
   </data>
@@ -258,8 +247,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Kattintson a(z) {0} elemre a hiba kijavításához</value>
+    <value>Kattintson vagy nyomja le a(z) {0} billentyűt, hogy az ügynöktől javasolt javítást kérjen</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>A javítás kész. Nyomja le a(z) {0} billentyűt az áttekintéshez</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Nyissa meg az ügynök ablaktábláját a javasolt javítás áttekintéséhez</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Hiba észlelve. Kattintson vagy nyomja le a(z) {0} billentyűt, hogy az AI ügynök diagnosztizáljon és javasoljon egy javítást.</value>
@@ -307,4 +304,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Engedélyezze az Intelligent Terminal számára, hogy hozzáférjen a parancshéjhoz, és automatikusan felismerje a hibákat.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ A shell-integráció telepítése sikertelen. A hibaészlelés ki lett kapcsolva. Újra engedélyezheti, és megpróbálhatja újra, vagy menthet a folytatáshoz nélküle.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ A session hooks telepítése sikertelen. A munkamenet-kezelés ki lett kapcsolva. Újra engedélyezheti, és megpróbálhatja újra, vagy menthet a folytatáshoz nélküle.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Útmutató a probléma manuális megoldásához</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

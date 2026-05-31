@@ -1,6 +1,6 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
-setup.title.first_run: "Vítejte v Intelligent Terminal!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Vítejte v Inteligentní Terminál!"
 setup.title.agent_missing: "Agenta se nepodařilo najít"
 setup.title.agent_error: "Připojení k agentovi se nezdařilo"
 setup.title.switch_agent: "Přepnout agenta"
@@ -8,13 +8,13 @@ setup.title.not_available: "Agent není k dispozici"
 setup.title.sign_in: "Vyžadováno přihlášení"
 
 # %{agent} is replaced with the agent display name at runtime.
-setup.subtitle.copilot_missing: "Váš agent \"%{agent}\" není nainstalován. Postupujte podle níže uvedených kroků a nainstalujte ho. Chcete-li přepnout agenta, přejděte do Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "Váš agent \"%{agent}\" není nainstalován. Přeinstalujte ho ručně a zkuste to znovu. Chcete-li přepnout agenta, přejděte do Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Postupujte podle níže uvedených kroků a přihlaste se. Chcete-li přepnout agenta, přejděte do Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Přihlaste se přes agenta a pak vyberte \"Přihlásil/a jsem se\" níže. Chcete-li přepnout agenta, přejděte do Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "Váš agent \"%{agent}\" není nainstalován. Postupujte podle níže uvedených kroků a nainstalujte ho. Chcete-li přepnout agenta, přejděte do Inteligentní Terminál Settings > Agent."
+setup.subtitle.agent_missing: "Váš agent \"%{agent}\" není nainstalován. Přeinstalujte ho ručně a zkuste to znovu. Chcete-li přepnout agenta, přejděte do Inteligentní Terminál Settings > Agent."
+setup.subtitle.copilot_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Postupujte podle níže uvedených kroků a přihlaste se. Chcete-li přepnout agenta, přejděte do Inteligentní Terminál Settings > Agent."
+setup.subtitle.agent_auth: "Váš agent \"%{agent}\" vyžaduje ověření. Přihlaste se přes agenta a pak vyberte \"Přihlásil/a jsem se\" níže. Chcete-li přepnout agenta, přejděte do Inteligentní Terminál Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Vyberte výchozího agenta, kterého chcete používat v Intelligent Terminal. Můžete"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Vyberte výchozího agenta, kterého chcete používat v Inteligentní Terminál. Můžete"
 setup.description.fre_line2: "přejít do Settings a nakonfigurovat svůj pracovní prostor."
 
 setup.option.install: "Instalovat %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Stiskněte Enter pro přihlášení, Esc pro návrat"  # {L
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Přemýšlím..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
-chat.welcome_title: "Vítejte v Intelligent Terminal!"
-chat.welcome_disclaimer: "Intelligent Terminal používá AI. Kontrolujte chyby."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Vítejte v Inteligentní Terminál!"
+chat.welcome_disclaimer: "Inteligentní Terminál používá AI. Kontrolujte chyby."
 chat.plan_header: "Plán:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -126,12 +126,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. zobrazit/skrýt panel agenta • Ctrl+Shif
 # ── Connection state ────────────────────────────────────────────────────────
 connection.starting: "Spouštění agenta..."
 connection.reconnecting: "Opětovné připojování..."
+connection.connecting_activity: "Připojování k agentovi…"
+connection.lost: "Připojení k agentovi bylo ztraceno. Zadáním /restart se znovu připojíte."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Zrušeno."
 system.no_prompt_in_flight: "Žádný dotaz neprobíhá."
 system.authentication_failed: "Ověření se nezdařilo"
 system.command_copied_retry: "Příkaz zkopírován — spusťte ho v jiném terminálu a stiskněte Enter pro opakování"  # {Locked="Enter"}
+system.stopped_max_tokens: "Odpověď byla oříznuta po dosažení výstupního limitu modelu."
+system.stopped_max_turn_requests: "Agent se zastavil po dosažení limitu požadavků pro toto kolo."
+system.stopped_refusal: "Agent odmítl pokračovat v tomto požadavku."
+system.agent_busy: "Agent je na této kartě zaneprázdněn — počkejte, až aktuální výzva skončí."
+system.resuming_session: "Obnovuje se relace %{session_id}..."
+system.unknown_command: "Neznámý příkaz \"%{command}\" — odeslán jako výzva. Seznam zobrazíte zadáním /help."  # {Locked="/help"}
+system.busy_use_stop: "Počkejte, až aktuální výzva skončí, nebo nejdřív použijte /stop."  # {Locked="/stop"}
+system.cannot_focus_session: "Nelze zaměřit relaci %{session_id}: vypadá jako živá, ale zatím není navázán žádný GUID podokna. Zkuste to znovu za chvíli."
+system.cannot_resume_no_load_session: "Nelze obnovit v podokně agenta: %{agent} neohlásil schopnost ACP `loadSession`. Stisknutím Enter (bez Shift) místo toho obnovíte relaci v novém terminálovém podokně."  # {Locked="ACP","loadSession","Enter","Shift"}
+system.cannot_resume_no_resume_flag: "Nelze obnovit relaci %{agent}: tento agent nemá příznak ve stylu `--resume`. Stiskněte Shift+Enter a zkuste obnovit uvnitř podokna agenta přes ACP."  # {Locked="--resume","Shift","Enter","ACP"}
+system.cannot_resume_unknown_agent: "Nelze obnovit relaci %{session_id}: její zdrojový agent není této verzi WTA známý."
+system.cannot_resume_phantom_via_flag: "Nelze obnovit relaci %{agent} %{session_id}: byla spuštěna, ale nikdy neshromáždila žádnou konverzaci, takže samotný %{agent} by obnovení odmítl. Řádek se odebírá."
+system.cannot_resume_phantom_via_load: "Nelze obnovit relaci %{agent} %{session_id}: byla spuštěna, ale nikdy neshromáždila žádnou konverzaci, takže %{agent} by načtení odmítl. Řádek se odebírá."
+system.fallback.this_agent: "tento agent"
+system.fallback.connected_agent: "připojený agent"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Nebyla nalezena žádná okna."
@@ -181,3 +198,6 @@ time.hour_singular: "před 1 hodinou"
 time.hours_other: "před %{count} hodinami"
 time.day_singular: "před 1 dnem"
 time.days_other: "před %{count} dny"
+
+# ── Provedení doporučení (src/coordinator.rs) ───────────────────────────────
+system.choice_execution_failed: "Volba %{choice} selhala: %{error}"

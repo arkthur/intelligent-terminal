@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Intelligent Terminal-a xoş gəlmisiniz</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Ağıllı Terminal-a xoş gəlmisiniz</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Xətaları izah etməyə, əmr qaralamalarına və işlədiyin yerdə tıxanan tapşırıqları həll etməyə kömək edəcək daxili köməkçini qurun. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Intelligent Terminal haqqında daha çox öyrənin</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Ağıllı Terminal haqqında daha çox öyrənin</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Daxili AI agentinizlə iş axınını qoruyun</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Intelligent Terminal-a xoş gəlmisiniz</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Ağıllı Terminal-a xoş gəlmisiniz</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>İndi nəyi qurmaq istədiyinizi seçin. Bunları istənilən vaxt dəyişə bilərsiniz. </value>
@@ -181,8 +181,8 @@
     <value>Sessiya idarəetməsi</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Intelligent Terminal-a işləyən və ya aktiv agentlərinizin vəziyyətini izləmək icazəsi verin.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Ağıllı Terminal-a işləyən və ya aktiv agentlərinizin vəziyyətini izləmək icazəsi verin.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Bunu aktivləşdirmək agentləriniz arasında sessiyaları izləmək üçün inteqrasiya hooks quraşdıracaq.</value>
@@ -228,17 +228,6 @@
     <value>⚠ Node.js quraşdırıla bilmədi. Şəbəkənizi yoxlayın və yenidən cəhd edin.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Session hooks quraşdırmaq alınmadı. Sessiya idarəetməsi söndürülüb. Onu yenidən aktivləşdirib təkrar cəhd edə bilərsiniz və ya onsuz davam etmək üçün saxlaya bilərsiniz.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Shell inteqrasiyasını quraşdırmaq alınmadı. Xəta aşkarlanması söndürülüb. Onu yenidən aktivləşdirib təkrar cəhd edə bilərsiniz və ya onsuz davam etmək üçün saxlaya bilərsiniz.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Bunu necə əl ilə düzəltməyi öyrənin</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Açıq</value>
   </data>
@@ -258,8 +247,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Xətanı düzəltmək üçün {0} üzərinə klikləyin</value>
+    <value>Agentdən təklif olunan düzəliş istəmək üçün {0} üzərinə klikləyin və ya basın</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Düzəliş hazırdır. Nəzərdən keçirmək üçün {0} basın</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Təklif olunan düzəlişi nəzərdən keçirmək üçün agent panelini açın</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Xəta aşkar edildi. AI agentindən diaqnostika aparmasını və düzəliş təklif etməsini istəmək üçün {0} üzərinə klikləyin və ya basın.</value>
@@ -307,4 +304,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Intelligent Terminal-ə qabığınıza daxil olmaq və səhvləri avtomatik aşkarlamaq icazəsi verin.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Shell inteqrasiyasını quraşdırmaq alınmadı. Xəta aşkarlanması söndürülüb. Onu yenidən aktivləşdirib təkrar cəhd edə bilərsiniz və ya onsuz davam etmək üçün saxlaya bilərsiniz.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Session hooks quraşdırmaq alınmadı. Sessiya idarəetməsi söndürülüb. Onu yenidən aktivləşdirib təkrar cəhd edə bilərsiniz və ya onsuz davam etmək üçün saxlaya bilərsiniz.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Bunu necə əl ilə düzəltməyi öyrənin</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

@@ -1,6 +1,6 @@
 # Заголовки екрану налаштування
-# {Locked="Intelligent Terminal"} - назва продукту, не перекладати
-setup.title.first_run: "Ласкаво просимо до Intelligent Terminal!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Ласкаво просимо до Інтелектуальний Термінал!"
 setup.title.agent_missing: "Агент не знайдено"
 setup.title.agent_error: "Не вдалося підключитися до агента"
 setup.title.switch_agent: "Змінити агента"
@@ -8,13 +8,13 @@ setup.title.not_available: "Агент недоступний"
 setup.title.sign_in: "Потрібен вхід"
 
 # %{agent} замінюється на відображуване ім'я агента під час виконання.
-setup.subtitle.copilot_missing: "Ваш агент \"%{agent}\" не встановлено. Виконайте наведені нижче кроки, щоб його встановити. Щоб змінити агента, перейдіть до Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "Ваш агент \"%{agent}\" не встановлено. Перевстановіть його вручну та повторіть спробу. Щоб змінити агента, перейдіть до Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "Ваш агент \"%{agent}\" потребує автентифікації. Виконайте наведені нижче кроки для входу. Щоб змінити агента, перейдіть до Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "Ваш агент \"%{agent}\" потребує автентифікації. Увійдіть через агента та виберіть \"Я увійшов\" нижче. Щоб змінити агента, перейдіть до Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "Ваш агент \"%{agent}\" не встановлено. Виконайте наведені нижче кроки, щоб його встановити. Щоб змінити агента, перейдіть до Інтелектуальний Термінал Settings > Agent."
+setup.subtitle.agent_missing: "Ваш агент \"%{agent}\" не встановлено. Перевстановіть його вручну та повторіть спробу. Щоб змінити агента, перейдіть до Інтелектуальний Термінал Settings > Agent."
+setup.subtitle.copilot_auth: "Ваш агент \"%{agent}\" потребує автентифікації. Виконайте наведені нижче кроки для входу. Щоб змінити агента, перейдіть до Інтелектуальний Термінал Settings > Agent."
+setup.subtitle.agent_auth: "Ваш агент \"%{agent}\" потребує автентифікації. Увійдіть через агента та виберіть \"Я увійшов\" нижче. Щоб змінити агента, перейдіть до Інтелектуальний Термінал Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Оберіть агента за замовчуванням для використання в Intelligent Terminal. Ви можете"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Оберіть агента за замовчуванням для використання в Інтелектуальний Термінал. Ви можете"
 setup.description.fre_line2: "перейти до налаштувань для налаштування робочої області."
 
 setup.option.install: "Встановити %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Натисніть Enter для входу, Esc для по
 
 # ── Перегляд чату (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Думаю…"
-# {Locked="Intelligent Terminal"} - назва продукту, не перекладати
-chat.welcome_title: "Ласкаво просимо до Intelligent Terminal!"
-chat.welcome_disclaimer: "Intelligent Terminal використовує AI. Перевіряйте помилки."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Ласкаво просимо до Інтелектуальний Термінал!"
+chat.welcome_disclaimer: "Інтелектуальний Термінал використовує AI. Перевіряйте помилки."
 chat.plan_header: "План:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -126,12 +126,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. — показати/сховати пан
 # ── Стан підключення ────────────────────────────────────────────────────────────
 connection.starting: "Запуск агента..."
 connection.reconnecting: "Перепідключення..."
+connection.connecting_activity: "Підключення до агента…"
+connection.lost: "Підключення до агента втрачено. Введіть /restart, щоб підключитися знову."  # {Locked="/restart"}
 
 # ── Системні повідомлення (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "Скасовано."
 system.no_prompt_in_flight: "Немає активного запиту."
 system.authentication_failed: "Помилка автентифікації"
 system.command_copied_retry: "Команду скопійовано — виконайте її в іншому терміналі, потім натисніть Enter для повтору"  # {Locked="Enter"}
+system.stopped_max_tokens: "Відповідь було обрізано після досягнення ліміту виводу моделі."
+system.stopped_max_turn_requests: "Агент зупинився після досягнення ліміту запитів для цього ходу."
+system.stopped_refusal: "Агент відмовився продовжувати цей запит."
+system.agent_busy: "Агент зайнятий на цій вкладці — дочекайтеся завершення поточного запиту."
+system.resuming_session: "Відновлення сеансу %{session_id}..."
+system.unknown_command: "Невідома команда \"%{command}\" — надіслано як запит. Введіть /help, щоб переглянути список."  # {Locked="/help"}
+system.busy_use_stop: "Дочекайтеся завершення поточного запиту або спочатку скористайтеся /stop."  # {Locked="/stop"}
+system.cannot_focus_session: "Не вдається сфокусувати сеанс %{session_id}: він виглядає активним, але GUID панелі ще не прив’язано. Спробуйте ще раз за мить."
+system.cannot_resume_no_load_session: "Не вдається відновити в панелі агента: %{agent} не оголосив можливість ACP `loadSession`. Натисніть Enter (без Shift), щоб натомість відновити в новій панелі термінала."  # {Locked="ACP","loadSession","Enter","Shift"}
+system.cannot_resume_no_resume_flag: "Не вдається відновити сеанс %{agent}: цей агент не має прапорця в стилі `--resume`. Натисніть Shift+Enter, щоб спробувати відновити всередині панелі агента через ACP."  # {Locked="--resume","Shift","Enter","ACP"}
+system.cannot_resume_unknown_agent: "Не вдається відновити сеанс %{session_id}: його вихідний агент невідомий цій збірці WTA."
+system.cannot_resume_phantom_via_flag: "Не вдається відновити сеанс %{agent} %{session_id}: його було запущено, але в ньому не накопичилося жодної розмови, тому сам %{agent} відхилив би відновлення. Рядок видаляється."
+system.cannot_resume_phantom_via_load: "Не вдається відновити сеанс %{agent} %{session_id}: його було запущено, але в ньому не накопичилося жодної розмови, тому %{agent} відхилив би завантаження. Рядок видаляється."
+system.fallback.this_agent: "цей агент"
+system.fallback.connected_agent: "підключений агент"
 
 # ── Вивід CLI під час виконання (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Вікна не знайдено."
@@ -181,3 +198,6 @@ time.hour_singular: "1 годину тому"
 time.hours_other: "%{count} годин тому"
 time.day_singular: "1 день тому"
 time.days_other: "%{count} днів тому"
+
+# ── Виконання рекомендації (src/coordinator.rs) ─────────────────────────────
+system.choice_execution_failed: "Не вдалося виконати вибір %{choice}: %{error}"

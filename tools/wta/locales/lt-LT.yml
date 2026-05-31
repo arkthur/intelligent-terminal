@@ -1,6 +1,6 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
-setup.title.first_run: "Sveiki atvykę į Intelligent Terminal!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Sveiki atvykę į Išmanusis Terminalas!"
 setup.title.agent_missing: "Agentas nerastas"
 setup.title.agent_error: "Nepavyko prisijungti prie agento"
 setup.title.switch_agent: "Pakeisti agentą"
@@ -8,13 +8,13 @@ setup.title.not_available: "Agentas nepasiekiamas"
 setup.title.sign_in: "Reikia prisijungti"
 
 # %{agent} is replaced with the agent display name at runtime.
-setup.subtitle.copilot_missing: "Jūsų agentas \"%{agent}\" neįdiegtas. Norėdami jį įdiegti, atlikite toliau nurodytus veiksmus. Norėdami pakeisti agentą, eikite į Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "Jūsų agentas \"%{agent}\" neįdiegtas. Įdiekite jį iš naujo rankiniu būdu, tada bandykite dar kartą. Norėdami pakeisti agentą, eikite į Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "Jūsų agentas \"%{agent}\" reikalauja autentifikavimo. Norėdami prisijungti, atlikite toliau nurodytus veiksmus. Norėdami pakeisti agentą, eikite į Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "Jūsų agentas \"%{agent}\" reikalauja autentifikavimo. Prisijunkite per agentą, tada pasirinkite \"Prisijungiau\" žemiau. Norėdami pakeisti agentą, eikite į Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "Jūsų agentas \"%{agent}\" neįdiegtas. Norėdami jį įdiegti, atlikite toliau nurodytus veiksmus. Norėdami pakeisti agentą, eikite į Išmanusis Terminalas Settings > Agent."
+setup.subtitle.agent_missing: "Jūsų agentas \"%{agent}\" neįdiegtas. Įdiekite jį iš naujo rankiniu būdu, tada bandykite dar kartą. Norėdami pakeisti agentą, eikite į Išmanusis Terminalas Settings > Agent."
+setup.subtitle.copilot_auth: "Jūsų agentas \"%{agent}\" reikalauja autentifikavimo. Norėdami prisijungti, atlikite toliau nurodytus veiksmus. Norėdami pakeisti agentą, eikite į Išmanusis Terminalas Settings > Agent."
+setup.subtitle.agent_auth: "Jūsų agentas \"%{agent}\" reikalauja autentifikavimo. Prisijunkite per agentą, tada pasirinkite \"Prisijungiau\" žemiau. Norėdami pakeisti agentą, eikite į Išmanusis Terminalas Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Pasirinkite numatytąjį agentą, kurį norite naudoti Intelligent Terminal. Galite"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Pasirinkite numatytąjį agentą, kurį norite naudoti Išmanusis Terminalas. Galite"
 setup.description.fre_line2: "eiti į Settings, kad sukonfigūruotumėte ir nustatytumėte savo darbo sritį."
 
 setup.option.install: "Įdiegti %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Paspauskite Enter, kad prisijungtumėte, Esc, kad grįžtum
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Mąsto..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
-chat.welcome_title: "Sveiki atvykę į Intelligent Terminal!"
-chat.welcome_disclaimer: "Intelligent Terminal naudoja AI. Tikrinkite klaidas."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Sveiki atvykę į Išmanusis Terminalas!"
+chat.welcome_disclaimer: "Išmanusis Terminalas naudoja AI. Tikrinkite klaidas."
 chat.plan_header: "Planas:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -119,12 +119,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. rodyti / slėpti agento skydelį • Ctrl+
 # ── Connection state ────────────────────────────────────────────────────────
 connection.starting: "Paleidžiamas agentas..."
 connection.reconnecting: "Jungiamasi iš naujo..."
+connection.connecting_activity: "Jungiamasi prie agento…"
+connection.lost: "Ryšys su agentu nutrūko. Įveskite /restart, kad prisijungtumėte iš naujo."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Atšaukta."
 system.no_prompt_in_flight: "Nėra vykdomos užklausos."
 system.authentication_failed: "Autentifikavimas nepavyko"
 system.command_copied_retry: "Komanda nukopijuota — paleiskite ją kitame terminale, tada paspauskite Enter, kad bandytumėte iš naujo"  # {Locked="Enter"}
+system.stopped_max_tokens: "Atsakymas buvo nutrauktas pasiekus modelio išvesties ribą."
+system.stopped_max_turn_requests: "Agentas sustojo pasiekęs šio ėjimo užklausų ribą."
+system.stopped_refusal: "Agentas atsisakė tęsti šią užklausą."
+system.agent_busy: "Agentas šiame skirtuke užimtas — palaukite, kol dabartinė užklausa bus baigta."
+system.resuming_session: "Tęsiamas seansas %{session_id}..."
+system.unknown_command: "Nežinoma komanda \"%{command}\" — išsiųsta kaip užklausa. Sąrašui įveskite /help."  # {Locked="/help"}
+system.busy_use_stop: "Palaukite, kol dabartinė užklausa bus baigta, arba pirmiausia naudokite /stop."  # {Locked="/stop"}
+system.cannot_focus_session: "Nepavyksta sufokusuoti seanso %{session_id}: jis atrodo aktyvus, bet dar nėra susietas joks srities GUID. Bandykite dar kartą po akimirkos."
+system.cannot_resume_no_load_session: "Nepavyksta tęsti agento srityje: %{agent} nepaskelbė ACP `loadSession` galimybės. Paspauskite Enter (be Shift), kad vietoj to tęstumėte naujoje terminalo srityje."  # {Locked="ACP","loadSession","Enter","Shift"}
+system.cannot_resume_no_resume_flag: "Nepavyksta tęsti %{agent} seanso: šis agentas neturi `--resume` tipo vėliavėlės. Paspauskite Shift+Enter, kad pabandytumėte tęsti agento srityje per ACP."  # {Locked="--resume","Shift","Enter","ACP"}
+system.cannot_resume_unknown_agent: "Nepavyksta tęsti seanso %{session_id}: jo šaltinio agentas šiai WTA komponuotei nežinomas."
+system.cannot_resume_phantom_via_flag: "Nepavyksta tęsti %{agent} seanso %{session_id}: jis buvo paleistas, bet nesukaupė jokio pokalbio, todėl pats %{agent} atmestų tęsimą. Eilutė šalinama."
+system.cannot_resume_phantom_via_load: "Nepavyksta tęsti %{agent} seanso %{session_id}: jis buvo paleistas, bet nesukaupė jokio pokalbio, todėl %{agent} atmestų įkėlimą. Eilutė šalinama."
+system.fallback.this_agent: "šis agentas"
+system.fallback.connected_agent: "prijungtas agentas"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Langų nerasta."
@@ -171,3 +188,6 @@ time.hour_singular: "prieš %{count} valandą"
 time.hours_other: "prieš %{count} valandų"
 time.day_singular: "prieš %{count} dieną"
 time.days_other: "prieš %{count} dienų"
+
+# ── Rekomendacijos vykdymas (src/coordinator.rs) ────────────────────────────
+system.choice_execution_failed: "Pasirinkimas %{choice} nepavyko: %{error}"

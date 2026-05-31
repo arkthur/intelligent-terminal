@@ -1,6 +1,6 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
-setup.title.first_run: "Tervetuloa Intelligent Terminaliin!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Tervetuloa Älykäs Pääteiin!"
 setup.title.agent_missing: "Agenttia ei löytynyt"
 setup.title.agent_error: "Yhteys agenttiin epäonnistui"
 setup.title.switch_agent: "Vaihda agentti"
@@ -8,13 +8,13 @@ setup.title.not_available: "Agentti ei ole käytettävissä"
 setup.title.sign_in: "Kirjautuminen vaaditaan"
 
 # %{agent} is replaced with the agent display name at runtime.
-setup.subtitle.copilot_missing: "Agenttiasi \"%{agent}\" ei ole asennettu. Asenna se seuraamalla alla olevia ohjeita. Vaihtaaksesi agenttia siirry kohtaan Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "Agenttiasi \"%{agent}\" ei ole asennettu. Asenna se uudelleen manuaalisesti ja yritä sitten uudelleen. Vaihtaaksesi agenttia siirry kohtaan Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "Agenttisi \"%{agent}\" vaatii todennuksen. Kirjaudu sisään seuraamalla alla olevia ohjeita. Vaihtaaksesi agenttia siirry kohtaan Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "Agenttisi \"%{agent}\" vaatii todennuksen. Kirjaudu sisään agentin kautta ja valitse sitten alta \"Olen kirjautunut sisään\". Vaihtaaksesi agenttia siirry kohtaan Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "Agenttiasi \"%{agent}\" ei ole asennettu. Asenna se seuraamalla alla olevia ohjeita. Vaihtaaksesi agenttia siirry kohtaan Älykäs Pääte Settings > Agent."
+setup.subtitle.agent_missing: "Agenttiasi \"%{agent}\" ei ole asennettu. Asenna se uudelleen manuaalisesti ja yritä sitten uudelleen. Vaihtaaksesi agenttia siirry kohtaan Älykäs Pääte Settings > Agent."
+setup.subtitle.copilot_auth: "Agenttisi \"%{agent}\" vaatii todennuksen. Kirjaudu sisään seuraamalla alla olevia ohjeita. Vaihtaaksesi agenttia siirry kohtaan Älykäs Pääte Settings > Agent."
+setup.subtitle.agent_auth: "Agenttisi \"%{agent}\" vaatii todennuksen. Kirjaudu sisään agentin kautta ja valitse sitten alta \"Olen kirjautunut sisään\". Vaihtaaksesi agenttia siirry kohtaan Älykäs Pääte Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Valitse oletusagentti, jota haluat käyttää Intelligent Terminalissa. Voit"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Valitse oletusagentti, jota haluat käyttää Älykäs Pääteissa. Voit"
 setup.description.fre_line2: "siirtyä kohtaan Settings määrittääksesi ja ottaaksesi käyttöön työtilasi."
 
 setup.option.install: "Asenna %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Paina Enter kirjautuaksesi sisään, Esc palataksesi takais
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Ajattelee..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
-chat.welcome_title: "Tervetuloa Intelligent Terminaliin!"
-chat.welcome_disclaimer: "Intelligent Terminal käyttää tekoälyä. Tarkista virheet."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Tervetuloa Älykäs Pääteiin!"
+chat.welcome_disclaimer: "Älykäs Pääte käyttää tekoälyä. Tarkista virheet."
 chat.plan_header: "Suunnitelma:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -119,12 +119,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. näyttää/piilottaa agenttipaneelin • C
 # ── Connection state ────────────────────────────────────────────────────────
 connection.starting: "Käynnistetään agenttia..."
 connection.reconnecting: "Yhdistetään uudelleen..."
+connection.connecting_activity: "Yhdistetään agenttiin…"
+connection.lost: "Yhteys agenttiin katkesi. Muodosta yhteys uudelleen kirjoittamalla /restart."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Peruutettu."
 system.no_prompt_in_flight: "Ei käynnissä olevaa kehotetta."
 system.authentication_failed: "Todennus epäonnistui"
 system.command_copied_retry: "Komento kopioitu — suorita se toisessa terminaalissa ja paina sitten Enter yrittääksesi uudelleen"  # {Locked="Enter"}
+system.stopped_max_tokens: "Vastaus katkaistiin mallin tulostusrajan saavuttamisen jälkeen."
+system.stopped_max_turn_requests: "Agentti pysähtyi saavutettuaan tämän vuoron pyyntörajan."
+system.stopped_refusal: "Agentti kieltäytyi jatkamasta tätä pyyntöä."
+system.agent_busy: "Agentti on varattu tässä välilehdessä — odota, että nykyinen kehote valmistuu."
+system.resuming_session: "Jatketaan istuntoa %{session_id}..."
+system.unknown_command: "Tuntematon komento \"%{command}\" — lähetetty kehotteena. Näytä luettelo kirjoittamalla /help."
+system.busy_use_stop: "Odota, että nykyinen kehote valmistuu, tai käytä ensin /stop."
+system.cannot_focus_session: "Istuntoon %{session_id} ei voi kohdistaa: se näyttää olevan käytössä, mutta ruudun GUID-tunnusta ei ole vielä sidottu. Yritä hetken kuluttua uudelleen."
+system.cannot_resume_no_load_session: "Agenttiruudussa ei voi jatkaa: %{agent} ei ilmoittanut ACP `loadSession` -ominaisuutta. Jatka sen sijaan uudessa pääteruudussa painamalla Enter (ilman Shift-näppäintä)."
+system.cannot_resume_no_resume_flag: "%{agent}-istuntoa ei voi jatkaa: tällä agentilla ei ole `--resume`-tyylistä lippua. Kokeile jatkamista agenttiruudussa ACP:n kautta painamalla Shift+Enter."
+system.cannot_resume_unknown_agent: "Istuntoa %{session_id} ei voi jatkaa: sen lähdeagenttia ei tunneta tässä koontiversiossa."
+system.cannot_resume_phantom_via_flag: "%{agent}-istuntoa %{session_id} ei voi jatkaa: se käynnistettiin, mutta siihen ei koskaan kertynyt keskustelua, joten %{agent} itse hylkäisi jatkamisen. Poistetaan rivi."
+system.cannot_resume_phantom_via_load: "%{agent}-istuntoa %{session_id} ei voi jatkaa: se käynnistettiin, mutta siihen ei koskaan kertynyt keskustelua, joten %{agent} hylkäisi latauksen. Poistetaan rivi."
+system.fallback.this_agent: "tämä agentti"
+system.fallback.connected_agent: "yhdistetty agentti"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Ikkunoita ei löytynyt."
@@ -171,3 +188,6 @@ time.hour_singular: "%{count} tunti sitten"
 time.hours_other: "%{count} tuntia sitten"
 time.day_singular: "%{count} päivä sitten"
 time.days_other: "%{count} päivää sitten"
+
+# ── Suosituksen suorittaminen (src/coordinator.rs) ───────────────────────────
+system.choice_execution_failed: "Valinta %{choice} epäonnistui: %{error}"

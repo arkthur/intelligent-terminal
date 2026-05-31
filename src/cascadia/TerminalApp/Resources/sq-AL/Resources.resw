@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Mirë se vini në Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Mirë se vini në Terminali inteligjent</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Konfiguroni asistentin tuaj të integruar për t'ju ndihmuar të shpjegoni gabimet, të hartoni komanda dhe të zhbllokoni detyra pikërisht aty ku punoni. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Mësoni më shumë rreth Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Mësoni më shumë rreth Terminali inteligjent</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Qëndroni në rrjedhë me agjentin tuaj të integruar AI</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Mirë se vini në Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Mirë se vini në Terminali inteligjent</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Zgjidhni çfarë dëshiron të konfigurosh tani. Mund t'i ndryshosh këto në çdo kohë. </value>
@@ -181,8 +181,8 @@
     <value>Menaxhimi i seancave</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Jepini Intelligent Terminal leje për të ndjekur statusin e agjentëve tuaj në ekzekutim ose aktiv.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Jepini Terminali inteligjent leje për të ndjekur statusin e agjentëve tuaj në ekzekutim ose aktiv.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Aktivizimi i kësaj do të instalojë hooks integrimi për ndjekjen e seancave midis agjentëve tuaj.</value>
@@ -228,17 +228,6 @@
     <value>⚠ Instalimi i Node.js dështoi. Kontrolloni lidhjen e rrjetit dhe provoni përsëri.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Instalimi i session hooks dështoi. Menaxhimi i sesioneve është çaktivizuar. Mund ta riaktivizoni dhe të provoni përsëri, ose të ruani për të vazhduar pa të.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Instalimi i integrimit të shell-it dështoi. Zbulimi i gabimeve është çaktivizuar. Mund ta riaktivizoni dhe të provoni përsëri, ose të ruani për të vazhduar pa të.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Mësoni si ta rregulloni këtë manualisht</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Aktiv</value>
   </data>
@@ -258,8 +247,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Klikoni {0} për të rregulluar gabimin</value>
+    <value>Klikoni ose shtypni {0} për t'i kërkuar agjentit një rregullim të sugjeruar</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Rregullimi është gati. Shtypni {0} për të shqyrtuar</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Hapni panelin e agjentit për të shqyrtuar rregullimin e sugjeruar</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>U zbulua një gabim. Klikoni ose shtypni {0} që t'i kërkoni agjentit të IA të diagnostikojë dhe të sugjerojë një zgjidhje.</value>
@@ -307,4 +304,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Lejoni Intelligent Terminal të hyjë në guaskën tuaj dhe të zbulojë gabimet automatikisht.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Instalimi i integrimit të shell-it dështoi. Zbulimi i gabimeve është çaktivizuar. Mund ta riaktivizoni dhe të provoni përsëri, ose të ruani për të vazhduar pa të.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Instalimi i session hooks dështoi. Menaxhimi i sesioneve është çaktivizuar. Mund ta riaktivizoni dhe të provoni përsëri, ose të ruani për të vazhduar pa të.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Mësoni si ta rregulloni këtë manualisht</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

@@ -1,6 +1,6 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
-setup.title.first_run: "Intelligent Terminal-a xoş gəlmisiniz!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Ağıllı Terminal-a xoş gəlmisiniz!"
 setup.title.agent_missing: "Agent tapılmadı"
 setup.title.agent_error: "Agent bağlantısı uğursuz oldu"
 setup.title.switch_agent: "Agenti dəyiş"
@@ -8,13 +8,13 @@ setup.title.not_available: "Agent əlçatan deyil"
 setup.title.sign_in: "Daxil olma tələb olunur"
 
 # %{agent} is replaced with the agent display name at runtime.
-setup.subtitle.copilot_missing: "Agentiniz \"%{agent}\" quraşdırılmayıb. Quraşdırmaq üçün aşağıdakı addımları izləyin. Agenti dəyişmək üçün Intelligent Terminal Settings > Agent-ə keçin."
-setup.subtitle.agent_missing: "Agentiniz \"%{agent}\" quraşdırılmayıb. Lütfən əllə yenidən quraşdırın, sonra yenidən cəhd edin. Agenti dəyişmək üçün Intelligent Terminal Settings > Agent-ə keçin."
-setup.subtitle.copilot_auth: "Agentiniz \"%{agent}\" kimlik doğrulaması tələb edir. Daxil olmaq üçün aşağıdakı addımları izləyin. Agenti dəyişmək üçün Intelligent Terminal Settings > Agent-ə keçin."
-setup.subtitle.agent_auth: "Agentiniz \"%{agent}\" kimlik doğrulaması tələb edir. Lütfən agent vasitəsilə daxil olun, sonra aşağıda \"Daxil oldum\" seçin. Agenti dəyişmək üçün Intelligent Terminal Settings > Agent-ə keçin."
+setup.subtitle.copilot_missing: "Agentiniz \"%{agent}\" quraşdırılmayıb. Quraşdırmaq üçün aşağıdakı addımları izləyin. Agenti dəyişmək üçün Ağıllı Terminal Settings > Agent-ə keçin."
+setup.subtitle.agent_missing: "Agentiniz \"%{agent}\" quraşdırılmayıb. Lütfən əllə yenidən quraşdırın, sonra yenidən cəhd edin. Agenti dəyişmək üçün Ağıllı Terminal Settings > Agent-ə keçin."
+setup.subtitle.copilot_auth: "Agentiniz \"%{agent}\" kimlik doğrulaması tələb edir. Daxil olmaq üçün aşağıdakı addımları izləyin. Agenti dəyişmək üçün Ağıllı Terminal Settings > Agent-ə keçin."
+setup.subtitle.agent_auth: "Agentiniz \"%{agent}\" kimlik doğrulaması tələb edir. Lütfən agent vasitəsilə daxil olun, sonra aşağıda \"Daxil oldum\" seçin. Agenti dəyişmək üçün Ağıllı Terminal Settings > Agent-ə keçin."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Intelligent Terminal-da istifadə etmək istədiyiniz standart agenti seçin. İş sahənizi"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Ağıllı Terminal-da istifadə etmək istədiyiniz standart agenti seçin. İş sahənizi"
 setup.description.fre_line2: "konfiqurasiya etmək və qurmaq üçün Settings-ə keçə bilərsiniz."
 
 setup.option.install: "%{agent} quraşdır"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Daxil olmaq üçün Enter, geri qayıtmaq üçün Esc bası
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Düşünür…"
-# {Locked="Intelligent Terminal"} - product name, do not translate
-chat.welcome_title: "Intelligent Terminal-a xoş gəlmisiniz!"
-chat.welcome_disclaimer: "Intelligent Terminal AI istifadə edir. Səhvləri yoxlayın."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Ağıllı Terminal-a xoş gəlmisiniz!"
+chat.welcome_disclaimer: "Ağıllı Terminal AI istifadə edir. Səhvləri yoxlayın."
 chat.plan_header: "Plan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -130,12 +130,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. agent panelini göstər/gizlə • Ctrl+Sh
 # ── Connection state ────────────────────────────────────────────────────────
 connection.starting: "Agent başladılır..."
 connection.reconnecting: "Yenidən qoşulur..."
+connection.connecting_activity: "Agentə qoşulur…"
+connection.lost: "Agentlə bağlantı itdi. Yenidən qoşulmaq üçün /restart yazın."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Ləğv edildi."
 system.no_prompt_in_flight: "İcra olunan sorğu yoxdur."
 system.authentication_failed: "Kimlik doğrulaması uğursuz oldu"
 system.command_copied_retry: "Əmr kopyalandı — başqa terminalda icra edin, sonra yenidən sınamaq üçün Enter basın"  # {Locked="Enter"}
+system.stopped_max_tokens: "Cavab modelin çıxış həddinə çatdıqdan sonra kəsildi."
+system.stopped_max_turn_requests: "Agent bu növbə üçün sorğu həddinə çatdıqdan sonra dayandı."
+system.stopped_refusal: "Agent bu sorğunu davam etdirməkdən imtina etdi."
+system.agent_busy: "Agent bu tabda məşğuldur — cari sorğunun tamamlanmasını gözləyin."
+system.resuming_session: "Sessiya %{session_id} bərpa olunur..."
+system.unknown_command: "Naməlum əmr \"%{command}\" — sorğu kimi göndərildi. Siyahı üçün /help yazın."  # {Locked="/help"}
+system.busy_use_stop: "Cari sorğunun tamamlanmasını gözləyin və ya əvvəlcə /stop istifadə edin."  # {Locked="/stop"}
+system.cannot_focus_session: "Sessiya %{session_id} fokuslana bilmir: canlı görünür, amma hələ heç bir panel GUID-i bağlanmayıb. Bir az sonra yenidən cəhd edin."
+system.cannot_resume_no_load_session: "Agent panelində bərpa etmək mümkün deyil: %{agent} ACP `loadSession` imkanını elan etməyib. Bunun əvəzinə yeni terminal panelində bərpa etmək üçün Enter (Shift olmadan) basın."  # {Locked="ACP","loadSession","Enter","Shift"}
+system.cannot_resume_no_resume_flag: "%{agent} sessiyasını bərpa etmək mümkün deyil: bu agentdə `--resume` üslublu bayraq yoxdur. Əvəzində ACP vasitəsilə agent panelində bərpa etməyi sınamaq üçün Shift+Enter basın."  # {Locked="--resume","Shift","Enter","ACP"}
+system.cannot_resume_unknown_agent: "Sessiya %{session_id} bərpa edilə bilmir: onun mənbə agenti bu WTA quruluşuna məlum deyil."
+system.cannot_resume_phantom_via_flag: "%{agent} sessiyası %{session_id} bərpa edilə bilmir: o başladılıb, amma heç bir söhbət toplanmayıb, buna görə %{agent} özü bərpanı rədd edəcək. Sətir silinir."
+system.cannot_resume_phantom_via_load: "%{agent} sessiyası %{session_id} bərpa edilə bilmir: o başladılıb, amma heç bir söhbət toplanmayıb, buna görə %{agent} yükləməni rədd edəcək. Sətir silinir."
+system.fallback.this_agent: "bu agent"
+system.fallback.connected_agent: "qoşulmuş agent"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Pəncərə tapılmadı."
@@ -181,3 +198,6 @@ time.hour_singular: "%{count} saat əvvəl"
 time.hours_other: "%{count} saat əvvəl"
 time.day_singular: "%{count} gün əvvəl"
 time.days_other: "%{count} gün əvvəl"
+
+# ── Tövsiyənin icrası (src/coordinator.rs) ──────────────────────────────────
+system.choice_execution_failed: "Seçim %{choice} uğursuz oldu: %{error}"

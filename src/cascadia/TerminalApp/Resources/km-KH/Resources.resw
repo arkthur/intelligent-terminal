@@ -6,15 +6,15 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>សូមស្វាគមន៍មកកាន់ Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.</comment>
+    <value>សូមស្វាគមន៍មកកាន់ ស្ថានីយឆ្លាតវៃ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>រៀបចំអ្នកជំនួយការដែលដំឡើងដើម្បីជួយអ្នកពន្យល់កំហុស តែងពាក្យបញ្ជា និងដោះស្រាយកិច្ចការត្រង់កន្លែងដែលអ្នកត្រូវធ្វើការ។ </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>ស្វែងយល់បន្ថែមអំពី Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.</comment>
+    <value>ស្វែងយល់បន្ថែមអំពី ស្ថានីយឆ្លាតវៃ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>នៅតែនិងអ្នកជាមួយភ្នាក់ងារ AI ដែលដំឡើងដើម្បី</value>
@@ -36,8 +36,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>សូមស្វាគមន៍មកកាន់ Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.</comment>
+    <value>សូមស្វាគមន៍មកកាន់ ស្ថានីយឆ្លាតវៃ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>ជ្រើសរើសអ្វីដែលត្រូវដំឡើងឥឡូវនេះ។ អ្នកអាចផ្លាស់ប្តូរទាំងនេះបានគ្រប់ពេល។ </value>
@@ -68,9 +68,8 @@
     <value>ការគ្រប់គ្រងវគ្គ</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>អនុញ្ញាត Intelligent Terminal ឲ្យតាមដានស្ថានភាពភ្នាក់ងារដែលកំពុងត្រូវដំណើរការ ឬសកម្ម។</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <value>អនុញ្ញាត ស្ថានីយឆ្លាតវៃ ឲ្យតាមដានស្ថានភាពភ្នាក់ងារដែលកំពុងត្រូវដំណើរការ ឬសកម្ម។</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ ការបើកនេះនឹងតំឡើង hooks វគ្គដើម្បីតាមដានវគ្គក្នុងភ្នាក់ងាររបស់អ្នក។</value>
@@ -116,17 +115,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>⚠ ការតំឡើង Node.js បានបរាជ័យ។ ពិនិត្យម៉ោងការតភ្ជាប់បណ្តាញ និងសាកល្បងឡើងវិញ។</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ បានបរាជ័យក្នុងការតំឡើង session hooks។ ការគ្រប់គ្រងវគ្គត្រូវបានបិទ។ អ្នកអាចបើកវាឡើងវិញ ហើយសាកល្បងម្ដងទៀត ឬរក្សាទុកដើម្បីបន្តដោយគ្មានវា។</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ បានបរាជ័យក្នុងការតំឡើងការរួមបញ្ចូល shell។ ការរកឃើញកំហុសត្រូវបានបិទ។ អ្នកអាចបើកវាឡើងវិញ ហើយសាកល្បងម្ដងទៀត ឬរក្សាទុកដើម្បីបន្តដោយគ្មានវា។</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>ស្វែងយល់ពីរបៀបជួសជុលវាដោយដៃ</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>បើក</value>
   </data>
@@ -139,4 +127,12 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>ផ្តល់សិទ្ធិឱ្យ Intelligent Terminal ចូលប្រើសែលរបស់អ្នក និងរកឃើញកំហុសដោយស្វ័យប្រវត្តិ។</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ បានបរាជ័យក្នុងការតំឡើងការរួមបញ្ចូល shell។ ការរកឃើញកំហុសត្រូវបានបិទ។ អ្នកអាចបើកវាឡើងវិញ ហើយសាកល្បងម្ដងទៀត ឬរក្សាទុកដើម្បីបន្តដោយគ្មានវា។</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ បានបរាជ័យក្នុងការតំឡើង session hooks។ ការគ្រប់គ្រងវគ្គត្រូវបានបិទ។ អ្នកអាចបើកវាឡើងវិញ ហើយសាកល្បងម្ដងទៀត ឬរក្សាទុកដើម្បីបន្តដោយគ្មានវា។</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>ស្វែងយល់ពីរបៀបជួសជុលវាដោយដៃ</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

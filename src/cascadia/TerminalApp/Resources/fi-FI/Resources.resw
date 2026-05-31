@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Tervetuloa Intelligent Terminaliin</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Tervetuloa Älykäs Pääteiin</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Määritä sisäänrakennettu avustajasi auttamaan sinua selittämään virheitä, laatimaan komentoja ja ratkaisemaan tehtäviä suoraan siellä, missä työskentelet. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Lue lisää Intelligent Terminalista</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Lue lisää Älykäs Pääteista</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Pysy työn imussa sisäänrakennetun AI-agenttisi kanssa</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Tervetuloa Intelligent Terminaliin</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Tervetuloa Älykäs Pääteiin</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Valitse, mitä haluat määrittää nyt. Voit muuttaa näitä asetuksia milloin tahansa. </value>
@@ -181,9 +181,8 @@
     <value>Istunnonhallinta</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Anna Intelligent Terminalille oikeus seurata käynnissä olevien tai aktiivisten agenttiesi tilaa.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <value>Anna Älykäs Pääteille oikeus seurata käynnissä olevien tai aktiivisten agenttiesi tilaa.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Tämän ottaminen käyttöön asentaa integraatio-hooksit istuntojen seuraamiseksi agenttiesi välillä.</value>
@@ -229,17 +228,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>⚠ Node.js-asennus epäonnistui. Tarkista verkkoyhteys ja yritä uudelleen.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Session hooks eivät asentuneet. Istunnonhallinta on poistettu käytöstä. Voit ottaa sen uudelleen käyttöön ja yrittää uudelleen tai tallentaa jatkaaksesi ilman sitä.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Komentotulkin integroinnin asennus epäonnistui. Virheiden tunnistus on poistettu käytöstä. Voit ottaa sen uudelleen käyttöön ja yrittää uudelleen tai tallentaa jatkaaksesi ilman sitä.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Opi korjaamaan tämä manuaalisesti</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Päällä</value>
   </data>
@@ -259,8 +247,16 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Korjaa virhe napsauttamalla {0}</value>
+    <value>Napsauta tai paina {0} pyytääksesi agentilta ehdotettua korjausta</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Korjaus valmis. Tarkista painamalla {0}</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Avaa agenttiruutu tarkistaaksesi ehdotetun korjauksen</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Virhe havaittu. Pyydä tekoälyagenttia diagnosoimaan ja ehdottamaan korjausta napsauttamalla tai painamalla {0}.</value>
@@ -308,4 +304,12 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Salli Intelligent Terminalin käyttää komentotulkkia ja tunnistaa virheet automaattisesti.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Komentotulkin integroinnin asennus epäonnistui. Virheiden tunnistus on poistettu käytöstä. Voit ottaa sen uudelleen käyttöön ja yrittää uudelleen tai tallentaa jatkaaksesi ilman sitä.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Session hooks eivät asentuneet. Istunnonhallinta on poistettu käytöstä. Voit ottaa sen uudelleen käyttöön ja yrittää uudelleen tai tallentaa jatkaaksesi ilman sitä.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Opi korjaamaan tämä manuaalisesti</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

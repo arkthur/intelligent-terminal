@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Dobro došli u Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Dobro došli u Inteligentni Terminal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Postavite ugrađenog pomoćnika koji će vam pomoći objašnjavati pogreške, sastavljati naredbe i odblokirati zadatke upravo tamo gdje radite. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Saznajte više o Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Saznajte više o Inteligentni Terminal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Ostanite u tijeku s ugrađenim AI agentom</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Dobro došli u Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Dobro došli u Inteligentni Terminal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Odaberite što želite sada postaviti. Ovo možete promijeniti u bilo kojem trenutku. </value>
@@ -181,8 +181,8 @@
     <value>Upravljanje sesijama</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Dajte Intelligent Terminal dopuštenje za praćenje statusa vaših pokrenutih ili aktivnih agenata.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Dajte Inteligentni Terminal dopuštenje za praćenje statusa vaših pokrenutih ili aktivnih agenata.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Omogućavanje ovoga instalirat će integracijske hooks za praćenje sesija među vašim agentima.</value>
@@ -228,17 +228,6 @@
     <value>⚠ Instalacija Node.js nije uspjela. Provjerite mrežnu vezu i pokušajte ponovno.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Instalacija session hooks nije uspjela. Upravljanje sesijama je isključeno. Možete ga ponovno omogućiti i pokušati ponovno ili spremiti za nastavak bez njega.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Instalacija integracije ljuske nije uspjela. Otkrivanje pogrešaka je isključeno. Možete ga ponovno omogućiti i pokušati ponovno ili spremiti za nastavak bez njega.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Saznajte kako to ručno popraviti</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Uključeno</value>
   </data>
@@ -258,8 +247,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Kliknite {0} za ispravljanje pogreške</value>
+    <value>Kliknite ili pritisnite {0} da biste od agenta zatražili predloženi popravak</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Popravak je spreman. Pritisnite {0} za pregled</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Otvorite okno agenta za pregled predloženog popravka</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Otkrivena je pogreška. Kliknite ili pritisnite {0} kako biste zatražili od AI agenta da dijagnosticira i predloži popravak.</value>
@@ -307,4 +304,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Dopustite aplikaciji Intelligent Terminal pristup ljusci i automatsko otkrivanje pogrešaka.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Instalacija integracije ljuske nije uspjela. Otkrivanje pogrešaka je isključeno. Možete ga ponovno omogućiti i pokušati ponovno ili spremiti za nastavak bez njega.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Instalacija session hooks nije uspjela. Upravljanje sesijama je isključeno. Možete ga ponovno omogućiti i pokušati ponovno ili spremiti za nastavak bez njega.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Saznajte kako to ručno popraviti</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

@@ -135,7 +135,7 @@ struct MasterStateInner {
     /// helper sharing this master.
     session_to_helper: Mutex<HashMap<acp::SessionId, HelperRoute>>,
     /// Authoritative live-session set, owned by master. Mirrors what
-    /// helpers learn via ext-notifications and what the F2 view sees
+    /// helpers learn via ext-notifications and what the session management view sees
     /// via the standard ACP `session/list` request. Kept beside
     /// `session_to_helper` (rather than fused with it) so the
     /// per-row metadata that `SessionInfo` carries — cwd, future
@@ -195,12 +195,40 @@ struct MasterStateInner {
     /// startup from `cli.agent` via `agent_registry::resolve_agent_id_from_cmd`.
     /// Used to stamp `cli_source` on every SessionInfo upserted from
     /// `session/new` and `session/load` so agent-pane sessions are not
-    /// reported with cli_source=None (which would make F2 Enter on a
+    /// reported with cli_source=None (which would make session management Enter on a
     /// Live row fall through to the resume path and fail with
     /// "unknown CLI"). `None` only when running with an agent CLI we
     /// don't recognize (e.g. `--agent codex` — tracked in CliSource::Unknown
-    /// but not surfaced as a known F2 filter).
+    /// but not surfaced as a known session management filter).
     pub(crate) cli_source: Option<crate::agent_sessions::CliSource>,
+    /// Per-helper crash-recovery metadata, keyed by `HelperId`.
+    ///
+    /// Populated/refreshed by the `new_session` + `load_session`
+    /// handlers (which see the helper-supplied `_meta.wta.owner_tab_id`
+    /// and the resulting `SessionId`), and consumed by `serve_helper`
+    /// when a helper's pipe disconnects: if the entry carries an
+    /// `owner_tab_id`, master emits a `restart_agent_pane` event so C++
+    /// re-warms a fresh helper for that tab (resuming the recorded
+    /// `last_session_id`). One entry per helper — `last_session_id` is
+    /// the most recently created/loaded session, i.e. the one the user
+    /// was last looking at, which is the right one to resume.
+    ///
+    /// Independent lock from `session_to_helper` so the per-session
+    /// routing hot path never contends on it.
+    pub(crate) helper_meta: Mutex<HashMap<HelperId, HelperRecoveryMeta>>,
+}
+
+/// Per-helper recovery metadata stashed in
+/// [`MasterStateInner::helper_meta`]. See the field doc for lifecycle.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct HelperRecoveryMeta {
+    /// The WT tab StableId that owns this helper's agent pane, from
+    /// `_meta.wta.owner_tab_id`. `None` for non-agent-pane helpers — in
+    /// which case no `restart_agent_pane` is emitted on disconnect.
+    pub(crate) owner_tab_id: Option<String>,
+    /// The most recently created/loaded session for this helper — the
+    /// one to resume via `--initial-load-session-id` on recovery.
+    pub(crate) last_session_id: Option<acp::SessionId>,
 }
 
 /// Master's `acp::Client` impl: handles inbound from the agent CLI.
@@ -500,9 +528,16 @@ impl acp::Client for MasterClient {
             op = "create_terminal",
             helper_id = ?helper_id,
             session_id = ?sid,
-            command = %args.command,
             args_len = args.args.len(),
             "forwarding terminal/create to helper"
+        );
+        // Command line can carry user/file content — trace only.
+        tracing::trace!(
+            target: "master.content",
+            session_id = ?sid,
+            command = %args.command,
+            args = ?args.args,
+            "create_terminal command"
         );
         forwarder.create_terminal(args).await
     }
@@ -773,7 +808,7 @@ impl acp::Agent for HelperHandler {
         info.pane_session_id = wta_meta.pane_session_id;
         // Stamp the row as a Live agent-pane session. Without this, the
         // row lands in master's registry with status=cli_source=origin=None,
-        // and helper-side F2 routing treats it as Historical (the default
+        // and helper-side session management routing treats it as Historical (the default
         // fallback in session_info_to_agent_session). Enter on it then
         // tries to resume and fails with "unknown CLI" since cli_source
         // is None. Agent-pane sessions never get a SessionStarted hook
@@ -787,7 +822,18 @@ impl acp::Agent for HelperHandler {
             .ok()
             .map(|d| d.as_millis() as u64);
         self.state.registry.upsert(info.clone()).await;
-        // Fan a `session_added` ExtNotification out to every other
+        // Record crash-recovery metadata for this helper: the owning
+        // WT tab StableId (so master can address a `restart_agent_pane`
+        // event on disconnect) and the just-created session as the
+        // resume target. See `MasterStateInner::helper_meta`.
+        {
+            let mut meta = self.state.helper_meta.lock().await;
+            let entry = meta.entry(self.helper_id).or_default();
+            if wta_meta.owner_tab_id.is_some() {
+                entry.owner_tab_id = wta_meta.owner_tab_id.clone();
+            }
+            entry.last_session_id = Some(resp.session_id.clone());
+        }
         // helper so their mirrors learn about this new row without
         // having to re-run `session/list`. The disconnecting-helper
         // race is benign: if a peer disconnects between us picking it
@@ -884,7 +930,7 @@ impl acp::Agent for HelperHandler {
                 // which include the disk-derived chat title (e.g.
                 // "# Terminal AgentYou"). A naked `SessionInfo::new`
                 // upsert would clobber that title with `None`, leaving
-                // the resumed Live row showing "—" in F2. By copying
+                // the resumed Live row showing "—" in session management view. By copying
                 // the prior title we keep the resumed row identifiable
                 // to the user.
                 if let Some(existing) =
@@ -898,22 +944,16 @@ impl acp::Agent for HelperHandler {
                     }
                 }
                 self.state.registry.upsert(info.clone()).await;
-                crate::master::broadcast_ext_to_helpers(
-                    &self.state,
-                    crate::session_registry::build_session_added_notification(&info),
-                )
-                .await;
-                crate::master::broadcast_ext_to_helpers(
-                    &self.state,
-                    crate::session_registry::build_sessions_changed_notification(),
-                )
-                .await;
-                tracing::info!(
-                    target: "master",
-                    helper_id = ?self.helper_id,
-                    session_id = ?session_id,
-                    "loaded session bound to helper"
-                );
+                // Mirror new_session: refresh crash-recovery metadata so
+                // a resume targets the session the user is now looking at.
+                {
+                    let mut meta = self.state.helper_meta.lock().await;
+                    let entry = meta.entry(self.helper_id).or_default();
+                    if wta_meta.owner_tab_id.is_some() {
+                        entry.owner_tab_id = wta_meta.owner_tab_id.clone();
+                    }
+                    entry.last_session_id = Some(session_id.clone());
+                }
                 Ok(resp)
             }
             Err(err) => {
@@ -998,8 +1038,8 @@ impl acp::Agent for HelperHandler {
     /// Answer `session/list` from our own live-session registry instead
     /// of forwarding to the agent CLI.
     ///
-    /// Rationale: the only live-session view that matters to the F2
-    /// Terminal session-management panel is "what's wired up through
+    /// Rationale: the only live-session view that matters to the
+    /// Terminal session management panel is "what's wired up through
     /// master right now" — agent-CLI-side dormant history is exposed
     /// separately through `agent-pane-sessions.jsonl` + per-CLI
     /// `<cli> --resume`. Forwarding to the agent CLI would conflate
@@ -1149,7 +1189,9 @@ impl acp::Agent for HelperHandler {
 
 /// Master mode entry point.
 pub async fn run_master_mode(cli: Cli, pipe_name: String) -> Result<()> {
-    let _guard = crate::logging::init("main_master");
+    // Logging is initialized once in `main()`; the WorkerGuard lives there for
+    // the whole process so the non-blocking appender flushes on the graceful
+    // shutdown path (see the `run_master_loop` shutdown notes below).
     tracing::info!(
         target: "master",
         pipe_name = %pipe_name,
@@ -1163,10 +1205,49 @@ pub async fn run_master_mode(cli: Cli, pipe_name: String) -> Result<()> {
         ));
     }
 
+    // Kick off the auto-upgrade check on a blocking-pool thread. Fire-and-
+    // forget — the agent CLI spawn below proceeds concurrently. Fast-path
+    // cache (see `agent_hooks_installer::upgrade_installed_hooks` doc) keeps
+    // the common no-upgrade case under ~10ms; only the first run after an
+    // IT install/upgrade does any per-CLI work. Caveat: when an upgrade is
+    // actually needed, the agent CLI process master is about to spawn may
+    // miss the new hooks until its next restart.
+    //
+    // Wrap in `catch_unwind` so an unexpected panic inside the upgrade flow
+    // (or any of its transitive dependencies) doesn't get silently swallowed
+    // by tokio's fire-and-forget JoinHandle. Master keeps running either
+    // way; this just promotes the panic into a visible trace event.
+    tokio::task::spawn_blocking(|| {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+            crate::agent_hooks_installer::upgrade_installed_hooks,
+        ));
+        if let Err(panic) = result {
+            let msg = panic
+                .downcast_ref::<&'static str>()
+                .copied()
+                .or_else(|| panic.downcast_ref::<String>().map(|s| s.as_str()))
+                .unwrap_or("<non-string panic payload>");
+            tracing::error!(
+                target: "agent_hooks",
+                panic = %msg,
+                "upgrade_installed_hooks panicked; master continues",
+            );
+        }
+    });
+
     let local_set = LocalSet::new();
-    local_set
+    let result = local_set
         .run_until(async move { run_master_loop(cli, pipe_name).await })
-        .await
+        .await;
+
+    // Every master-side failure (named-pipe create/connect, agent CLI spawn,
+    // ACP initialize timeout/failure, accept-loop shutdown) funnels through
+    // here. Log with target=master so connection failures are always present
+    // in wta-main_master.log, greppable alongside the success-path traces.
+    if let Err(err) = &result {
+        tracing::error!(target: "master", error = ?err, "wta-master exiting with error");
+    }
+    result
 }
 
 
@@ -1266,13 +1347,16 @@ async fn run_master_loop(cli: Cli, pipe_name: String) -> Result<()> {
         .ok_or_else(|| anyhow!("agent CLI child has no stdout"))?;
     let is_npx = spawn_result.is_npx;
 
-    // Drain agent stderr to logs so failures are diagnosable.
+    // Drain agent stderr to logs so failures are diagnosable. At debug, not
+    // warn: most lines are routine adapter chatter (and can echo prompt/file
+    // content), so they shouldn't pollute shipping logs or fire as warnings.
+    // The agent's actual exit/crash is logged separately at error.
     if let Some(stderr) = spawn_result.child.stderr.take() {
         tokio::task::spawn_local(async move {
             use tokio::io::{AsyncBufReadExt, BufReader};
             let mut lines = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = lines.next_line().await {
-                tracing::warn!(target: "agent_stderr", "{line}");
+                tracing::debug!(target: "agent_stderr", "{line}");
             }
         });
     }
@@ -1289,12 +1373,13 @@ async fn run_master_loop(cli: Cli, pipe_name: String) -> Result<()> {
     //     remaining tasks, and the child handle drops — `kill_on_drop`
     //     then reaps surviving descendants. `process::exit` would skip
     //     that path and could orphan agent grandchildren.
-    //   * The `WorkerGuard` returned by `crate::logging::init` is held
-    //     by `run_master_mode`; it only flushes the non-blocking
-    //     tracing appender on Drop. `process::exit` skips that Drop and
-    //     the final error lines silently vanish. The graceful path
-    //     here lets the guard drop in normal stack unwinding so the
-    //     "agent CLI exited" diagnostic actually lands on disk.
+    //   * The `WorkerGuard` from `crate::logging::init` is held by
+    //     `main()` for the whole process; it only flushes the
+    //     non-blocking tracing appender on Drop. `process::exit` skips
+    //     that Drop and the final error lines silently vanish. The
+    //     graceful path here lets `main()` return so the guard drops in
+    //     normal stack unwinding and the "agent CLI exited" diagnostic
+    //     actually lands on disk.
     //
     // Capacity 2: at most one child-exit reason + one I/O-loop reason
     // will ever be sent, and both `try_send`s are non-blocking.
@@ -1377,16 +1462,17 @@ async fn run_master_loop(cli: Cli, pipe_name: String) -> Result<()> {
         wt,
         cached_init_resp: OnceLock::new(),
         cli_source,
+        helper_meta: Mutex::new(HashMap::new()),
     });
 
     // Seed the registry with historical sessions scanned from
     // `~/.copilot/`, `~/.claude/`, `~/.gemini/` so `wta sessions list`
-    // and helper F2 viewers see the full set, not just live sessions
+    // and helper session management viewers see the full set, not just live sessions
     // created via `session/new` after master booted. Disk scan can take
     // ~100ms-1s for users with many sessions, so we run it in
     // spawn_blocking and broadcast `sessions/changed` once when done.
-    // Helpers that have F2 open at that moment will refetch and pick
-    // up the historicals; helpers that open F2 later will see them on
+    // Helpers that have session management view open at that moment will refetch and pick
+    // up the historicals; helpers that open session management view later will see them on
     // the next `sessions/list` call.
     let inner_for_history = Arc::clone(&inner);
     tokio::task::spawn_local(async move {
@@ -1479,12 +1565,20 @@ async fn run_master_loop(cli: Cli, pipe_name: String) -> Result<()> {
     )
     .await
     .map_err(|_| {
+        tracing::error!(
+            target: "master",
+            timeout_secs = init_timeout_secs,
+            "ACP initialize timed out — agent CLI did not respond"
+        );
         anyhow!(
             "ACP initialize timed out after {}s — agent CLI did not respond",
             init_timeout_secs
         )
     })?
-    .map_err(|e| anyhow!("ACP initialize failed: {e}"))?;
+    .map_err(|e| {
+        tracing::error!(target: "master", error = %e, "ACP initialize failed");
+        anyhow!("ACP initialize failed: {e}")
+    })?;
     tracing::info!(
         target: "master",
         ?init_resp,
@@ -1722,7 +1816,58 @@ async fn serve_helper(
         "helper disconnected"
     );
 
+    // Crash-recovery: if this helper owned an agent pane (we recorded an
+    // `owner_tab_id` from its `_meta.wta` at session/new|load), tell C++
+    // to re-warm a fresh helper for that tab. A clean helper EXIT also
+    // takes this path, but C++ suppresses the restart when the pane was
+    // torn down deliberately (Ctrl+C×2, tab close) — see
+    // `OnAgentPaneRestartRequested`. The pipe-disconnect that brings us
+    // here is the same signal for both crash and clean exit, which is
+    // exactly what we want: respawn unless C++ knows it was intentional.
+    let recovery = {
+        let mut meta = state.helper_meta.lock().await;
+        meta.remove(&helper_id)
+    };
+    if let Some(recovery) = recovery {
+        if let Some(tab_id) = recovery.owner_tab_id {
+            emit_restart_agent_pane(&tab_id, recovery.last_session_id.as_ref());
+        }
+    }
+
     result
+}
+
+/// Emit a `restart_agent_pane` WT-protocol event so C++ re-warms a fresh
+/// helper for `tab_id`, resuming `session_id` (when known) via
+/// `--initial-load-session-id`. Routed per-tab by StableId, mirroring
+/// `close_agent_pane`. See `doc/specs/connection-resilience.md` §8.
+fn emit_restart_agent_pane(tab_id: &str, session_id: Option<&acp::SessionId>) {
+    let evt = build_restart_agent_pane_event(tab_id, session_id);
+    tracing::info!(
+        target: "master",
+        tab_id = %tab_id,
+        session_id = ?session_id,
+        "emitting restart_agent_pane (helper disconnected)"
+    );
+    crate::app::send_wt_protocol_event(evt.to_string());
+}
+
+/// Pure builder for the `restart_agent_pane` WT-protocol event payload.
+/// Split out from [`emit_restart_agent_pane`] so the envelope shape is
+/// unit-testable without the `wtcli publish` side effect.
+fn build_restart_agent_pane_event(
+    tab_id: &str,
+    session_id: Option<&acp::SessionId>,
+) -> serde_json::Value {
+    serde_json::json!({
+        "type": "event",
+        "method": "restart_agent_pane",
+        "params": {
+            "tab_id": tab_id,
+            "session_id": session_id.map(|s| s.0.as_ref()),
+            "reason": "helper_disconnect",
+        }
+    })
 }
 
 /// Remove every `session_to_helper` entry owned by `helper_id`.
@@ -1829,7 +1974,7 @@ async fn handle_sessions_list(
 /// row for a "synthetic" title (cwd basename / empty) and try to upgrade it
 /// by reading the CLI's on-disk session artefacts (Copilot's `workspace.yaml
 /// summary:`/`name:`, Claude/Gemini's first user prompt). The helper already
-/// runs the equivalent refresh against its *local* registry, but F2 renders
+/// runs the equivalent refresh against its *local* registry, but session management view renders
 /// from master's snapshot — without this refresh master never sees the
 /// upgraded title and the row keeps showing the cwd basename forever for
 /// shell-pane CLI sessions whose first hook arrives before the CLI has
@@ -2225,7 +2370,26 @@ mod tests {
             wt: None,
             cached_init_resp: OnceLock::new(),
             cli_source: Some(crate::agent_sessions::CliSource::Copilot),
+            helper_meta: Mutex::new(HashMap::new()),
         })
+    }
+
+    #[test]
+    fn restart_agent_pane_event_shape_carries_tab_and_session() {
+        let sid = SessionId::from("sess-abc");
+        let evt = build_restart_agent_pane_event("tab-42", Some(&sid));
+        assert_eq!(evt["type"], "event");
+        assert_eq!(evt["method"], "restart_agent_pane");
+        assert_eq!(evt["params"]["tab_id"], "tab-42");
+        assert_eq!(evt["params"]["session_id"], "sess-abc");
+        assert_eq!(evt["params"]["reason"], "helper_disconnect");
+    }
+
+    #[test]
+    fn restart_agent_pane_event_null_session_when_none() {
+        let evt = build_restart_agent_pane_event("tab-7", None);
+        assert!(evt["params"]["session_id"].is_null());
+        assert_eq!(evt["params"]["tab_id"], "tab-7");
     }
 
     fn make_notif(sid: &SessionId) -> SessionNotification {
@@ -2518,7 +2682,7 @@ mod tests {
     /// the same teardown call must also remove the corresponding rows
     /// from `state.registry`. Otherwise, a `session/list` response (or
     /// a downstream `intellterm.wta/focus_session` lookup) could hand
-    /// out a SessionId whose helper is already gone, and the F2 view
+    /// out a SessionId whose helper is already gone, and the session management view
     /// would route Enter to a dead pane.
     #[tokio::test]
     async fn drop_sessions_for_helper_also_clears_registry() {
@@ -3011,6 +3175,7 @@ mod tests {
             wt: Some(wt),
             cached_init_resp: OnceLock::new(),
             cli_source: Some(crate::agent_sessions::CliSource::Copilot),
+            helper_meta: Mutex::new(HashMap::new()),
         })
     }
 

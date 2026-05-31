@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Welkom bij Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Welkom bij Intelligente Terminal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Stel uw ingebouwde assistent in om u te helpen fouten uit te leggen, opdrachten op te stellen en taken te deblokkeren, precies waar u werkt. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Meer informatie over Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Meer informatie over Intelligente Terminal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Blijf in uw flow met uw ingebouwde AI-agent</value>
@@ -146,8 +146,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Welkom bij Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Welkom bij Intelligente Terminal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Kies wat u nu wilt instellen. U kunt deze instellingen op elk gewenst moment wijzigen. </value>
@@ -177,8 +177,8 @@
     <value>Sessiebeheer</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Geef Intelligent Terminal toestemming om de status van uw actieve of lopende agents bij te houden.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Geef Intelligente Terminal toestemming om de status van uw actieve of lopende agents bij te houden.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Als u dit inschakelt, worden integratiehooks geïnstalleerd om sessies bij te houden voor al uw agents.</value>
@@ -223,17 +223,6 @@
     <value>⚠ Installatie van Node.js is mislukt. Controleer uw netwerkverbinding en probeer het opnieuw.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Het installeren van sessie-hooks is mislukt. Sessiebeheer is uitgeschakeld. U kunt het opnieuw inschakelen en het opnieuw proberen, of opslaan om verder te gaan zonder.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Het installeren van shellintegratie is mislukt. Foutdetectie is uitgeschakeld. U kunt het opnieuw inschakelen en het opnieuw proberen, of opslaan om verder te gaan zonder.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Meer informatie over hoe u dit handmatig kunt oplossen</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Aan</value>
   </data>
@@ -253,8 +242,16 @@
     <comment>{0} = sneltoets.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Klik op {0} om de fout op te lossen</value>
+    <value>Klik of druk op {0} om de agent om een voorgestelde oplossing te vragen</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Oplossing gereed. Druk op {0} om te controleren</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Open het agentvenster om de voorgestelde oplossing te controleren</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Fout gedetecteerd. Klik of druk op {0} om de AI-agent te vragen de fout te analyseren en een oplossing voor te stellen.</value>
@@ -302,4 +299,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Geef Intelligent Terminal toestemming om toegang te krijgen tot uw shell en automatisch fouten te detecteren.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Het installeren van shellintegratie is mislukt. Foutdetectie is uitgeschakeld. U kunt het opnieuw inschakelen en het opnieuw proberen, of opslaan om verder te gaan zonder.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Het installeren van sessie-hooks is mislukt. Sessiebeheer is uitgeschakeld. U kunt het opnieuw inschakelen en het opnieuw proberen, of opslaan om verder te gaan zonder.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Meer informatie over hoe u dit handmatig kunt oplossen</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Vítejte v Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Vítejte v Inteligentní Terminál</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Nastavte si vestavěného asistenta, který vám pomůže vysvětlovat chyby, navrhovat příkazy a odblokovat úkoly přímo tam, kde pracujete. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Další informace o Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Další informace o Inteligentní Terminál</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Zůstaňte v proudu s vestavěným AI agentem</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Vítejte v Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Vítejte v Inteligentní Terminál</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Vyberte, co chcete nyní nastavit. Tato nastavení můžete kdykoli změnit. </value>
@@ -181,8 +181,8 @@
     <value>Správa relací</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Udělte Intelligent Terminal oprávnění ke sledování stavu vašich běžících nebo aktivních agentů.</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Udělte Inteligentní Terminál oprávnění ke sledování stavu vašich běžících nebo aktivních agentů.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Povolením této funkce se nainstalují integrační hooks pro sledování relací napříč vašimi agenty.</value>
@@ -228,17 +228,6 @@
     <value>⚠ Nepodařilo se nainstalovat Node.js. Zkontrolujte síťové připojení a zkuste to znovu.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Nepodařilo se nainstalovat session hooks. Správa relací byla vypnuta. Můžete ji znovu zapnout a zkusit to znovu, nebo uložit a pokračovat bez ní.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Nepodařilo se nainstalovat integraci prostředí. Detekce chyb byla vypnuta. Můžete ji znovu zapnout a zkusit to znovu, nebo uložit a pokračovat bez ní.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Zjistěte, jak to opravit ručně</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Zapnuto</value>
   </data>
@@ -258,8 +247,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Kliknutím na {0} opravíte chybu</value>
+    <value>Kliknutím nebo stisknutím {0} požádejte agenta o navrženou opravu</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Oprava připravena. Zkontrolujte stisknutím {0}</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Otevřete podokno agenta a zkontrolujte navrženou opravu</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Byla zjištěna chyba. Kliknutím nebo stisknutím {0} požádáte agenta AI, aby diagnostikoval problém a navrhl opravu.</value>
@@ -307,4 +304,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Povolte aplikaci Intelligent Terminal přístup k prostředí shell a automatickou detekci chyb.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Nepodařilo se nainstalovat integraci prostředí. Detekce chyb byla vypnuta. Můžete ji znovu zapnout a zkusit to znovu, nebo uložit a pokračovat bez ní.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Nepodařilo se nainstalovat session hooks. Správa relací byla vypnuta. Můžete ji znovu zapnout a zkusit to znovu, nebo uložit a pokračovat bez ní.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Zjistěte, jak to opravit ručně</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

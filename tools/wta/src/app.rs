@@ -30,8 +30,50 @@ struct DeferredAcpParams {
 }
 
 mod turn_state;
+mod autofix;
+use autofix::*;
 
 pub use turn_state::{AutofixContext, ChunkKind, SubmittedPrompt, TurnOutcome, TurnState};
+
+// ─── MVP sessions origin filter ────────────────────────────────────────────────────
+//
+// The session management view (`/sessions`) currently ships in MVP
+// mode: it only surfaces shell-pane sessions (the user manually ran
+// `copilot` / `claude` / `gemini` in a regular shell). Agent-pane
+// sessions (Class A — created by WTA on behalf of an Intelligent
+// Terminal agent pane) stay in the registry so Enter routing,
+// alive-mirror reconciliation, and `wta sessions list` continue to
+// work; they just don't render in the picker.
+//
+// To bring agent-pane sessions back into the picker once the manage UX
+// is ready, flip this constant to `OriginFilter::All` and delete the
+// `WTA_SESSIONS_SHOW_AGENT_PANE` env override below. No other call sites
+// need to change — all consumers go through
+// `App::sessions_origin_filter`.
+const MVP_SESSIONS_ORIGIN_FILTER: crate::agent_sessions::OriginFilter =
+    crate::agent_sessions::OriginFilter::ShellOnly;
+
+/// Resolve the `/sessions` origin filter for this process.
+///
+/// Defaults to [`MVP_SESSIONS_ORIGIN_FILTER`]. The `WTA_SESSIONS_SHOW_AGENT_PANE`
+/// env var (set to `1` / `true`) flips a single helper to
+/// `OriginFilter::All` for debugging — matches the existing
+/// `WTA_LOG_AGENT_EVENT` / `WTA_SOURCE_*` convention. Each helper is
+/// a separate process so the override only affects the pane that
+/// launched with the env var set; the rest of the Terminal keeps the
+/// MVP default.
+pub fn resolve_sessions_origin_filter() -> crate::agent_sessions::OriginFilter {
+    match std::env::var("WTA_SESSIONS_SHOW_AGENT_PANE")
+        .ok()
+        .as_deref()
+        .map(str::trim)
+    {
+        Some("1") | Some("true") | Some("TRUE") | Some("True") | Some("yes") => {
+            crate::agent_sessions::OriginFilter::All
+        }
+        _ => MVP_SESSIONS_ORIGIN_FILTER,
+    }
+}
 
 use crate::commands::{self, CommandKind, CommandSpec, ParsedCommand};
 use crate::coordinator::{
@@ -451,7 +493,7 @@ where
     // session row owns. The reducer then no-ops, AND the synthetic
     // key gates the event out of the master publish path (see
     // `key_is_synthetic` below), so master never learns the row is
-    // now waiting for input. Net effect: the F2 row stays at
+    // now waiting for input. Net effect: the session management row stays at
     // `Working` ("Active") from the prior `tool.starting` and never
     // flips to `Attention` ("Waiting for input").
     //
@@ -534,7 +576,7 @@ where
     // bookkeeping (so `is_agent_pane(pane_id)` works for the OSC 133;A
     // handler) but DO NOT publish these to master — master only ever
     // learns about real ACP sessions via `new_session`/`load_session`,
-    // and feeding it synthetic rows produces duplicate F2 entries that
+    // and feeding it synthetic rows produces duplicate session management entries that
     // shadow the real session (one with the real sid, one with `pane:`
     // key, both pointing at the same agent — see PR B debug session log
     // around 2026-05-28T00:30 for the user-visible repro).
@@ -639,7 +681,7 @@ where
     // row is now Ended for a managed CLI (Claude/Copilot/Gemini) whose
     // on-disk artefacts contain no resumable content, drop it from the
     // registry now. Without this, the user who opens `<cli>` and exits
-    // without typing a real prompt is left with an Ended row in F2
+    // without typing a real prompt is left with an Ended row in session management view
     // whose Enter would launch `<cli> --resume <id>` — and the CLI
     // itself would then reject the request (`No conversation found`
     // for Claude, `No session, task, or name matched` for Copilot,
@@ -910,7 +952,7 @@ pub struct AcpModelInfo {
 
 /// Test-visible record of a wtcli command the App fired through the
 /// `wt_channel::spawn_*` helpers. Captured under `cfg(test)` so we can
-/// assert the F2 Agents view dispatches the right shape of command
+/// assert the agent session view dispatches the right shape of command
 /// without needing a live wtcli to verify against.
 #[cfg(test)]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -946,6 +988,13 @@ pub struct DispatchedCommand {
 pub enum AppEvent {
     Key(KeyEvent),
     Tick,
+    /// High-frequency (~30Hz) reveal animation tick. Drives the typewriter
+    /// smoothing of the streaming agent response (advances `reveal_chars`).
+    /// Separate from `Tick` so we can run the reveal at 30fps without
+    /// quadrupling the spinner's full-frame flush rate: a `RevealTick` only
+    /// forces a redraw when there is unrevealed pending text on the current
+    /// tab (`has_reveal_backlog`).
+    RevealTick,
     Resize(u16, u16), // terminal resize (handled by ratatui)
     /// XAML focus on our hosting TermControl changed — true when the agent
     /// pane gained focus, false when it lost focus. Sourced from xterm
@@ -974,7 +1023,7 @@ pub enum AppEvent {
         /// ACP-advertised current model id (NewSessionResponse.models.current_model_id).
         current_model_id: Option<String>,
         /// Whether the agent advertised the `loadSession` capability in
-        /// the initialize response. Used by the session-management
+        /// the initialize response. Used by the session management
         /// view's Shift+Enter handler to short-circuit with a clear
         /// error before opening a new tab when the agent can't
         /// rehydrate ACP sessions.
@@ -1010,10 +1059,22 @@ pub enum AppEvent {
     },
     /// Errors raised before a session exists carry None for `session_id`
     /// and route to the active tab; in-flight failures route to the
-    /// session's tab.
+    /// session's tab. `failure` is the typed classification that drives
+    /// recovery (sign-in / `/restart` / show-and-stay); `message` is the
+    /// human-readable line to display.
     AgentError {
         session_id: Option<String>,
+        failure: crate::protocol::acp::failure::AgentFailure,
         message: String,
+    },
+    /// A turn that completed successfully at the protocol level but ended on a
+    /// soft stop (output-token limit, request budget, or refusal). NOT a
+    /// connection failure — the session stays `Connected`; this only appends an
+    /// informational line to the session's chat. Emitted *after*
+    /// `AgentMessageEnd` so the notice follows the agent's streamed content.
+    AgentSoftStop {
+        session_id: String,
+        reason: crate::protocol::acp::soft_stop::SoftStopReason,
     },
     /// Same-tab single-flight guard rejection. The user submitted a new
     /// prompt while the previous one is still in flight on the same tab.
@@ -1132,7 +1193,7 @@ pub enum AppEvent {
     /// Initial bootstrap of the alive-session mirror from master, in
     /// response to the helper's startup `session/list` request. The
     /// payload replaces any existing entries and flips `alive_loaded`
-    /// to true so F2 routing logic can start trusting `alive.lookup()`
+    /// to true so session management routing logic can start trusting `alive.lookup()`
     /// misses as "session is gone". See
     /// `crate::session_registry::apply_snapshot`.
     AliveSnapshotLoaded(Vec<crate::session_registry::SessionInfo>),
@@ -1217,74 +1278,6 @@ impl Scroll {
     }
 }
 
-/// Per-tab autofix state machine. Each tab tracks its own pending /
-/// armed / suggested autofix independently so a failure in a background
-/// tab doesn't clobber an armed fix in the active tab and vice versa.
-/// The bottom-bar projection is per-tab too: WTA only emits
-/// `autofix_state` events to C++ when the target tab is currently
-/// active, and re-emits the active tab's snapshot on tab_changed.
-#[derive(Debug, Clone, Default)]
-pub struct TabAutofixState {
-    /// Failing pane for Pending/Armed. Cleared when the user dismisses
-    /// (Esc), the error resolves (exit 0 on the same pane), or the fix
-    /// is executed.
-    pub pane_id: Option<String>,
-    /// Monotonic timestamp captured when `pane_id` is armed, used for
-    /// ErrorFixResolved telemetry elapsed time.
-    pub armed_at: Option<std::time::Instant>,
-    /// Failing pane for the Suggested terminal state (a non-actionable
-    /// explanation in chat — distinct from `pane_id` so the two
-    /// kinds of "the bar is showing something" can be reasoned about
-    /// independently).
-    pub suggested_pane_id: Option<String>,
-    /// Bumped on every new trigger / cancel. Snapshotted into
-    /// `AutofixContext.generation` at submit time; chunks whose
-    /// snapshot diverges are dropped as stale.
-    pub generation: u64,
-    /// Last bottom-bar state we emitted (or would have emitted, if the
-    /// tab wasn't active). Used to re-emit on tab_changed so the bar
-    /// shows the right state when the user comes back to this tab.
-    pub bar_snapshot: AutofixBarSnapshot,
-    /// PaneID where the most recent D-synchronous state set happened
-    /// (Detected or Pending — both fire ~1ms before PowerShell emits the
-    /// next `osc:133;A`). The next prompt-start in that pane is consumed
-    /// as the trigger's echo rather than as a "user moved on" dismiss,
-    /// otherwise the state we just set would be cleared before reaching
-    /// the user. Cleared when the echo A arrives, or when the state
-    /// transitions out (set_bar_snapshot → Idle).
-    pub trigger_echo_pane: Option<String>,
-}
-
-/// Snapshot of the bottom-bar autofix state for one tab. Mirrors the
-/// `state` field of the `autofix_state` protocol event so we can rebuild
-/// the payload from the cached snapshot when the tab becomes active.
-#[derive(Debug, Clone, Default)]
-pub enum AutofixBarSnapshot {
-    #[default]
-    Idle,
-    /// Suggest mode: an error was detected but the LLM has not been
-    /// invoked. The bar shows a hint inviting the user to press the
-    /// hotkey / click the pill to request a fix. Carries enough
-    /// context to replay the LLM trigger when the user activates it.
-    Detected {
-        pane_id: String,
-        summary: String,
-        hotkey_hint: String,
-    },
-    Pending {
-        pane_id: String,
-        summary: String,
-    },
-    Armed {
-        pane_id: String,
-        fix_preview: String,
-        hotkey_hint: String,
-    },
-    Suggested {
-        pane_id: String,
-        suggestion_title: String,
-    },
-}
 
 /// Everything that conceptually belongs to one tab's conversation: the
 /// message history, the streaming buffer of the in-flight prompt, the
@@ -1341,6 +1334,13 @@ pub struct TabSession {
     // back to the spinner label derived from `turn` when None.
     pub progress_status: Option<String>,
     pub activity_frame: usize,
+    /// Typewriter reveal cursor: how many characters of the *user-visible*
+    /// streaming text are currently shown. The full text lives in
+    /// `turn.buffer()`; the renderer only emits the first `reveal_chars`
+    /// chars of it. Advanced toward the full length by `RevealTick`
+    /// (`advance_reveal`), reset to 0 when a new turn starts streaming, and
+    /// made irrelevant on finalize (the committed message renders in full).
+    pub reveal_chars: usize,
     pub timing_note: Option<String>,
     pub selection_visible_pending: bool,
 
@@ -1389,7 +1389,7 @@ pub struct TabSession {
     #[allow(dead_code)]
     pub session_id: Option<String>,
 
-    // Agents picker view (F2 / `/sessions`) — per-tab so each WT tab keeps
+    // agent session view (`/sessions`) — per-tab so each WT tab keeps
     // its own open/closed state and selected row across tab switches.
     pub current_view: View,
     pub agents_list_state: ratatui::widgets::ListState,
@@ -1851,17 +1851,25 @@ pub struct App {
     /// + selected row) lives per-tab on `TabSession`.
     pub agent_sessions: crate::agent_sessions::AgentSessionRegistry,
     /// Tracks the lazy load of historical sessions. Flipped to Loading
-    /// on first session-management-view open; flipped to Loaded when
+    /// on first session management-view open; flipped to Loaded when
     /// `HistoricalSessionsLoaded` arrives. The agents_view reads this to
     /// render a "Loading..." row instead of an empty list during the
     /// scan.
     pub history_load_state: HistoryLoadState,
     /// Whether the connected ACP agent advertised the `loadSession`
     /// capability in its initialize response. Used by the
-    /// session-management view's Shift+Enter handler to short-circuit
+    /// session management view's Shift+Enter handler to short-circuit
     /// with a clear error before opening a new tab when the agent
     /// can't rehydrate ACP sessions. Set on `AgentConnected`.
     pub agent_supports_load_session: bool,
+    /// Origin filter for the `/sessions` picker. Captured once at
+    /// `App::new` time via [`resolve_sessions_origin_filter`] so the value is
+    /// stable for the lifetime of this helper process. Read by
+    /// [`Self::agents_rows_for_tab`] (the cursor / Enter source of
+    /// truth), the post-history-scan auto-select, the Delete clamp,
+    /// and the `agents_view::render` call in `ui/layout.rs`. See
+    /// [`MVP_SESSIONS_ORIGIN_FILTER`] for the gate to flip when un-MVP.
+    pub sessions_origin_filter: crate::agent_sessions::OriginFilter,
     // Onboarding: signals main.rs to install agent hook plugins on demand.
     install_request_tx: Option<mpsc::UnboundedSender<()>>,
     /// Posts `AppEvent::AgentSessionEvent` from background callbacks
@@ -1873,7 +1881,7 @@ pub struct App {
     agent_event_tx: Option<mpsc::UnboundedSender<AppEvent>>,
     /// Helper-mode fire-and-forget publisher for `intellterm.wta/session_hook`.
     session_hook_tx: Option<mpsc::UnboundedSender<crate::agent_sessions::SessionEvent>>,
-    /// Test-only: last command issued via the F2 Agents view's Enter
+    /// Test-only: last command issued via the agent session view's Enter
     /// dispatch (`dispatch_resume` / focus). Used by unit tests in
     /// place of a live wtcli; not compiled into release builds.
     #[cfg(test)]
@@ -1904,7 +1912,7 @@ pub struct App {
     /// recorded deadline.
     pub transient_hint: Option<(String, std::time::Instant)>,
     /// Mirror of master's authoritative live-session set, pushed via
-    /// ACP `intellterm.wta/session_*` ext-notifications. F2 Enter
+    /// ACP `intellterm.wta/session_*` ext-notifications. session management Enter
     /// routing reads this to decide Focus vs Resume without an extra
     /// IPC round-trip. Wired into B-6 (subscribe) and B-10 (consult);
     /// here we just hold the mirror so the rest of the helper can
@@ -1924,7 +1932,7 @@ pub struct App {
 /// a stale arm doesn't bite the next time they want to clear input.
 pub const CLOSE_PANE_ARM_WINDOW: std::time::Duration = std::time::Duration::from_millis(1500);
 
-/// Top-level UI view selector. Toggled with F2.
+/// Top-level UI view selector. Toggled with Ctrl+Shift+/.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
     Chat,
@@ -1957,8 +1965,8 @@ pub struct AgentsViewState {
 ///
 /// Doing that eagerly on every wta spawn (including every model
 /// switch, which kills the old wta and starts a new one) is wasted
-/// work — the data is only consumed by the Agents view (F2). We
-/// defer the scan to the first F2 press and cache the result for
+/// work — the data is only consumed by the agent session view. We
+/// defer the scan to the first Ctrl+Shift+/ press and cache the result for
 /// the rest of this wta's lifetime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HistoryLoadState {
@@ -2072,6 +2080,7 @@ impl App {
             agent_sessions: crate::agent_sessions::AgentSessionRegistry::new(),
             history_load_state: HistoryLoadState::NotStarted,
             agent_supports_load_session: false,
+            sessions_origin_filter: resolve_sessions_origin_filter(),
             install_request_tx: None,
             agent_event_tx: None,
             session_hook_tx: None,
@@ -2253,7 +2262,7 @@ impl App {
         }
     }
 
-    /// Filter to apply to the F2 session-management view based on which
+    /// Filter to apply to the session management view based on which
     /// agent CLI the WTA agent pane is currently driving. Returns
     /// `Some(CliSource::*)` when `current_agent_id` resolves to a tracked
     /// CLI (copilot / claude / gemini) so only matching rows are listed.
@@ -2387,43 +2396,54 @@ impl App {
             EnterAction::NotResumable { reason } => {
                 // Surface a user-visible system message scoped to the
                 // current tab so the user can read it from the
-                // Agents view (which is rendered in-tab).
-                let cli_id = match s.cli_source {
-                    crate::agent_sessions::CliSource::Claude => "claude",
-                    crate::agent_sessions::CliSource::Copilot => "copilot",
-                    crate::agent_sessions::CliSource::Gemini => "gemini",
-                    crate::agent_sessions::CliSource::Unknown(_) => "this CLI",
+                // agent session view (which is rendered in-tab).
+                let agent_display: String = match s.cli_source {
+                    crate::agent_sessions::CliSource::Claude => {
+                        crate::agent_registry::lookup_profile_by_id("claude")
+                            .display_name
+                            .to_string()
+                    }
+                    crate::agent_sessions::CliSource::Copilot => {
+                        crate::agent_registry::lookup_profile_by_id("copilot")
+                            .display_name
+                            .to_string()
+                    }
+                    crate::agent_sessions::CliSource::Gemini => {
+                        crate::agent_registry::lookup_profile_by_id("gemini")
+                            .display_name
+                            .to_string()
+                    }
+                    crate::agent_sessions::CliSource::Unknown(_) => {
+                        t!("system.fallback.this_agent").into_owned()
+                    }
                 };
                 let msg = match reason {
-                    NotResumableReason::LiveWithoutPane => format!(
-                        "Cannot focus session {}: it appears live but no \
-                         pane GUID is bound yet. Try again in a moment.",
-                        s.key
-                    ),
-                    NotResumableReason::LoadSessionNotSupported => {
-                        let agent = if self.agent_name.is_empty() {
-                            "the connected agent"
-                        } else {
-                            self.agent_name.as_str()
-                        };
-                        format!(
-                            "Cannot resume in agent pane: {} did not advertise \
-                             the ACP `loadSession` capability. Press Enter \
-                             (without Shift) to resume in a new terminal pane instead.",
-                            agent
-                        )
+                    NotResumableReason::LiveWithoutPane => {
+                        t!("system.cannot_focus_session", session_id = s.key.as_str())
+                            .into_owned()
                     }
-                    NotResumableReason::CliHasNoResumeFlag => format!(
-                        "Cannot resume {} session: this CLI has no \
-                         `--resume`-style flag. Press Shift+Enter to try \
-                         resuming inside the agent pane via ACP instead.",
-                        cli_id
-                    ),
-                    NotResumableReason::UnknownCli => format!(
-                        "Cannot resume session {}: its source CLI is unknown \
-                         to this WTA build.",
-                        s.key
-                    ),
+                    NotResumableReason::LoadSessionNotSupported => {
+                        let agent: String = if self.agent_name.is_empty() {
+                            t!("system.fallback.connected_agent").into_owned()
+                        } else {
+                            self.agent_name.clone()
+                        };
+                        t!(
+                            "system.cannot_resume_no_load_session",
+                            agent = agent.as_str()
+                        )
+                        .into_owned()
+                    }
+                    NotResumableReason::CliHasNoResumeFlag => t!(
+                        "system.cannot_resume_no_resume_flag",
+                        agent = agent_display.as_str()
+                    )
+                    .into_owned(),
+                    NotResumableReason::UnknownCli => t!(
+                        "system.cannot_resume_unknown_agent",
+                        session_id = s.key.as_str()
+                    )
+                    .into_owned(),
                 };
                 tracing::warn!(
                     target: "agents_view",
@@ -2446,7 +2466,7 @@ impl App {
         }
     }
 
-    /// Enter handler for the F2 Agents view. For live rows (Idle / Working
+    /// Enter handler for the agent session view. For live rows (Idle / Working
     /// / Attention / Error), focus the underlying WT pane. For terminal-
     /// state rows (Ended / Historical), spawn a new pane that runs the
     /// CLI's `--resume <session_id>` flow via [`Self::dispatch_resume`].
@@ -2578,11 +2598,12 @@ impl App {
                 "dispatch_resume: refusing to resume phantom session (no on-disk content); pruning row",
             );
             let short_key: String = s.key.chars().take(8).collect();
-            let msg = format!(
-                "Cannot resume {} session {}: it was started but never accumulated any \
-                 conversation, so {} itself would reject the resume. Removing the row.",
-                cli_id, short_key, cli_id
-            );
+            let msg = t!(
+                "system.cannot_resume_phantom_via_flag",
+                agent = profile.display_name,
+                session_id = short_key.as_str()
+            )
+            .into_owned();
             let tab = self.current_tab_mut();
             tab.messages.push(ChatMessage::System(msg));
             tab.scroll_to_bottom();
@@ -2619,17 +2640,47 @@ impl App {
         // npm-installed CLIs (`copilot.cmd`, `claude.cmd`, `gemini.cmd`)
         // need cmd.exe's PATHEXT resolution to launch from a bare name
         // (`CreateProcess` returns 0x80070002 for `.cmd` shims).
-        let cwd_string = s.cwd.to_string_lossy().to_string();
-        let launch_commandline = format!("cmd /c {}", commandline);
+        //
+        // Loading banner (issue #135): the agent CLIs take 1–3s of
+        // Node.js cold-start + JSONL history parse before they paint
+        // anything, so the new tab was blank with no feedback. Prepend
+        // a blinking ANSI banner (`SGR 1;36;5` = bold cyan slow-blink)
+        // so the user sees immediate animated feedback in the new
+        // pane while the CLI cold-starts. The CLI's alt-screen TUI
+        // takes over once it boots and overwrites this line cleanly,
+        // so the banner leaves no residue on success. On CLI launch
+        // failure the banner stays put together with cmd.exe's error
+        // message — that's a feature, not a bug (the short id helps
+        // the user file a useful report). The trailing `\x1b[0m`
+        // reset guarantees any post-failure output isn't tinted /
+        // blinking.
+        let raw_cwd_string = s.cwd.to_string_lossy().to_string();
+        // Drop stale cwd so wtcli falls back to the profile default
+        // rather than failing CreateProcessW with ERROR_DIRECTORY.
+        let valid_cwd = crate::cwd_util::validate_starting_directory(&s.cwd);
+        if valid_cwd.is_none() && !raw_cwd_string.is_empty() {
+            tracing::warn!(
+                target: "agents_view",
+                key = %key,
+                cwd = %raw_cwd_string,
+                "dispatch_resume: stored cwd is no longer a valid directory; falling back to profile default",
+            );
+        }
+        let short_key: String = key.chars().take(8).collect();
+        let launch_commandline = format!(
+            "cmd /c echo \x1b[1;36;5mResuming {} session {}...\x1b[0m && {}",
+            cli_id, short_key, commandline
+        );
         let mut argv = vec![
             "new-tab".to_string(),
             "-c".to_string(),
             launch_commandline.clone(),
         ];
-        if !cwd_string.is_empty() {
+        if let Some(ref cwd) = valid_cwd {
             argv.push("-d".to_string());
-            argv.push(cwd_string.clone());
+            argv.push(cwd.clone());
         }
+        let cwd_string = valid_cwd.clone().unwrap_or_default();
 
         // Optimistic state flip: bump Historical/Ended -> Idle so a rapid
         // second Enter on the same row sees a non-terminal status and
@@ -2725,17 +2776,16 @@ impl App {
         // keep the session management view focused so the user can
         // press plain Enter to fall back to the split-pane resume path.
         if !self.agent_supports_load_session {
-            let agent = if self.agent_name.is_empty() {
-                "the connected agent"
+            let agent: String = if self.agent_name.is_empty() {
+                t!("system.fallback.connected_agent").into_owned()
             } else {
-                self.agent_name.as_str()
+                self.agent_name.clone()
             };
-            let msg = format!(
-                "Cannot resume in agent pane: {} did not advertise the ACP \
-                 `loadSession` capability. Press Enter (without Shift) to \
-                 resume in a new terminal pane instead.",
-                agent
-            );
+            let msg = t!(
+                "system.cannot_resume_no_load_session",
+                agent = agent.as_str()
+            )
+            .into_owned();
             tracing::warn!(
                 target: "agents_view",
                 key = %s.key,
@@ -2774,17 +2824,32 @@ impl App {
                 "dispatch_resume_in_agent_pane: refusing to load phantom session; pruning row",
             );
             let short_key: String = s.key.chars().take(8).collect();
-            let cli_id = match s.cli_source {
-                crate::agent_sessions::CliSource::Claude => "claude",
-                crate::agent_sessions::CliSource::Copilot => "copilot",
-                crate::agent_sessions::CliSource::Gemini => "gemini",
-                crate::agent_sessions::CliSource::Unknown(_) => "this CLI",
+            let agent_display: String = match s.cli_source {
+                crate::agent_sessions::CliSource::Claude => {
+                    crate::agent_registry::lookup_profile_by_id("claude")
+                        .display_name
+                        .to_string()
+                }
+                crate::agent_sessions::CliSource::Copilot => {
+                    crate::agent_registry::lookup_profile_by_id("copilot")
+                        .display_name
+                        .to_string()
+                }
+                crate::agent_sessions::CliSource::Gemini => {
+                    crate::agent_registry::lookup_profile_by_id("gemini")
+                        .display_name
+                        .to_string()
+                }
+                crate::agent_sessions::CliSource::Unknown(_) => {
+                    t!("system.fallback.this_agent").into_owned()
+                }
             };
-            let msg = format!(
-                "Cannot resume {} session {}: it was started but never accumulated any \
-                 conversation, so {} would reject the load. Removing the row.",
-                cli_id, short_key, cli_id
-            );
+            let msg = t!(
+                "system.cannot_resume_phantom_via_load",
+                agent = agent_display.as_str(),
+                session_id = short_key.as_str()
+            )
+            .into_owned();
             let tab = self.current_tab_mut();
             tab.messages.push(ChatMessage::System(msg));
             tab.scroll_to_bottom();
@@ -2805,7 +2870,17 @@ impl App {
         }
 
         let key = s.key.clone();
-        let cwd_string = s.cwd.to_string_lossy().to_string();
+        let raw_cwd_string = s.cwd.to_string_lossy().to_string();
+        let valid_cwd = crate::cwd_util::validate_starting_directory(&s.cwd);
+        if valid_cwd.is_none() && !raw_cwd_string.is_empty() {
+            tracing::warn!(
+                target: "agents_view",
+                key = %key,
+                cwd = %raw_cwd_string,
+                "dispatch_resume_in_agent_pane: stored cwd is no longer a valid directory; omitting from resume_in_new_agent_tab event",
+            );
+        }
+        let cwd_string = valid_cwd.unwrap_or_default();
 
         // Mirror dispatch_resume's optimistic state flip so a rapid
         // double press doesn't double-dispatch.
@@ -2814,13 +2889,15 @@ impl App {
         self.publish_session_hook(resume_event);
         self.dispatch_session_resume_dispatched_rpc(&key);
 
+        let mut params = serde_json::Map::new();
+        params.insert("session_id".to_string(), serde_json::Value::String(key.clone()));
+        if !cwd_string.is_empty() {
+            params.insert("cwd".to_string(), serde_json::Value::String(cwd_string.clone()));
+        }
         let evt = serde_json::json!({
             "type": "event",
             "method": "resume_in_new_agent_tab",
-            "params": {
-                "session_id": key,
-                "cwd": cwd_string,
-            }
+            "params": params,
         });
         send_wt_protocol_event(evt.to_string());
 
@@ -2833,21 +2910,24 @@ impl App {
 
         #[cfg(test)]
         {
+            let mut argv = vec![
+                "resume_in_new_agent_tab".to_string(),
+                "--session-id".to_string(),
+                s.key.clone(),
+            ];
+            if !cwd_string.is_empty() {
+                argv.push("--cwd".to_string());
+                argv.push(cwd_string);
+            }
             self.last_dispatched_command = Some(DispatchedCommand {
                 kind: DispatchedCommandKind::ResumeInAgentPane,
                 session_id: Some(s.key.clone()),
-                argv: vec![
-                    "resume_in_new_agent_tab".to_string(),
-                    "--session-id".to_string(),
-                    s.key.clone(),
-                    "--cwd".to_string(),
-                    cwd_string,
-                ],
+                argv,
             });
         }
     }
 
-    /// Test-only accessor for the most recent F2 Agents-view dispatch.
+    /// Test-only accessor for the most recent agent session view dispatch.
     #[cfg(test)]
     pub fn last_dispatched_command_for_test(&self) -> Option<DispatchedCommand> {
         self.last_dispatched_command.clone()
@@ -3018,6 +3098,7 @@ impl App {
 
     fn agents_rows_for_tab(&self, tab_id: &str) -> Vec<crate::agent_sessions::AgentSession> {
         let filter = self.current_cli_filter();
+        let origin = self.sessions_origin_filter;
         if let Some(snapshot) = self
             .tab_sessions
             .get(tab_id)
@@ -3028,10 +3109,17 @@ impl App {
             if let Some(want) = filter.as_ref() {
                 rows.retain(|s| &s.cli_source == want || matches!(&s.cli_source, crate::agent_sessions::CliSource::Unknown(v) if v.is_empty()));
             }
+            // Apply the MVP origin filter on top of the cli filter.
+            // Snapshot rows come from master via SessionInfo where origin
+            // is Option<SessionOrigin>; session_info_to_agent_session
+            // collapses None -> SessionOrigin::Unknown so a registry-style
+            // `matches(&s.origin)` is sufficient and stays consistent
+            // with the registry branch below.
+            rows.retain(|s| origin.matches(&s.origin));
             rows
         } else {
             self.agent_sessions
-                .iter_sorted_filtered(filter.as_ref())
+                .iter_sorted_with_filters(filter.as_ref(), origin)
                 .into_iter()
                 .cloned()
                 .collect()
@@ -3101,10 +3189,10 @@ impl App {
     ///
     /// Called eagerly from `run_acp_app` right after `set_event_tx` so the
     /// scan starts overlapping with ACP startup and is usually done by the
-    /// time the user first opens the Agents view. Also called defensively
-    /// from the F2 / `/sessions` toggle in case startup raced ahead of
+    /// time the user first opens the agent session view. Also called defensively
+    /// from the `/sessions` toggle in case startup raced ahead of
     /// `set_event_tx` (Setup/FRE mode — `event_tx` not yet wired, so the
-    /// eager call early-returns and the F2 press picks it up).
+    /// eager call early-returns and the Ctrl+Shift+/ press picks it up).
     ///
     /// Pre-eager-load this was strictly lazy because each wta restart
     /// (model switch, new agent pane) re-pays the ~10s scan. The eager
@@ -3115,7 +3203,7 @@ impl App {
             return;
         }
         let Some(tx) = self.event_tx.clone() else {
-            // No event channel yet — Setup mode at startup. The first F2
+            // No event channel yet — Setup mode at startup. The first Ctrl+Shift+/
             // press post-FRE will retry. Safe to leave state as NotStarted.
             return;
         };
@@ -3195,7 +3283,8 @@ impl App {
                         if let Some(stderr) = stderr {
                             let reader = std::io::BufReader::new(stderr);
                             for line in reader.lines().map_while(Result::ok) {
-                                tracing::debug!("login stderr: {}", line);
+                                // Raw auth-flow output carries the device code — trace only.
+                                tracing::trace!(target: "login.content", "login stderr: {}", line);
                                 if line.contains("enter code") {
                                     if let Some(code) = line.split("enter code ").nth(1) {
                                         let code = code.trim_end_matches('.');
@@ -3221,7 +3310,8 @@ impl App {
                     if let Some(stdout) = stdout {
                         let reader = std::io::BufReader::new(stdout);
                         for line in reader.lines().map_while(Result::ok) {
-                            tracing::debug!("login stdout: {}", line);
+                            // Raw auth-flow output carries the device code — trace only.
+                            tracing::trace!(target: "login.content", "login stdout: {}", line);
                             if line.contains("enter code") {
                                 if let Some(code) = line.split("enter code ").nth(1) {
                                     let code = code.trim_end_matches('.');
@@ -3787,6 +3877,7 @@ impl App {
             AppEvent::TabSystemMessage { .. } => "tab_system_message",
             AppEvent::PromptTemplateLoaded { .. } => "prompt_template_loaded",
             AppEvent::AgentError { .. } => "agent_error",
+            AppEvent::AgentSoftStop { .. } => "agent_soft_stop",
             AppEvent::AgentBusy { .. } => "agent_busy",
             AppEvent::TabRenamed { .. } => "tab_renamed",
             AppEvent::ExecutionInfo(_) => "execution_info",
@@ -3815,6 +3906,7 @@ impl App {
             AppEvent::SessionsChanged => "sessions_changed",
             AppEvent::AgentsSnapshotLoaded { .. } => "agents_snapshot_loaded",
             AppEvent::MasterMutationCompleted { .. } => "master_mutation_completed",
+            AppEvent::RevealTick => "reveal_tick",
         }
     }
 
@@ -3856,6 +3948,11 @@ impl App {
                 if self.mode == AppMode::Setup
                     || self.mode == AppMode::Auth
                     || self.history_load_state == HistoryLoadState::Loading
+                    // Keep the connecting indicator animating during the
+                    // pipe-connect → ACP init → session/new handshake so a cold
+                    // start (which can run tens of seconds) doesn't look frozen
+                    // (F7). Without this the chat sat static with no progress.
+                    || matches!(self.state, ConnectionState::Connecting(_))
                 {
                     self.activity_frame = self.activity_frame.wrapping_add(1);
                 }
@@ -3873,6 +3970,9 @@ impl App {
             AppEvent::Resize(w, h) => {
                 self.terminal_cols = w;
                 self.terminal_rows = h;
+            }
+            AppEvent::RevealTick => {
+                self.advance_reveal();
             }
             AppEvent::FocusChanged(focused) => {
                 self.pane_focused = focused;
@@ -4017,10 +4117,8 @@ impl App {
             }
             AppEvent::AgentBusy { tab_id } => {
                 let tab = self.tab_mut(&tab_id);
-                tab.messages.push(ChatMessage::System(
-                    "Agent is busy on this tab — wait for the current prompt to finish."
-                        .to_string(),
-                ));
+                tab.messages
+                    .push(ChatMessage::System(t!("system.agent_busy").into_owned()));
                 tab.scroll_to_bottom();
             }
             AppEvent::TabRenamed {
@@ -4032,18 +4130,29 @@ impl App {
             }
             AppEvent::AgentError {
                 session_id,
+                failure,
                 message,
             } => {
-                // Optimistic-connect fallback: if we have stashed auth info
-                // and the error is auth-related, show the auth screen instead
-                // of a dead error state.
-                let lower = message.to_lowercase();
-                let is_auth_error = lower.contains("authentication required")
-                    || lower.contains("not logged in")
-                    || lower.contains("unauthorized")
-                    || lower.contains("401")
-                    || lower.contains("apikey is missing")
-                    || lower.contains("api key");
+                // Classification is typed (`AgentFailure`), done once at the
+                // helper boundary where the `acp::Error` code / transport
+                // signal is still available. No substring matching here — the
+                // discriminant decides the recovery path. `message` is only the
+                // human-readable line to display.
+                tracing::info!(
+                    target: "failure",
+                    class = failure.class(),
+                    session_id = ?session_id,
+                    "agent failure"
+                );
+
+                // A user-initiated cancel surfaced as an error is not a
+                // failure — the turn already ended via the cancel path, so
+                // show nothing and leave the state untouched.
+                if failure.is_cancelled() {
+                    return;
+                }
+
+                let is_auth_error = failure.is_auth();
                 if is_auth_error && !self.preflight_setup_active {
                     tracing::info!("AgentError auth fallback: showing setup screen");
                     // Use current_agent_id — set at preflight or agent selection time.
@@ -4103,8 +4212,46 @@ impl App {
                     tab.activity_frame = 0;
                     tab.timing_note = None;
                     tab.turn = TurnState::Idle;
-                    tab.messages.push(ChatMessage::Error(message));
+                    // Suppress only an *identical* consecutive error, not any
+                    // trailing error. When the master/agent dies, two errors can
+                    // arrive: the raw transport error (returned as-is) and the
+                    // `handle_io` watchdog's connection.lost ("/restart") line.
+                    // Those are different messages and BOTH should show — the raw
+                    // one says what broke, the connection.lost one says how to
+                    // recover. Collapsing every consecutive error (the previous
+                    // behavior) could hide the /restart hint behind an unrelated
+                    // or in-flight error. Dedup only true duplicates so the same
+                    // line never stacks.
+                    let is_duplicate = matches!(
+                        tab.messages.last(),
+                        Some(ChatMessage::Error(prev)) if prev == &message
+                    );
+                    if !is_duplicate {
+                        tab.messages.push(ChatMessage::Error(message));
+                    }
                 }
+            }
+            AppEvent::AgentSoftStop { session_id, reason } => {
+                use crate::protocol::acp::soft_stop::SoftStopReason;
+                // A soft stop is an *outcome*, not a connection failure — the
+                // session stays Connected and the turn already closed via
+                // AgentMessageEnd. We only append an informational line so the
+                // user knows why the reply ended (truncation / budget / refusal)
+                // instead of silently trailing off.
+                tracing::info!(
+                    target: "soft_stop",
+                    class = reason.class(),
+                    session_id = %session_id,
+                    "agent turn ended on a soft stop"
+                );
+                let msg = match reason {
+                    SoftStopReason::MaxTokens => t!("system.stopped_max_tokens"),
+                    SoftStopReason::MaxTurnRequests => t!("system.stopped_max_turn_requests"),
+                    SoftStopReason::Refusal => t!("system.stopped_refusal"),
+                };
+                let tab = self.session_tab_mut(&session_id);
+                tab.messages.push(ChatMessage::System(msg.into_owned()));
+                tab.scroll_to_bottom();
             }
             AppEvent::ExecutionInfo(message) => {
                 self.push_execution_info(message);
@@ -4382,16 +4529,19 @@ impl App {
                     }
                 }
 
-                // If the user is already on the Agents view (e.g. they were
+                // If the user is already on the agent session view (e.g. they were
                 // dropped there by --initial-view sessions, or they pressed
-                // F2 / Ctrl+Shift+/ before the scan finished) and nothing
+                // Ctrl+Shift+/ before the scan finished) and nothing
                 // is selected yet, seed selection on row 0 so Enter
-                // activates immediately. Mirrors the F2 enter-Agents path.
+                // activates immediately. Mirrors the session management enter-Agents path.
                 if self.current_tab().current_view == View::Agents
                     && self.current_tab().agents_list_state.selected().is_none()
                     && !self
                         .agent_sessions
-                        .iter_sorted_filtered(self.current_cli_filter().as_ref())
+                        .iter_sorted_with_filters(
+                            self.current_cli_filter().as_ref(),
+                            self.sessions_origin_filter,
+                        )
                         .is_empty()
                 {
                     self.current_tab_mut().agents_list_state.select(Some(0));
@@ -4443,7 +4593,7 @@ impl App {
                 // tells us it's alive. Without this, only the bootstrap
                 // `AliveSnapshotLoaded` join would upgrade rows — every
                 // subsequent `session_added` broadcast would land only
-                // in the mirror and the F2 row would stay Historical.
+                // in the mirror and the session management row would stay Historical.
                 self.agent_sessions
                     .apply_alive_session_join([(sid.0.as_ref(), info.pane_session_id.as_deref())]);
                 let reg = std::sync::Arc::clone(&self.alive);
@@ -4458,8 +4608,9 @@ impl App {
                     "alive session removed by master"
                 );
                 // Mirror PaneClosed's reducer for this sid synchronously,
-                // before the async mirror update lands. Otherwise, the F2
-                // row stays stuck on Live until the next bootstrap, since
+                // before the async mirror update lands. Otherwise, the
+                // session management row stays stuck on Live until the next
+                // bootstrap, since
                 // `apply_alive_pane_snapshot` is only called at startup
                 // and `AliveSessionRemoved` had no path into the reducer
                 // (the bug rubber-duck Finding 2 surfaced post-B-12).
@@ -4504,7 +4655,7 @@ impl App {
                 tracing::debug!(target: "autofix", method = %method, pane_id = %pane_id, tab_id = ?tab_id, self_pane_id = ?self.pane_id, "WtEvent");
 
                 // Hook bridge events: fire-and-forget into the agent registry
-                // so the F2 Agents view stays current. Unrelated to autofix /
+                // so the agent session view stays current. Unrelated to autofix /
                 // tab routing; runs before the same-pane skip because we want
                 // to record events from our own pane too.
                 if method == "agent_event" {
@@ -4795,10 +4946,13 @@ impl App {
                         // close it).
                         tab.loading_session = true;
                         tab.loading_target_session_id = Some(session_id.to_string());
-                        tab.messages.push(ChatMessage::System(format!(
-                            "Resuming session {}...",
-                            session_id
-                        )));
+                        tab.messages.push(ChatMessage::System(
+                            t!(
+                                "system.resuming_session",
+                                session_id = session_id
+                            )
+                            .into_owned(),
+                        ));
                         tab.scroll_to_bottom();
                     }
                     // If the load_session target IS the active tab, push the
@@ -4940,6 +5094,19 @@ impl App {
                             "applying pane_open"
                         );
                         self.tab_mut(&target_tab).pane_open = open;
+                        // If a result is waiting for review on this tab,
+                        // re-project the bar: opening the pane makes the
+                        // result visible (→ Idle, bar goes quiet), closing
+                        // it brings the Review hint back. The open/closed →
+                        // Idle/Review decision lives entirely here in the
+                        // helper, not in C++.
+                        if let Some(review_pane) = self
+                            .tab_sessions
+                            .get(&target_tab)
+                            .and_then(|t| t.autofix.suggested_pane_id.clone())
+                        {
+                            self.emit_autofix_state_result(&target_tab, &review_pane);
+                        }
                     }
 
                     // Always echo the mutation back — C++ routes
@@ -4961,7 +5128,7 @@ impl App {
                 // (Idle/Working/...) when the underlying pane dies. The
                 // hook-bridge path (`agent.session.end` → `SessionStopped`)
                 // handles Claude/Copilot, but Gemini has no end-of-session
-                // hook, so without this wire a Gemini row spawned via F2
+                // hook, so without this wire a Gemini row spawned via session management view
                 // resume stays Idle forever after the user types `/exit`.
                 //
                 // Both event variants are no-ops in the registry when
@@ -5047,7 +5214,7 @@ impl App {
                     // ANY bound session and demoted the row to Ended
                     // even though the agent CLI was happily still
                     // streaming notifications — the user sees this as
-                    // "F2 Enter on a Live row spawned a new pane
+                    // "session management Enter on a Live row spawned a new pane
                     // instead of focusing the existing one" because
                     // the row demoted between snapshot and Enter.
                     //
@@ -5441,9 +5608,14 @@ impl App {
     fn event_requires_redraw(&self, event: &AppEvent) -> bool {
         match event {
             AppEvent::Tick => self.has_activity_indicator() || self.show_notification_banner,
+            // The reveal animation only needs a frame while there is still
+            // unrevealed pending text on the *visible* tab. When the reveal
+            // has caught up (or nothing is streaming) this is a cheap no-op
+            // tick that doesn't redraw — so idle/no-backlog costs nothing.
+            AppEvent::RevealTick => self.has_reveal_backlog(),
             AppEvent::AgentMessageChunk { .. } => true,
             AppEvent::DebugPipeMessage(_) => self.show_debug_panel,
-            // History only affects the Agents view; chat doesn't read it.
+            // History only affects the agent session view; chat doesn't read it.
             // A redraw is cheap enough that we don't bother gating on which
             // view is showing — pay the one frame.
             AppEvent::HistoricalSessionsLoaded(_) => true,
@@ -5451,8 +5623,57 @@ impl App {
         }
     }
 
+    /// Number of *user-visible* characters in a tab's streaming buffer, i.e.
+    /// the length of what the renderer would show in full. `None` when the
+    /// tab is not streaming visible prose.
+    fn tab_visible_stream_len(tab: &TabSession) -> Option<usize> {
+        let buf = tab.turn.buffer()?;
+        crate::ui::chat::user_visible_stream_text(buf).map(|t| t.chars().count())
+    }
+
+    /// True iff the current (visible) tab has streaming text that the reveal
+    /// cursor hasn't caught up to yet. Used to gate `RevealTick` redraws.
+    fn has_reveal_backlog(&self) -> bool {
+        let tab = self.current_tab();
+        matches!(Self::tab_visible_stream_len(tab), Some(len) if tab.reveal_chars < len)
+    }
+
+    /// Advance the typewriter reveal cursor on every streaming tab. The step
+    /// is *adaptive*: it grows with the backlog so the reveal can never fall
+    /// permanently behind a fast model — any backlog is drained within
+    /// `REVEAL_CATCHUP_FRAMES` ticks. Combined with the fact that finalize
+    /// commits the message in full (un-gated), this guarantees the smoothing
+    /// never increases the total time for the response to appear: it only
+    /// redistributes *when* characters show up within the streaming window.
+    fn advance_reveal(&mut self) {
+        // ~30fps tick. `REVEAL_MIN_STEP` is the floor so a slow trickle still
+        // animates; the `backlog / REVEAL_CATCHUP_FRAMES` term speeds up to
+        // match (and overtake) arrival, capping the visible lag at roughly
+        // `REVEAL_CATCHUP_FRAMES` ticks (~130ms).
+        const REVEAL_MIN_STEP: usize = 3;
+        const REVEAL_CATCHUP_FRAMES: usize = 4;
+        for tab in self.tab_sessions.values_mut() {
+            let Some(len) = Self::tab_visible_stream_len(tab) else {
+                continue;
+            };
+            if tab.reveal_chars >= len {
+                // Clamp down if the visible text shrank (e.g. a fenced JSON
+                // block replaced the streamed prose).
+                tab.reveal_chars = len;
+                continue;
+            }
+            let backlog = len - tab.reveal_chars;
+            let step = REVEAL_MIN_STEP.max(backlog / REVEAL_CATCHUP_FRAMES);
+            tab.reveal_chars = (tab.reveal_chars + step).min(len);
+        }
+    }
+
     fn handle_key(&mut self, key: KeyEvent) {
-        tracing::info!(
+        // Per-keystroke and carries the raw `KeyCode` (the typed character for
+        // `Char` keys) — the user's prompt can be reconstructed from this
+        // stream. Trace only so it never persists in shipping (info) or
+        // default-debug logs.
+        tracing::trace!(
             target: "input",
             code = ?key.code,
             modifiers = ?key.modifiers,
@@ -5601,7 +5822,7 @@ impl App {
             return;
         }
 
-        // Agents view (F2): list navigation + Enter to focus pane + Delete
+        // agent session view: list navigation + Enter to focus pane + Delete
         // to evict an Ended/Historical row. Captures all input while open
         // — including Esc which closes the view. View open-state and the
         // selection cursor are per-tab on `TabSession` so each WT tab
@@ -5658,11 +5879,15 @@ impl App {
                             if matches!(status, Ended | Historical) {
                                 self.agent_sessions.remove(&key);
                                 // Keep the cursor in-bounds after eviction.
-                                // Re-query through the same filter so the
-                                // selection clamp matches the rendered list.
+                                // Re-query through the same filters so the
+                                // selection clamp matches the rendered list
+                                // (both cli + MVP origin filter).
                                 let new_count = self
                                     .agent_sessions
-                                    .iter_sorted_filtered(self.current_cli_filter().as_ref())
+                                    .iter_sorted_with_filters(
+                                        self.current_cli_filter().as_ref(),
+                                        self.sessions_origin_filter,
+                                    )
                                     .len();
                                 let tab = self.current_tab_mut();
                                 if new_count == 0 {
@@ -6032,10 +6257,13 @@ impl App {
                             .unwrap_or("/")
                             .to_string();
                         let tab = self.current_tab_mut();
-                        tab.messages.push(ChatMessage::System(format!(
-                            "Unknown command \"{}\" — sent as prompt. Type /help for the list.",
-                            unknown
-                        )));
+                        tab.messages.push(ChatMessage::System(
+                            t!(
+                                "system.unknown_command",
+                                command = unknown.as_str()
+                            )
+                            .into_owned(),
+                        ));
                         // Fall through to the prompt path below.
                     }
                 }
@@ -6081,10 +6309,8 @@ impl App {
                     // too, but bouncing here keeps the user's input intact.
                     if !self.current_tab().turn.accepts_new_prompt() {
                         let tab = self.current_tab_mut();
-                        tab.messages.push(ChatMessage::System(
-                            "Agent is busy on this tab — wait for the current prompt to finish."
-                                .to_string(),
-                        ));
+                        tab.messages
+                            .push(ChatMessage::System(t!("system.agent_busy").into_owned()));
                         tab.scroll_to_bottom();
                         return;
                     }
@@ -6286,7 +6512,7 @@ impl App {
                 if in_flight {
                     let tab = self.current_tab_mut();
                     tab.messages.push(ChatMessage::System(
-                        "Wait for the current prompt to finish, or /stop first.".to_string(),
+                        t!("system.busy_use_stop").into_owned(),
                     ));
                     tab.scroll_to_bottom();
                     return;
@@ -6306,13 +6532,13 @@ impl App {
                 tab.scroll_to_bottom();
             }
             CommandKind::Sessions => {
-                // Mirror the F2 keybinding's open path: jump straight to
+                // Mirror the Ctrl+Shift+/ keybinding's open path: jump straight to
                 // the Agents picker and seed a selection so Enter/Up/Down
-                // are immediately useful. Esc / F2 still close the view.
+                // are immediately useful. Esc / Ctrl+Shift+/ still close the view.
                 // Per-tab — only flips the active tab's view state.
                 let tab_id = self.active_tab_key().to_string();
                 self.open_agents_view_for_tab(tab_id);
-                // F2 path also kicks the lazy history scan here. Without this,
+                // session management path also kicks the lazy history scan here. Without this,
                 // /sessions left the registry empty and rendered a blank view
                 // forever (state stuck at NotStarted, no Loading row, no rows).
                 self.ensure_history_loaded();
@@ -6805,397 +7031,6 @@ impl App {
         let _ = cmd.spawn();
     }
 
-    /// Auto-fix: when a command fails in another pane, ask the coordinator
-    /// agent to suggest a fix. The user confirms before execution.
-    fn maybe_trigger_autofix(&mut self, notification: &WtNotification) {
-        self.trigger_autofix_inner(notification, false);
-    }
-
-    /// Core autofix-trigger logic. `forced=true` bypasses the
-    /// `autofix_enabled` gate (used when the user explicitly activates a
-    /// Detected pill via click or hotkey). When `forced=false` and the
-    /// auto-suggest setting is off, this just emits the Detected
-    /// snapshot — the LLM is not invoked.
-    fn trigger_autofix_inner(&mut self, notification: &WtNotification, forced: bool) {
-        if self.state != ConnectionState::Connected {
-            return;
-        }
-
-        // No `is_agent_pane` suppression here. This path is reached only
-        // for `vt_sequence` notifications (see the dispatcher in
-        // `handle_event`), and `vt_sequence` Actionable events come from
-        // shell integration's `osc:133;D;<exit>` markers — the agent CLI
-        // doesn't emit OSC 133, so a D arriving implies the shell is the
-        // current foreground process and there's no agent teardown to
-        // filter. The two genuine "agent exited" paths are handled
-        // elsewhere: `osc:133;A` triggers a `PaneClosed` demotion above
-        // `classify_wt_event`, and pane-process exit surfaces as
-        // `connection_state: closed/failed`, which the dispatcher routes
-        // to the banner only — not here. A stale agent binding sitting in
-        // the registry (e.g. left by a hook that misreported `pane_id`)
-        // must not be allowed to eat a real shell command failure.
-
-        // Resolve the target tab: the tab that owns the failing pane.
-        // Without it we can't route the autofix to the right ACP session
-        // (the prior code fell back to `self.tab_id` and would land the
-        // fix in whichever tab WTA happened to be focused on — see
-        // comment block at `maybe_trigger_autofix` head). In release
-        // builds we drop the event with a warn instead of panicking,
-        // per Step 2 decision #4.
-        let target_tab_id = match notification.tab_id.clone() {
-            Some(t) => t,
-            None => {
-                tracing::warn!(
-                    target: "autofix",
-                    pane_id = %notification.pane_id,
-                    "dropping autofix: notification missing tab_id (older WT build?)",
-                );
-                return;
-            }
-        };
-
-        // Suggest-mode: when auto-suggest is off AND this isn't a user-
-        // forced activation, just surface the Detected pill and let the
-        // user decide whether to call the LLM. Skips the busy / generation
-        // / submit logic below — none of that machinery applies until the
-        // user activates the pill.
-        if !self.autofix_enabled && !forced {
-            tracing::info!(
-                target: "autofix",
-                pane_id = %notification.pane_id,
-                tab_id = %target_tab_id,
-                "auto-suggest off — surfacing Detected pill, no LLM call",
-            );
-            // D-driven: PowerShell will emit an immediate echo A within
-            // ~1ms. Arm the gate so it gets consumed rather than
-            // dismissing the pill we just set.
-            self.tab_mut(&target_tab_id).autofix.trigger_echo_pane =
-                Some(notification.pane_id.clone());
-            self.emit_autofix_state_detected(
-                &target_tab_id,
-                &notification.pane_id,
-                &notification.summary,
-            );
-            return;
-        }
-
-        // Latest event always wins — but only if we can actually act on it.
-        // The ACP transport single-flights at the tab level, so if the
-        // target tab already has a prompt in flight, submitting another
-        // one results in `tab.turn = Submitted(new)` + ACP `AgentBusy`
-        // rejection — the buffer and the wire diverge, and old chunks
-        // corrupt the new turn's state. Defer instead.
-        let (same_pane, already_busy, armed_pane_dbg) = {
-            let tab = self.tab_mut(&target_tab_id);
-            let same = tab.autofix.pane_id.as_deref() == Some(notification.pane_id.as_str());
-            let busy = !tab.turn.is_idle()
-                && !matches!(
-                    tab.turn,
-                    TurnState::Surfaced {
-                        end_pending: false,
-                        ..
-                    }
-                );
-            (same, busy, tab.autofix.pane_id.clone())
-        };
-
-        if already_busy {
-            if same_pane {
-                // Same pane re-trigger: refresh the bar's summary text but
-                // don't re-submit — the agent is already working on it.
-                tracing::info!(
-                    target: "autofix",
-                    pane_id = %notification.pane_id,
-                    tab_id = %target_tab_id,
-                    "autofix re-trigger same pane while pending — re-emit only",
-                );
-                // This branch is only reached on a fresh D event (the
-                // dispatcher routes vt_sequence here); arm the echo gate.
-                self.tab_mut(&target_tab_id).autofix.trigger_echo_pane =
-                    Some(notification.pane_id.clone());
-                self.emit_autofix_state_pending(
-                    &target_tab_id,
-                    &notification.pane_id,
-                    &notification.summary,
-                );
-            } else {
-                // Different pane while busy: drop. The user can Esc the
-                // current autofix to free the slot if they want this one.
-                tracing::info!(
-                    target: "autofix",
-                    pane_id = %notification.pane_id,
-                    tab_id = %target_tab_id,
-                    armed_pane = ?armed_pane_dbg,
-                    "skipping autofix: previous turn still in-flight",
-                );
-            }
-            return;
-        }
-
-        // For all other cases (different pane, or Armed state, or Idle):
-        // bump the target tab's generation to stale any in-flight response,
-        // then submit a new autofix turn via the state machine.
-        let new_gen = {
-            let tab = self.tab_mut(&target_tab_id);
-            tab.autofix.generation = tab.autofix.generation.wrapping_add(1);
-            // A new analysis supersedes any leftover suggestion. The C++ side
-            // will swap to Pending on the new pending event below; emitting an
-            // explicit cleared first would create a flicker.
-            tab.autofix.suggested_pane_id = None;
-            tab.autofix.generation
-        };
-
-        // The auto-fix kind is carried by PromptSubmission::is_autofix,
-        // so the text doesn't need a marker prefix — just the raw error
-        // summary + instruction.
-        let prompt_text = format!(
-            "{}\nDiagnose the error and suggest a fix.",
-            notification.summary
-        );
-
-        // Route through the target tab's ACP session. `tab_id` carries the
-        // failing tab's StableId so the ACP layer's `tab_to_session` map
-        // routes (or lazy-creates) to the right session even when the
-        // failing tab isn't currently focused. `source_pane_id` points at
-        // the failing pane so the agent can read its buffer.
-        let pane_context = PaneContext {
-            pane_id: self.pane_id.clone(),
-            tab_id: Some(target_tab_id.clone()),
-            window_id: self.window_id.clone(),
-            cwd: None,
-            source_pane_id: Some(notification.pane_id.clone()),
-        };
-
-        // Store the failing pane ID on the target tab so the Esc dismiss
-        // path can find it (legacy; the new state machine carries it via
-        // AutofixContext), and arm telemetry timing for resolution.
-        {
-            let tab = self.tab_mut(&target_tab_id);
-            tab.autofix.pane_id = Some(notification.pane_id.clone());
-            tab.autofix.armed_at = Some(std::time::Instant::now());
-        }
-
-        let prompt = PromptSubmission::new_autofix(prompt_text, Some(pane_context));
-        let submitted = SubmittedPrompt {
-            id: prompt.id,
-            text: prompt.text.clone(),
-            submitted_at_unix_s: prompt.submitted_at_unix_s,
-            autofix: Some(AutofixContext {
-                target_pane_id: notification.pane_id.clone(),
-                generation: new_gen,
-            }),
-        };
-        // Install the turn on the target tab — bypasses session_to_tab
-        // lookup so a tab with no ACP session yet still gets the prompt
-        // queued correctly (the ACP layer creates the session lazily when
-        // it processes the prompt).
-        self.turn_submit_prompt_for_tab(&target_tab_id, submitted);
-        tracing::info!(target: "autofix", pane_id = %notification.pane_id, tab_id = %target_tab_id, generation = new_gen, "sending auto-fix prompt");
-        let _ = self.prompt_tx.send(prompt);
-
-        // Light up the bottom-bar diagnostic icon in "Pending" state — the
-        // user knows something went wrong even before the agent responds.
-        // Arm the echo gate ONLY for D-driven entries (forced=false).
-        // The `execute_from_detected` path (forced=true) fires this on a
-        // stable prompt — no echo A is in flight, and arming would eat
-        // the user's first Enter as a fake echo. Bug repro: typo →
-        // Detected pill → click pill → Pending → Armed → press Enter
-        // (consumed as echo) → press Enter again (finally dismisses).
-        if !forced {
-            self.tab_mut(&target_tab_id).autofix.trigger_echo_pane =
-                Some(notification.pane_id.clone());
-        }
-        self.emit_autofix_state_pending(
-            &target_tab_id,
-            &notification.pane_id,
-            &notification.summary,
-        );
-    }
-
-    // ── autofix_state signalling ───────────────────────────────────────────
-    //
-    // Notifies the TerminalPage about autofix progress via a JSON event on
-    // the SendEvent bus. The COM server special-cases method=="autofix_state"
-    // and dispatches to TerminalPage.OnAutofixStateChanged (UI thread).
-    //
-    // Per-tab projection: the bar shows the ACTIVE tab's autofix state. Each
-    // emit_autofix_state_* stores the new snapshot on the target tab AND
-    // only forwards to WT when the target tab is currently active. On
-    // tab_changed, `project_active_tab_state` re-emits the new active
-    // tab's snapshot so the bar matches.
-
-    fn emit_autofix_state_pending(&mut self, target_tab_id: &str, pane_id: &str, summary: &str) {
-        let snapshot = AutofixBarSnapshot::Pending {
-            pane_id: pane_id.to_string(),
-            summary: summary.to_string(),
-        };
-        // NOTE: `trigger_echo_pane` is armed by the *caller*, not here —
-        // only D-driven calls expect an immediate echo A. The
-        // `execute_from_detected` path also funnels through Pending but
-        // runs on a stable prompt (no D), so arming inside this helper
-        // would consume the user's first real Enter as a fake echo.
-        self.set_bar_snapshot(target_tab_id, snapshot);
-    }
-
-    /// Suggest-mode entry: error detected but LLM not yet invoked. The
-    /// bar shows a clickable hint; the user activates the fix via the
-    /// pill or the hotkey, which fires `autofix_execute_from_detected`
-    /// and replays through `trigger_autofix_inner` with `force=true`.
-    fn emit_autofix_state_detected(&mut self, target_tab_id: &str, pane_id: &str, summary: &str) {
-        let snapshot = AutofixBarSnapshot::Detected {
-            pane_id: pane_id.to_string(),
-            summary: summary.to_string(),
-            hotkey_hint: "Ctrl+Alt+.".to_string(),
-        };
-        // See note in `emit_autofix_state_pending`: caller arms the echo
-        // gate when (and only when) a D-driven trigger is in progress.
-        self.set_bar_snapshot(target_tab_id, snapshot);
-    }
-
-    fn emit_autofix_state_armed(&mut self, target_tab_id: &str, pane_id: &str, fix_preview: &str) {
-        let snapshot = AutofixBarSnapshot::Armed {
-            pane_id: pane_id.to_string(),
-            fix_preview: fix_preview.to_string(),
-            hotkey_hint: "Ctrl+Alt+.".to_string(),
-        };
-        self.set_bar_snapshot(target_tab_id, snapshot);
-    }
-
-    /// Execute the currently armed autofix on behalf of the user (they
-    /// clicked the bottom-bar button or pressed Ctrl+. in the terminal
-    /// window). Mirrors the Enter-key path in the recommendations handler
-    /// but without requiring the agent pane to be focused.
-    /// User activated the Detected pill (click or hotkey). Read the
-    /// active tab's cached snapshot, synthesize a `WtNotification` from
-    /// it, and replay through `trigger_autofix_inner` with `forced=true`
-    /// so the auto-suggest off gate is bypassed and the LLM call fires.
-    fn handle_autofix_execute_from_detected(&mut self) {
-        let active_tab = self.active_tab_key().to_string();
-        let snapshot = self.current_tab().autofix.bar_snapshot.clone();
-        let (pane_id, summary) = match snapshot {
-            AutofixBarSnapshot::Detected {
-                pane_id, summary, ..
-            } => (pane_id, summary),
-            other => {
-                tracing::info!(
-                    target: "autofix",
-                    state = ?other,
-                    "autofix_execute_from_detected: bar not in Detected state — ignoring",
-                );
-                return;
-            }
-        };
-        let notification = WtNotification {
-            severity: WtEventSeverity::Actionable,
-            pane_id,
-            tab_id: Some(active_tab),
-            summary,
-            acknowledged: false,
-            age_ticks: 0,
-        };
-        self.trigger_autofix_inner(&notification, true);
-    }
-
-    fn handle_autofix_execute_request(&mut self, requested_pane_id: &str) {
-        let active_tab = self.active_tab_key().to_string();
-        let active_armed = self.current_tab().autofix.pane_id.clone();
-        tracing::info!(target: "autofix", requested_pane = %requested_pane_id, armed_pane = ?active_armed, has_recs = self.current_tab().turn.recommendations().is_some(), "autofix_execute received");
-        // Only execute if the active tab's armed pane matches the request.
-        // The bar always reflects the active tab, so the click must target
-        // it. The pane_id check prevents a stale UI click from running
-        // against an unrelated, more recent error.
-        let armed_pane = match active_armed {
-            Some(p) if p == requested_pane_id => p,
-            _ => {
-                tracing::info!(target: "autofix", "autofix_execute: no armed fix for this pane");
-                // Tell the UI anyway so it returns to Idle.
-                self.emit_autofix_state_cleared(&active_tab);
-                return;
-            }
-        };
-        let rec = match self.current_tab().turn.recommendations().cloned() {
-            Some(r) => r,
-            None => {
-                self.emit_autofix_state_cleared(&active_tab);
-                let autofix = &mut self.current_tab_mut().autofix;
-                autofix.pane_id = None;
-                autofix.armed_at = None;
-                return;
-            }
-        };
-        let idx = rec
-            .recommended_choice
-            .unwrap_or(self.current_tab_mut().selected_recommendation)
-            .min(rec.choices.len().saturating_sub(1));
-        let Some(mut choice) = rec.choices.get(idx).cloned() else {
-            self.emit_autofix_state_cleared(&active_tab);
-            let autofix = &mut self.current_tab_mut().autofix;
-            autofix.pane_id = None;
-            autofix.armed_at = None;
-            return;
-        };
-        // Auto-fill parent for Send actions, same as Enter path.
-        for action in &mut choice.actions {
-            if let crate::coordinator::RecommendedAction::Send { ref mut parent, .. } = action {
-                if parent.is_empty() {
-                    *parent = armed_pane.clone();
-                }
-            }
-        }
-        // Drive the cutover state machine: if the current tab's turn is
-        // still in `Surfaced{Recommendation,..}`, route through
-        // `turn_execute_card`; otherwise fall back to the lightweight
-        // dispatch path (the user may have already cleared the card via
-        // some other input).
-        let session_id = self.current_tab().session_id.clone();
-        let routed = if let Some(sid) = session_id {
-            if matches!(
-                self.current_tab().turn,
-                TurnState::Surfaced {
-                    outcome: TurnOutcome::Recommendation(_),
-                    ..
-                }
-            ) {
-                self.turn_execute_card(&sid);
-                true
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-        let choice_label = choice.choice;
-        if !routed {
-            let autofix = &mut self.current_tab_mut().autofix;
-            autofix.pane_id = None;
-            autofix.armed_at = None;
-            self.clear_recommendations();
-            let _ = self
-                .recommendation_tx
-                .send(crate::coordinator::ChoiceExecution {
-                    choice,
-                    insert_only: false,
-                });
-        }
-        self.push_execution_info(format!("Auto-executing choice {}.", choice_label));
-        self.emit_autofix_state_cleared(&active_tab);
-        // Defensive: covers the fall-back path above where we dispatched the
-        // choice directly without going through `turn_execute_card`. The
-        // matched-path case already recomputes via that callee.
-        self.recompute_chip_override(&active_tab);
-    }
-
-    fn emit_autofix_state_cleared(&mut self, target_tab_id: &str) {
-        // `cleared` carries no pane info — C++ clears its
-        // `lastErrorSessionId` based on the state alone. Reusing the
-        // `Idle` snapshot means a subsequent tab switch re-emits a
-        // clean state rather than something stale.
-        // Also drop any pending trigger-echo gate: once we're back to
-        // Idle there's no state to protect, and leaving the pane
-        // armed would silently swallow the next real prompt-start.
-        self.tab_mut(target_tab_id).autofix.trigger_echo_pane = None;
-        self.set_bar_snapshot(target_tab_id, AutofixBarSnapshot::Idle);
-    }
 
     /// Ask WT to tear down this agent pane. Wired to the second tap of the
     /// double-Ctrl+C close sequence. WT closes the Pane, which causes its
@@ -7228,25 +7063,6 @@ impl App {
         send_wt_protocol_event(evt.to_string());
     }
 
-    /// Bottom bar shows "Suggestion ready — open agent pane" (blue/info style).
-    /// The full explanation lives in the agent pane chat history; the protocol
-    /// event only carries the title used as the bar label.
-    fn emit_autofix_state_suggested(&mut self, target_tab_id: &str, pane_id: &str, title: &str) {
-        let snapshot = AutofixBarSnapshot::Suggested {
-            pane_id: pane_id.to_string(),
-            suggestion_title: title.to_string(),
-        };
-        self.set_bar_snapshot(target_tab_id, snapshot);
-    }
-
-    /// Store a fresh bar snapshot on the target tab and, if that tab is
-    /// currently active, forward it to WT so the bottom bar updates.
-    fn set_bar_snapshot(&mut self, target_tab_id: &str, snapshot: AutofixBarSnapshot) {
-        self.tab_mut(target_tab_id).autofix.bar_snapshot = snapshot.clone();
-        if target_tab_id == self.active_tab_key() {
-            send_bar_event(&snapshot, Some(target_tab_id));
-        }
-    }
 
     /// Recompute the chip-target override for the tab and, if it changed
     /// since the last emit, publish a `set_agent_chip_target` event so the
@@ -7276,10 +7092,6 @@ impl App {
         let new_target = self.tab_mut(tab_id).compute_chip_card_target();
         self.tab_mut(tab_id).last_emitted_chip_override = new_target.clone();
         emit_agent_chip_target(tab_id, new_target.as_deref());
-    }
-
-    fn armed_fix_preview(rec: &crate::coordinator::RecommendationSet) -> String {
-        armed_fix_preview(rec)
     }
 
     fn push_execution_info(&mut self, _message: String) {}
@@ -7459,6 +7271,8 @@ impl App {
                     prompt,
                     buf: text.to_string(),
                 };
+                // New turn: restart the typewriter reveal from the top.
+                tab.reveal_chars = 0;
                 true
             }
             // Thought chunk while Submitted: enter Streaming with empty buf.
@@ -7472,6 +7286,7 @@ impl App {
                     prompt,
                     buf: String::new(),
                 };
+                tab.reveal_chars = 0;
                 false
             }
             // Streaming → Streaming, append message chunks only.
@@ -7996,9 +7811,19 @@ impl App {
                 recommendations.choices.first().map(|c| &c.title)
             ),
         );
-        let preview = Self::armed_fix_preview(&recommendations);
         let target_tab = self.tab_for_session(session_id);
-        self.emit_autofix_state_armed(&target_tab, &pane_id, &preview);
+        // Analysis produced a fix recommendation. Record it as a result
+        // pending review and surface the bar accordingly (Review when the
+        // pane is closed, Idle when it's already open). The recommendation
+        // card still lives in the turn below so the user can act on it
+        // inside the pane — autofix no longer auto-executes.
+        {
+            let autofix = &mut self.tab_mut(&target_tab).autofix;
+            autofix.suggested_pane_id = Some(pane_id.clone());
+            autofix.pane_id = None;
+            autofix.armed_at = None;
+        }
+        self.emit_autofix_state_result(&target_tab, &pane_id);
         let rec_idx = recommended_choice_index(&recommendations);
         let summary = format_recommendations_for_chat(&recommendations);
         let turn_prompt_label = t!("chat.autofix_prompt_label").into_owned();
@@ -8079,13 +7904,16 @@ impl App {
         }
 
         let target_tab = self.tab_for_session(session_id);
-        self.emit_autofix_state_suggested(&target_tab, &pane_id, &title);
+        // Explanation lives in the chat above; mark the tab as having a
+        // result pending review and surface the bar (Review when the pane
+        // is closed, Idle when already open).
         {
             let tab = self.session_tab_mut(session_id);
             tab.autofix.suggested_pane_id = Some(pane_id.clone());
             tab.autofix.pane_id = None;
             tab.autofix.armed_at = None;
         }
+        self.emit_autofix_state_result(&target_tab, &pane_id);
 
         let tab = self.session_tab_mut(session_id);
         let prompt = tab.turn.prompt().cloned().expect("prompt set");
@@ -8260,35 +8088,6 @@ fn format_recommendations_for_chat(set: &RecommendationSet) -> String {
     out
 }
 
-/// Extract a short preview string from the recommended choice's first
-/// Send action, for display in the bottom-bar tooltip on Armed state.
-pub fn armed_fix_preview(rec: &crate::coordinator::RecommendationSet) -> String {
-    let idx = rec
-        .recommended_choice
-        .unwrap_or(0)
-        .min(rec.choices.len().saturating_sub(1));
-    let Some(choice) = rec.choices.get(idx).or_else(|| rec.choices.first()) else {
-        return String::new();
-    };
-    for action in &choice.actions {
-        use crate::coordinator::RecommendedAction;
-        match action {
-            RecommendedAction::Send { input, .. } => {
-                let cleaned = input.trim().replace(['\r', '\n'], " ");
-                return truncate(&cleaned, 80);
-            }
-            RecommendedAction::OpenAndSend { input, .. } => {
-                let cleaned = input.trim().replace(['\r', '\n'], " ");
-                return truncate(&cleaned, 80);
-            }
-            RecommendedAction::Open { .. } => {
-                return truncate(&choice.title, 80);
-            }
-        }
-    }
-    truncate(&choice.title, 80)
-}
-
 impl App {
     /// Push the current agent status (name / version / model / connection state)
     /// to the host so a XAML-rendered agent bar can update itself. The COM
@@ -8372,7 +8171,7 @@ impl App {
     ///   - `set_agent_state` handler end — echoes C++'s request back so C++
     ///     mirrors it (the round-trip the new architecture is built on).
     ///   - `load_session` after the per-tab mutation.
-    ///   - Esc out of Agents view, `/sessions` slash command, Ctrl+C×2
+    ///   - Esc out of agent session view, `/sessions` slash command, Ctrl+C×2
     ///     multi-tab reset.
     ///   - Once at startup (after `--initial-view` has been applied) so
     ///     the bar and the agent-pane-open flag both pick up the spawn
@@ -8436,81 +8235,6 @@ pub fn send_wt_protocol_event(json_payload: String) {
     let _ = tx.send(json_payload);
 }
 
-/// Build and send an `autofix_state` protocol event from a cached bar
-/// snapshot. Used by both fresh state transitions (active tab) and the
-/// tab_changed re-emit path. Field shape mirrors what C++
-/// `OnAutofixStateChanged` consumes.
-fn send_bar_event(snapshot: &AutofixBarSnapshot, tab_id: Option<&str>) {
-    let mut evt = match snapshot {
-        AutofixBarSnapshot::Idle => serde_json::json!({
-            "type": "event",
-            "method": "autofix_state",
-            "params": { "state": "cleared" }
-        }),
-        AutofixBarSnapshot::Detected {
-            pane_id,
-            summary,
-            hotkey_hint,
-        } => serde_json::json!({
-            "type": "event",
-            "method": "autofix_state",
-            "params": {
-                "state": "detected",
-                "pane_id": pane_id,
-                "summary": summary,
-                "hotkey_hint": hotkey_hint,
-            }
-        }),
-        AutofixBarSnapshot::Pending { pane_id, summary } => serde_json::json!({
-            "type": "event",
-            "method": "autofix_state",
-            "params": {
-                "state": "pending",
-                "pane_id": pane_id,
-                "summary": summary,
-            }
-        }),
-        AutofixBarSnapshot::Armed {
-            pane_id,
-            fix_preview,
-            hotkey_hint,
-        } => serde_json::json!({
-            "type": "event",
-            "method": "autofix_state",
-            "params": {
-                "state": "armed",
-                "pane_id": pane_id,
-                "fix_preview": fix_preview,
-                "hotkey_hint": hotkey_hint,
-            }
-        }),
-        AutofixBarSnapshot::Suggested {
-            pane_id,
-            suggestion_title,
-        } => serde_json::json!({
-            "type": "event",
-            "method": "autofix_state",
-            "params": {
-                "state": "suggested",
-                "pane_id": pane_id,
-                "suggestion_title": suggestion_title,
-            }
-        }),
-    };
-    // Tag with tab_id so C++ routes the bottom-bar update to the right
-    // tab's AgentPaneContent (window-level bar reflects active tab's
-    // autofix state). Without this, the event fans out and a non-active
-    // tab's autofix would clobber the bar.
-    if let Some(t) = tab_id {
-        if let Some(params) = evt.get_mut("params").and_then(|v| v.as_object_mut()) {
-            params.insert(
-                "tab_id".to_string(),
-                serde_json::Value::String(t.to_string()),
-            );
-        }
-    }
-    send_wt_protocol_event(evt.to_string());
-}
 
 /// Tell WT which pane in `tab_id` should display the blue "Agent" chip.
 /// `pane_session_id = None` releases the override and lets the C++ side
@@ -9004,7 +8728,7 @@ mod tests {
     fn session_info_to_agent_session_preserves_live_agent_pane_session_fields() {
         // Regression: master's new_session/load_session handlers stamp
         // status=Idle, cli_source=<resolved>, origin=AgentPane on the
-        // SessionInfo so helper-side F2 routing sees a Live row. Without
+        // SessionInfo so helper-side session management routing sees a Live row. Without
         // this stamping the row would land with all fields None, the
         // converter would map status=None -> AgentStatus::Historical (its
         // documented default), and Enter would fall through to the resume
@@ -9118,7 +8842,7 @@ mod tests {
 
     #[test]
     fn helper_agent_event_without_agent_session_id_does_not_publish_synthetic_to_master() {
-        // Regression for the user-reported duplicate F2 row:
+        // Regression for the user-reported duplicate session management row:
         //   "system32  Error                          29 minutes ago"
         //   "Agent pane session b832a8d3: system32  Active · copilot"
         //
@@ -9126,8 +8850,9 @@ mod tests {
         // hook, race, or hook from a workspace shell pane that doesn't
         // own an ACP session), the helper used to synthesize a
         // `pane:<guid>` placeholder, apply it locally, AND publish it to
-        // master. Master then surfaced the placeholder as a separate F2
-        // row alongside the real session, both pointing at the same
+        // master. Master then surfaced the placeholder as a separate
+        // session management row alongside the real session, both pointing
+        // at the same
         // underlying pane — hence the duplicate.
         //
         // Fix: keep the synthetic placeholder local for helper
@@ -10338,6 +10063,108 @@ mod tests {
         assert!(master_rx.try_recv().is_err(), "closed UI must not refetch");
     }
 
+    /// MVP sessions origin filter: with `ShellOnly`, agent-pane rows must
+    /// be hidden from `agents_rows_for_tab` (the cursor / Enter
+    /// dispatch source of truth) — *not just* from `agents_view::render`.
+    /// A bug where render filtered but `agents_rows_for_tab` didn't
+    /// would let Enter on visible row N activate hidden row M.
+    #[test]
+    fn shell_only_filter_hides_agent_pane_rows_from_cursor_model() {
+        use crate::agent_sessions::{OriginFilter, SessionOrigin};
+        let mut app = test_app();
+        app.sessions_origin_filter = OriginFilter::ShellOnly;
+        // Snapshot path: master pushed two rows — one tagged
+        // AgentPane (Class A, hidden under ShellOnly), one tagged
+        // Unknown (Class B, visible).
+        let mut pane = session_info_for_test("class-a");
+        pane.origin = Some(SessionOrigin::AgentPane);
+        pane.last_activity_at_ms = Some(200);
+        let mut shell = session_info_for_test("class-b");
+        shell.origin = Some(SessionOrigin::Unknown);
+        shell.last_activity_at_ms = Some(100);
+        app.current_tab_mut().agents_view.snapshot = Some(vec![pane, shell]);
+
+        let rows = app.agents_rows_for_tab(DEFAULT_TAB_ID);
+        assert_eq!(rows.len(), 1, "only the Class B row is visible: {rows:?}");
+        assert_eq!(rows[0].key, "class-b");
+
+        // Flip to All — both rows must reappear so the un-MVP toggle
+        // brings agent-pane rows back without any other code change.
+        app.sessions_origin_filter = OriginFilter::All;
+        let rows = app.agents_rows_for_tab(DEFAULT_TAB_ID);
+        assert_eq!(rows.len(), 2);
+
+        // AgentPaneOnly is the inverse — only Class A surfaces.
+        app.sessions_origin_filter = OriginFilter::AgentPaneOnly;
+        let rows = app.agents_rows_for_tab(DEFAULT_TAB_ID);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].key, "class-a");
+    }
+
+    /// Registry path (no snapshot): the same filter must apply when
+    /// `agents_rows_for_tab` falls back to `agent_sessions` directly.
+    /// Without this, helpers that haven't received a master snapshot
+    /// yet would show every row regardless of the MVP filter.
+    #[test]
+    fn shell_only_filter_applies_to_registry_fallback_path() {
+        use crate::agent_sessions::{CliSource, OriginFilter, SessionEvent, SessionOrigin};
+        use std::path::PathBuf;
+        let mut app = test_app();
+        app.sessions_origin_filter = OriginFilter::ShellOnly;
+        // No snapshot primed — `agents_rows_for_tab` goes through
+        // `iter_sorted_with_filters` on the registry.
+        app.agent_sessions.apply(SessionEvent::SessionStarted {
+            key: "shell-key".into(),
+            cli_source: CliSource::Claude,
+            pane_session_id: "00000000-0000-0000-0000-00000000aaaa".into(),
+            cwd: PathBuf::from("/x"),
+            title: "shell".into(),
+        });
+        app.agent_sessions.apply(SessionEvent::SessionStarted {
+            key: "pane-key".into(),
+            cli_source: CliSource::Claude,
+            pane_session_id: "00000000-0000-0000-0000-00000000bbbb".into(),
+            cwd: PathBuf::from("/x"),
+            title: "pane".into(),
+        });
+        app.agent_sessions.set_origin("pane-key", SessionOrigin::AgentPane);
+
+        let rows = app.agents_rows_for_tab(DEFAULT_TAB_ID);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].key, "shell-key");
+    }
+
+    /// `resolve_sessions_origin_filter` reads the `WTA_SESSIONS_SHOW_AGENT_PANE`
+    /// env var. With it unset (or 0/false) the MVP default
+    /// (`ShellOnly`) wins; with it set to a truthy value we flip to
+    /// `All` so a single debug helper can see everything without a
+    /// rebuild.
+    ///
+    /// Env vars are process-global, so this test serializes via the
+    /// `WTA_SESSIONS_SHOW_AGENT_PANE_TEST_LOCK` mutex shared with any other
+    /// future test that touches the same var.
+    #[test]
+    fn resolve_sessions_origin_filter_respects_env_override() {
+        use crate::agent_sessions::OriginFilter;
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _g = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        std::env::remove_var("WTA_SESSIONS_SHOW_AGENT_PANE");
+        assert_eq!(crate::app::resolve_sessions_origin_filter(), MVP_SESSIONS_ORIGIN_FILTER);
+        assert_eq!(MVP_SESSIONS_ORIGIN_FILTER, OriginFilter::ShellOnly);
+
+        std::env::set_var("WTA_SESSIONS_SHOW_AGENT_PANE", "1");
+        assert_eq!(crate::app::resolve_sessions_origin_filter(), OriginFilter::All);
+
+        std::env::set_var("WTA_SESSIONS_SHOW_AGENT_PANE", "true");
+        assert_eq!(crate::app::resolve_sessions_origin_filter(), OriginFilter::All);
+
+        std::env::set_var("WTA_SESSIONS_SHOW_AGENT_PANE", "0");
+        assert_eq!(crate::app::resolve_sessions_origin_filter(), MVP_SESSIONS_ORIGIN_FILTER);
+
+        std::env::remove_var("WTA_SESSIONS_SHOW_AGENT_PANE");
+    }
+
     #[test]
     fn snapshot_refetch_preserves_focused_sid() {
         let (mut app, mut master_rx) = test_app_with_master_rx();
@@ -10431,7 +10258,7 @@ mod tests {
         info
     }
 
-    // ─── F2 Agents view: Enter / Delete dispatch ───────────────────────────
+    // ─── agent session view: Enter / Delete dispatch ───────────────────────────
     //
     // Originally added in commit `e4723510e` ("Enter/Delete actions on Agents
     // view (M4.4-M4.6)") and lost in the post-#29 merge that stubbed out
@@ -10466,13 +10293,18 @@ mod tests {
     fn enter_on_history_row_dispatches_new_tab_with_resume() {
         use crate::agent_sessions::{CliSource, SessionEvent};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-        use std::path::PathBuf;
+        // Use a real existing directory so cwd_util::validate_starting_directory
+        // accepts it. A missing path would (correctly) be dropped from
+        // the argv — that behaviour is covered by
+        // `enter_on_history_row_with_missing_cwd_omits_d_flag` below.
+        let real_cwd = std::env::temp_dir();
+        let real_cwd_str = real_cwd.to_string_lossy().to_string();
         let mut app = test_app();
         app.agent_sessions.apply(SessionEvent::SessionStarted {
             key: "abc-123".into(),
             cli_source: CliSource::Claude,
             pane_session_id: "p".into(),
-            cwd: PathBuf::from("/work/proj"),
+            cwd: real_cwd.clone(),
             title: "t".into(),
         });
         app.agent_sessions.apply(SessionEvent::SessionStopped {
@@ -10500,10 +10332,21 @@ mod tests {
         );
         // The CLI invocation is still wrapped in `cmd /c` so .cmd shims
         // resolve via PATHEXT, but the legacy `cd /d` prefix is gone —
-        // cwd is threaded through wtcli's `-d` flag now.
+        // cwd is threaded through wtcli's `-d` flag now. Issue #135:
+        // a blinking ANSI loading banner (`SGR 1;36;5` = bold cyan
+        // slow-blink) is prepended so the user sees immediate animated
+        // feedback while the CLI cold-starts; the CLI's alt-screen TUI
+        // overwrites it on success.
         assert!(
-            argv.contains("cmd /c claude --resume abc-123"),
-            "argv: {}",
+            argv.contains(
+                "cmd /c echo \x1b[1;36;5mResuming claude session abc-123...\x1b[0m"
+            ),
+            "expected blinking loading banner echo; argv: {:?}",
+            argv
+        );
+        assert!(
+            argv.contains("&& claude --resume abc-123"),
+            "expected resume command chained after banner; argv: {}",
             argv
         );
         assert!(
@@ -10514,9 +10357,69 @@ mod tests {
         // Resume is keyed off the session's project cwd — the new tab's
         // primary pane must start in that directory so the CLI's session
         // store lookup (`~/.claude/projects/<encoded-cwd>/...`) succeeds.
+        let expected = format!("-d {}", real_cwd_str);
         assert!(
-            argv.contains("-d /work/proj"),
-            "expected -d <cwd>; argv: {}",
+            argv.contains(&expected),
+            "expected `{}` in argv: {}",
+            expected,
+            argv
+        );
+    }
+
+    /// When the stored cwd no longer exists on disk (e.g. user deleted
+    /// the project), `dispatch_resume` must omit `-d <cwd>` entirely so
+    /// wtcli falls back to the profile's startingDirectory. Without
+    /// this guard, `CreateProcessW` would fail with `ERROR_DIRECTORY`
+    /// and produce a visibly-broken pane.
+    #[test]
+    fn enter_on_history_row_with_missing_cwd_omits_d_flag() {
+        use crate::agent_sessions::{CliSource, SessionEvent};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        use std::path::PathBuf;
+        let missing = {
+            let mut p = std::env::temp_dir();
+            p.push(format!(
+                "wta-missing-cwd-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0)
+            ));
+            p
+        };
+        assert!(!missing.exists());
+        let mut app = test_app();
+        app.agent_sessions.apply(SessionEvent::SessionStarted {
+            key: "abc-stale".into(),
+            cli_source: CliSource::Claude,
+            pane_session_id: "p".into(),
+            cwd: PathBuf::from(&missing),
+            title: "t".into(),
+        });
+        app.agent_sessions.apply(SessionEvent::SessionStopped {
+            key: "abc-stale".into(),
+            reason: "user_exit".into(),
+        });
+        app.current_tab_mut().current_view = View::Agents;
+        app.current_tab_mut().agents_list_state.select(Some(0));
+        app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+        let cmd = app
+            .last_dispatched_command_for_test()
+            .expect("a command was dispatched");
+        assert_eq!(cmd.kind, DispatchedCommandKind::NewTabResume);
+        let argv = cmd.argv.join(" ");
+        assert!(argv.contains("new-tab"), "argv: {}", argv);
+        // The stale cwd must NOT have leaked through as `-d`.
+        assert!(
+            !argv.contains("-d "),
+            "argv must omit -d when cwd is missing: {}",
+            argv
+        );
+        assert!(
+            !argv.contains(&missing.to_string_lossy().to_string()),
+            "argv must not embed the stale cwd: {}",
             argv
         );
     }
@@ -10531,7 +10434,11 @@ mod tests {
         // regression-checked.
         use crate::agent_sessions::{CliSource, SessionEvent};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-        use std::path::PathBuf;
+        // Use a real existing directory so cwd_util::validate_starting_directory
+        // accepts it. A missing cwd would (correctly) be omitted —
+        // covered by `shift_enter_on_history_row_with_missing_cwd_omits_cwd`.
+        let real_cwd = std::env::temp_dir();
+        let real_cwd_str = real_cwd.to_string_lossy().to_string();
         let mut app = test_app();
         // Capability gate: dispatch is only attempted when the agent
         // advertised loadSession. Without this, the handler
@@ -10541,7 +10448,7 @@ mod tests {
             key: "abc-123".into(),
             cli_source: CliSource::Claude,
             pane_session_id: "p".into(),
-            cwd: PathBuf::from("/work/proj"),
+            cwd: real_cwd.clone(),
             title: "t".into(),
         });
         app.agent_sessions.apply(SessionEvent::SessionStopped {
@@ -10561,7 +10468,76 @@ mod tests {
         let argv = cmd.argv.join(" ");
         assert!(argv.contains("resume_in_new_agent_tab"), "argv: {}", argv);
         assert!(argv.contains("--session-id abc-123"), "argv: {}", argv);
-        assert!(argv.contains("--cwd /work/proj"), "argv: {}", argv);
+        let expected = format!("--cwd {}", real_cwd_str);
+        assert!(
+            argv.contains(&expected),
+            "expected `{}` in argv: {}",
+            expected,
+            argv
+        );
+    }
+
+    /// Shift+Enter mirror of `enter_on_history_row_with_missing_cwd_omits_d_flag`:
+    /// when the stored cwd no longer exists, the resume-in-agent-pane
+    /// path must omit the `cwd` field from the emitted
+    /// `resume_in_new_agent_tab` event so WT's `_OpenNewTab` falls back
+    /// to the profile's startingDirectory (otherwise the new tab opens
+    /// with a broken connection).
+    #[test]
+    fn shift_enter_on_history_row_with_missing_cwd_omits_cwd() {
+        use crate::agent_sessions::{CliSource, SessionEvent};
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        use std::path::PathBuf;
+        let missing = {
+            let mut p = std::env::temp_dir();
+            p.push(format!(
+                "wta-missing-shift-cwd-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_nanos())
+                    .unwrap_or(0)
+            ));
+            p
+        };
+        assert!(!missing.exists());
+        let mut app = test_app();
+        app.agent_supports_load_session = true;
+        app.agent_sessions.apply(SessionEvent::SessionStarted {
+            key: "abc-stale".into(),
+            cli_source: CliSource::Claude,
+            pane_session_id: "p".into(),
+            cwd: PathBuf::from(&missing),
+            title: "t".into(),
+        });
+        app.agent_sessions.apply(SessionEvent::SessionStopped {
+            key: "abc-stale".into(),
+            reason: "user_exit".into(),
+        });
+        app.current_tab_mut().current_view = View::Agents;
+        app.current_tab_mut().agents_list_state.select(Some(0));
+        app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::SHIFT));
+
+        let cmd = app
+            .last_dispatched_command_for_test()
+            .expect("a command was dispatched");
+        assert_eq!(cmd.kind, DispatchedCommandKind::ResumeInAgentPane);
+        let argv = cmd.argv.join(" ");
+        assert!(argv.contains("resume_in_new_agent_tab"), "argv: {}", argv);
+        // Fallback contract: the --cwd flag (and any value) must be
+        // omitted entirely so the consumer uses its default. A
+        // regression that sent `--cwd ""` would slip past a
+        // string-contains check, hence the explicit flag assertion.
+        assert!(
+            !cmd.argv.iter().any(|a| a == "--cwd"),
+            "argv must omit --cwd when cwd is missing: {:?}",
+            cmd.argv
+        );
+        assert!(
+            !argv.contains(&missing.to_string_lossy().to_string()),
+            "argv must not embed the stale cwd: {}",
+            argv
+        );
     }
 
     #[test]
@@ -10656,10 +10632,15 @@ mod tests {
     /// Class A dead + Enter ran the CLI --resume flag path.
     #[test]
     fn enter_on_class_a_dead_row_dispatches_resume_in_agent_pane() {
-        use crate::agent_sessions::{CliSource, SessionEvent, SessionOrigin};
+        use crate::agent_sessions::{CliSource, OriginFilter, SessionEvent, SessionOrigin};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         use std::path::PathBuf;
         let mut app = test_app();
+        // This test exercises the Class A (AgentPane) Enter routing,
+        // which the MVP sessions filter hides. Opt out so the row is
+        // visible to the cursor; the dispatch logic under test is
+        // unchanged by the filter.
+        app.sessions_origin_filter = OriginFilter::All;
         app.agent_supports_load_session = true;
         app.agent_sessions.apply(SessionEvent::SessionStarted {
             key: "abc-class-a".into(),
@@ -10692,10 +10673,15 @@ mod tests {
     /// Shift flips the default → ResumeCliFlag (new tab CLI --resume).
     #[test]
     fn shift_enter_on_class_a_dead_row_dispatches_cli_resume() {
-        use crate::agent_sessions::{CliSource, SessionEvent, SessionOrigin};
+        use crate::agent_sessions::{CliSource, OriginFilter, SessionEvent, SessionOrigin};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         use std::path::PathBuf;
         let mut app = test_app();
+        // See enter_on_class_a_dead_row_dispatches_resume_in_agent_pane
+        // for the OriginFilter::All rationale — the MVP filter hides
+        // Class A rows from the cursor model; this test exercises the
+        // routing logic that fires when they ARE visible.
+        app.sessions_origin_filter = OriginFilter::All;
         app.agent_supports_load_session = true;
         app.agent_sessions.apply(SessionEvent::SessionStarted {
             key: "abc-class-a-shift".into(),
@@ -10734,10 +10720,14 @@ mod tests {
     /// A origin to confirm origin doesn't matter for Live rows.
     #[test]
     fn shift_enter_on_class_a_live_row_focuses() {
-        use crate::agent_sessions::{CliSource, SessionEvent, SessionOrigin};
+        use crate::agent_sessions::{CliSource, OriginFilter, SessionEvent, SessionOrigin};
         use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
         use std::path::PathBuf;
         let mut app = test_app();
+        // Same rationale as the Class A dead-row tests above:
+        // MVP sessions filter hides AgentPane rows, this test verifies the
+        // dispatch logic for when they are visible.
+        app.sessions_origin_filter = OriginFilter::All;
         app.agent_sessions.apply(SessionEvent::SessionStarted {
             key: "live-class-a".into(),
             cli_source: CliSource::Claude,
@@ -10760,8 +10750,8 @@ mod tests {
     }
 
     /// Class B (Unknown origin) + plain Enter on a Live row preserves
-    /// the legacy focus behavior — this exercises the most common F2
-    /// path (user-started `copilot` in a normal pane via hooks).
+    /// the legacy focus behavior — this exercises the most common
+    /// session management path (user-started `copilot` in a normal pane via hooks).
     #[test]
     fn enter_on_class_b_live_row_focuses() {
         use crate::agent_sessions::{CliSource, SessionEvent};
@@ -10933,7 +10923,7 @@ mod tests {
     fn prune_phantom_session_keeps_ended_row_when_resumable() {
         // Symmetric to the per-CLI drop tests: if the on-disk
         // artefact has real content, the prune is a no-op so the user
-        // can resume via Enter in F2.
+        // can resume via Enter in session management view.
         use crate::agent_sessions::CliSource;
         let mut reg = make_ended_session(CliSource::Claude, "real-id");
         crate::app::prune_phantom_session_if_ended_with(&mut reg, "real-id", |_cli, _k| true);
@@ -11025,7 +11015,7 @@ mod tests {
         // session id (it only flushes when there's content). With
         // the previous lenient probe ("missing artefact → defer to
         // CLI → resumable=true"), the post-`SessionStopped` prune
-        // believed the row was real and left it Ended in F2. Pressing
+        // believed the row was real and left it Ended in session management view. Pressing
         // Enter then launched `claude --resume <id>` and dead-ended
         // on `No conversation found with session ID: <id>`.
         //
@@ -11187,7 +11177,7 @@ mod tests {
     #[test]
     fn closing_other_tab_preserves_per_tab_view_when_tab_changed_follows() {
         // Reproduces the user-reported bug:
-        //   tab1 has the session list (Agents view) open. User opens
+        //   tab1 has the session list (agent session view) open. User opens
         //   tab2, then closes tab2. Focus returns to tab1, the agent
         //   pane is still visible, but the session list has vanished
         //   — the user has to press the shortcut again to bring it
@@ -11226,7 +11216,7 @@ mod tests {
             });
         }
 
-        // (1) tab1 active, Agents view, selection at row 2.
+        // (1) tab1 active, agent session view, selection at row 2.
         let tab1 = "tab1-stable-id";
         let tab2 = "tab2-stable-id";
         app.tab_id = Some(tab1.into());
@@ -11304,6 +11294,168 @@ mod tests {
         assert!(
             !app.tab_mut("test-tab").turn.is_idle(),
             "autofix prompt should be in-flight on the target tab"
+        );
+    }
+
+    /// F3: a transport death (helper `handle_io` watchdog) moves the UI out of
+    /// `Connected`, and its connection.lost ("/restart") line must survive even
+    /// when a different error (e.g. the in-flight prompt failure, "returned as
+    /// is") is already shown — only identical consecutive errors collapse, so
+    /// the recovery hint is never hidden.
+    #[test]
+    fn transport_loss_surfaces_restart_hint_even_behind_another_error() {
+        let lost = t!("connection.lost").into_owned();
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+        // In-flight prompt fails first (raw), then the watchdog's connection.lost.
+        app.handle_event(AppEvent::AgentError {
+            session_id: None,
+            failure: crate::protocol::acp::failure::AgentFailure::Protocol {
+                code: -32603,
+                message: "pipe closed".to_string(),
+            },
+            message: "prompt error: pipe closed".to_string(),
+        });
+        app.handle_event(AppEvent::AgentError {
+            session_id: None,
+            failure: crate::protocol::acp::failure::AgentFailure::TransportLost,
+            message: lost.clone(),
+        });
+        assert!(
+            matches!(app.state, ConnectionState::Failed(_)),
+            "a transport loss must move the UI out of Connected (F3)"
+        );
+        assert!(
+            app.current_tab()
+                .messages
+                .iter()
+                .any(|m| matches!(m, ChatMessage::Error(s) if *s == lost)),
+            "the connection.lost /restart hint must be shown, not hidden behind the raw error"
+        );
+        // An identical connection.lost arriving again must not stack a duplicate.
+        app.handle_event(AppEvent::AgentError {
+            session_id: None,
+            failure: crate::protocol::acp::failure::AgentFailure::TransportLost,
+            message: lost.clone(),
+        });
+        let n = app
+            .current_tab()
+            .messages
+            .iter()
+            .filter(|m| matches!(m, ChatMessage::Error(s) if *s == lost))
+            .count();
+        assert_eq!(n, 1, "identical connection.lost must not duplicate");
+    }
+
+    /// Auth failures must reach the sign-in screen, not get flattened to a dead
+    /// `connection.lost`. Classification is typed (`AgentFailure::AuthRequired`),
+    /// done once at the helper boundary, so the handler routes purely on the
+    /// discriminant — no substring matching of the message text.
+    #[test]
+    fn auth_error_routes_to_signin_not_connection_lost() {
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+        app.handle_event(AppEvent::AgentError {
+            session_id: None,
+            failure: crate::protocol::acp::failure::AgentFailure::AuthRequired {
+                message: "authentication required".to_string(),
+            },
+            message: "new_session over master pipe failed: authentication required"
+                .to_string(),
+        });
+        assert_eq!(
+            app.mode,
+            AppMode::Setup,
+            "an auth failure must route to the sign-in screen"
+        );
+        assert!(
+            !matches!(app.state, ConnectionState::Failed(_)),
+            "an auth failure must not become a Failed connection-lost state"
+        );
+    }
+
+    /// A soft stop is an *outcome*, not a connection failure: the handler must
+    /// append an informational System line carrying the localized reason text,
+    /// while leaving the connection `Connected` and never routing to the
+    /// sign-in screen. This is what keeps soft stops off the `AgentFailure`
+    /// axis — the gap the client-level emit test cannot cover.
+    #[test]
+    fn soft_stop_appends_system_line_without_changing_state() {
+        use crate::protocol::acp::soft_stop::SoftStopReason;
+        let mut app = test_app();
+        app.state = ConnectionState::Connected;
+
+        app.handle_event(AppEvent::AgentSoftStop {
+            session_id: "0".to_string(),
+            reason: SoftStopReason::Refusal,
+        });
+
+        let expected = t!("system.stopped_refusal").into_owned();
+        assert!(
+            app.current_tab()
+                .messages
+                .iter()
+                .any(|m| matches!(m, ChatMessage::System(s) if *s == expected)),
+            "a soft stop must append its localized System line"
+        );
+        assert!(
+            matches!(app.state, ConnectionState::Connected),
+            "a soft stop must not change the connection state"
+        );
+        assert_ne!(
+            app.mode,
+            AppMode::Setup,
+            "a soft stop is not a failure — it must never route to sign-in"
+        );
+        assert!(
+            !app.current_tab()
+                .messages
+                .iter()
+                .any(|m| matches!(m, ChatMessage::Error(_))),
+            "a soft stop must not surface an Error line"
+        );
+    }
+
+    /// Each `SoftStopReason` must resolve to its own distinct localized line so
+    /// the user can tell truncation from a request-budget stop from a refusal.
+    #[test]
+    fn soft_stop_reasons_map_to_distinct_localized_lines() {
+        use crate::protocol::acp::soft_stop::SoftStopReason;
+        for (reason, key) in [
+            (SoftStopReason::MaxTokens, "system.stopped_max_tokens"),
+            (
+                SoftStopReason::MaxTurnRequests,
+                "system.stopped_max_turn_requests",
+            ),
+            (SoftStopReason::Refusal, "system.stopped_refusal"),
+        ] {
+            let mut app = test_app();
+            app.handle_event(AppEvent::AgentSoftStop {
+                session_id: "0".to_string(),
+                reason,
+            });
+            let expected = t!(key).into_owned();
+            assert!(
+                app.current_tab()
+                    .messages
+                    .iter()
+                    .any(|m| matches!(m, ChatMessage::System(s) if *s == expected)),
+                "reason {reason:?} must render the {key} line"
+            );
+        }
+    }
+
+    /// F7: while `Connecting`, the activity frame must keep advancing on Tick so
+    /// the indicator animates and a cold start doesn't look frozen.
+    #[test]
+    fn connecting_state_advances_activity_frame_on_tick() {
+        let mut app = test_app();
+        app.state = ConnectionState::Connecting("Initializing ACP...".to_string());
+        let before = app.activity_frame;
+        app.handle_event(AppEvent::Tick);
+        assert_ne!(
+            app.activity_frame, before,
+            "the connecting indicator must keep animating (F7)"
         );
     }
 
@@ -11713,7 +11865,7 @@ mod tests {
     /// signal we get when the user `/exit`s a resumed Gemini pane is
     /// WT-native `connection_state: closed`. Without bridging that into a
     /// `SessionEvent::PaneClosed`, the row stays stuck at Idle/Working
-    /// forever in the F2 list.
+    /// forever in the session management list.
     #[test]
     fn connection_state_closed_transitions_agent_row_to_ended() {
         use crate::agent_sessions::{AgentStatus, CliSource, SessionEvent};

@@ -1,6 +1,6 @@
 # عناوين شاشة الإعداد
-# {Locked="Intelligent Terminal"} - اسم المنتج، لا تترجمه
-setup.title.first_run: "مرحبًا بك في Intelligent Terminal!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "مرحبًا بك في الوحدة الطرفية الذكية!"
 setup.title.agent_missing: "لم يتم العثور على عامل الذكاء الاصطناعي"
 setup.title.agent_error: "فشل الاتصال بعامل الذكاء الاصطناعي"
 setup.title.switch_agent: "تبديل عامل الذكاء الاصطناعي"
@@ -8,13 +8,13 @@ setup.title.not_available: "عامل الذكاء الاصطناعي غير مت
 setup.title.sign_in: "تسجيل الدخول مطلوب"
 
 # يتم استبدال %{agent} باسم عرض عامل الذكاء الاصطناعي في وقت التشغيل.
-setup.subtitle.copilot_missing: "عامل الذكاء الاصطناعي \"%{agent}\" غير مثبّت. اتبع الخطوات أدناه لتثبيته. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "عامل الذكاء الاصطناعي \"%{agent}\" غير مثبّت. يُرجى إعادة تثبيته يدويًا، ثم أعد المحاولة. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "يتطلب عامل الذكاء الاصطناعي \"%{agent}\" المصادقة. اتبع الخطوات أدناه لتسجيل الدخول. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "يتطلب عامل الذكاء الاصطناعي \"%{agent}\" المصادقة. يُرجى تسجيل الدخول عبر عامل الذكاء الاصطناعي، ثم حدد \"لقد سجّلت الدخول\" أدناه. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "عامل الذكاء الاصطناعي \"%{agent}\" غير مثبّت. اتبع الخطوات أدناه لتثبيته. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى الوحدة الطرفية الذكية Settings > Agent."
+setup.subtitle.agent_missing: "عامل الذكاء الاصطناعي \"%{agent}\" غير مثبّت. يُرجى إعادة تثبيته يدويًا، ثم أعد المحاولة. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى الوحدة الطرفية الذكية Settings > Agent."
+setup.subtitle.copilot_auth: "يتطلب عامل الذكاء الاصطناعي \"%{agent}\" المصادقة. اتبع الخطوات أدناه لتسجيل الدخول. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى الوحدة الطرفية الذكية Settings > Agent."
+setup.subtitle.agent_auth: "يتطلب عامل الذكاء الاصطناعي \"%{agent}\" المصادقة. يُرجى تسجيل الدخول عبر عامل الذكاء الاصطناعي، ثم حدد \"لقد سجّلت الدخول\" أدناه. لتبديل عوامل الذكاء الاصطناعي، انتقل إلى الوحدة الطرفية الذكية Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "اختر عامل الذكاء الاصطناعي الافتراضي الذي تريد استخدامه في Intelligent Terminal. يمكنك"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "اختر عامل الذكاء الاصطناعي الافتراضي الذي تريد استخدامه في الوحدة الطرفية الذكية. يمكنك"
 setup.description.fre_line2: "الانتقال إلى Settings لتكوين مساحة العمل وإعدادها."
 
 setup.option.install: "تثبيت %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  اضغط Enter لتسجيل الدخول، Esc للرجوع
 
 # ── عرض الدردشة (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "جارٍ التفكير…"
-# {Locked="Intelligent Terminal"} - اسم المنتج، لا تترجمه
-chat.welcome_title: "مرحبًا بك في Intelligent Terminal!"
-chat.welcome_disclaimer: "يستخدم Intelligent Terminal الذكاء الاصطناعي. تحقق من الأخطاء."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "مرحبًا بك في الوحدة الطرفية الذكية!"
+chat.welcome_disclaimer: "يستخدم الوحدة الطرفية الذكية الذكاء الاصطناعي. تحقق من الأخطاء."
 chat.plan_header: "الخطة:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -130,12 +130,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. لإظهار/إخفاء لوحة عامل 
 # ── حالة الاتصال ────────────────────────────────────────────────────────
 connection.starting: "جارٍ تشغيل عامل الذكاء الاصطناعي..."
 connection.reconnecting: "جارٍ إعادة الاتصال..."
+connection.connecting_activity: "جارٍ الاتصال بعامل الذكاء الاصطناعي…"
+connection.lost: "فُقد الاتصال بعامل الذكاء الاصطناعي. اكتب /restart لإعادة الاتصال."  # {Locked="/restart"}
 
 # ── رسائل النظام (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "تم الإلغاء."
 system.no_prompt_in_flight: "لا يوجد أمر قيد التنفيذ."
 system.authentication_failed: "فشلت المصادقة"
 system.command_copied_retry: "تم نسخ الأمر — شغّله في طرفية أخرى، ثم اضغط Enter لإعادة المحاولة"  # {Locked="Enter"}
+system.stopped_max_tokens: "تم اقتطاع الرد بعد بلوغ حد إخراج النموذج."
+system.stopped_max_turn_requests: "توقف الوكيل بعد بلوغ حد الطلبات لهذه الجولة."
+system.stopped_refusal: "رفض الوكيل متابعة هذا الطلب."
+system.agent_busy: "العامل مشغول في علامة التبويب هذه — انتظر حتى ينتهي الطلب الحالي."
+system.resuming_session: "جارٍ استئناف الجلسة %{session_id}..."
+system.unknown_command: "أمر غير معروف \"%{command}\" — تم إرساله كطلب. اكتب /help لعرض القائمة."  # {Locked="/help"} — slash-command name.
+system.busy_use_stop: "انتظر حتى ينتهي الطلب الحالي، أو استخدم /stop أولًا."  # {Locked="/stop"} — slash-command name.
+system.cannot_focus_session: "يتعذر التركيز على الجلسة %{session_id}: تبدو نشطة، لكن لم يتم ربط GUID للوحة بعد. حاول مرة أخرى بعد قليل."
+system.cannot_resume_no_load_session: "يتعذر الاستئناف في لوحة العامل: لم يعلن %{agent} عن إمكانية ACP `loadSession`. اضغط Enter (من دون Shift) للاستئناف في لوحة طرفية جديدة بدلًا من ذلك."  # {Locked="ACP","loadSession","Enter","Shift"} — protocol/UI terms.
+system.cannot_resume_no_resume_flag: "يتعذر استئناف جلسة %{agent}: لا يحتوي هذا العامل على علامة بنمط `--resume`. اضغط Shift+Enter لمحاولة الاستئناف داخل لوحة العامل عبر ACP بدلًا من ذلك."  # {Locked="--resume","Shift","Enter","ACP"} — flag and UI terms.
+system.cannot_resume_unknown_agent: "يتعذر استئناف الجلسة %{session_id}: عامل المصدر غير معروف لهذا الإصدار من WTA."
+system.cannot_resume_phantom_via_flag: "يتعذر استئناف جلسة %{agent} %{session_id}: بدأت لكنها لم تجمع أي محادثة، لذلك سيرفض %{agent} نفسه الاستئناف. تتم إزالة الصف."
+system.cannot_resume_phantom_via_load: "يتعذر استئناف جلسة %{agent} %{session_id}: بدأت لكنها لم تجمع أي محادثة، لذلك سيرفض %{agent} التحميل. تتم إزالة الصف."
+system.fallback.this_agent: "هذا العامل"
+system.fallback.connected_agent: "العامل المتصل"
 
 # ── مخرجات CLI في وقت التشغيل (src/main.rs) ────────────────────────────────────────
 output.no_windows: "لم يتم العثور على نوافذ."
@@ -181,3 +198,6 @@ time.hour_singular: "منذ ساعة واحدة"
 time.hours_other: "منذ %{count} ساعة"
 time.day_singular: "منذ يوم واحد"
 time.days_other: "منذ %{count} يومًا"
+
+# ── تنفيذ التوصية (src/coordinator.rs) ───────────────────────────
+system.choice_execution_failed: "فشل الاختيار %{choice}: %{error}"

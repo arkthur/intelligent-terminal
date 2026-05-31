@@ -1707,6 +1707,14 @@ namespace winrt::TerminalApp::implementation
         args.Handled(true);
     }
 
+    void TerminalPage::_HandleOpenBackgroundAgent(const IInspectable& /*sender*/,
+                                                  const ActionEventArgs& args)
+    {
+        OutputDebugStringW(L"[AgentPane] _HandleOpenBackgroundAgent called\n");
+        _OpenBackgroundAgentTab();
+        args.Handled(true);
+    }
+
     void TerminalPage::_HandleOpenAgentSessions(const IInspectable& /*sender*/,
                                                 const ActionEventArgs& args)
     {
@@ -1766,13 +1774,27 @@ namespace winrt::TerminalApp::implementation
         }
         using AS = winrt::TerminalApp::implementation::AgentPaneContent::AutofixState;
         const auto state = impl->GetAutofixState();
-        if (state == AS::Armed)
+        // Open or focus the active tab's agent pane (shared by Detected and
+        // Review). Opening it makes the helper observe pane_open=true and
+        // flip the bar to Idle on its own.
+        const auto openAgentPaneForReview = [&]() {
+            const auto agentPane = activeTab->FindAgentPane();
+            if (agentPane && !agentPane->IsHidden())
+            {
+                if (agentContent.IsSessionsView())
+                {
+                    _RequestAgentStateForTab(activeTab, "chat", std::nullopt);
+                }
+            }
+            else
+            {
+                _OpenOrReuseAgentPane(/*intoSessionsView*/ false, L"Autofix");
+            }
+        };
+        if (state == AS::Detected)
         {
-            _TriggerAutofix(activeTab, L"Hotkey");
-            args.Handled(true);
-        }
-        else if (state == AS::Detected)
-        {
+            // "Ask the agent for a fix": open the pane, then fire the LLM.
+            openAgentPaneForReview();
             Json::Value evt;
             evt["type"] = "event";
             evt["method"] = "autofix_execute_from_detected";
@@ -1785,6 +1807,12 @@ namespace winrt::TerminalApp::implementation
             ProtocolVtSequenceReceived.raise(
                 *this,
                 winrt::to_hstring(Json::writeString(wb, evt)));
+            args.Handled(true);
+        }
+        else if (state == AS::Review)
+        {
+            // Result is ready in the pane chat — just open it for review.
+            openAgentPaneForReview();
             args.Handled(true);
         }
     }
@@ -1802,14 +1830,15 @@ namespace winrt::TerminalApp::implementation
         {
             co_return;
         }
-        wil::unique_cotaskmem_string localAppDataRaw;
-        if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &localAppDataRaw)) || !localAppDataRaw)
+        const std::filesystem::path desktop{ desktopRaw.get() };
+        // Archive the WTA log *root* (`...\logs`), not the per-version subdir,
+        // so the bug report captures every version's logs plus the flat
+        // hook-trace.log — the whole `logs\` tree is tarred recursively below.
+        const std::filesystem::path logsDir = ::IntelligentTerminal::LogDir();
+        if (logsDir.empty())
         {
             co_return;
         }
-
-        const std::filesystem::path desktop{ desktopRaw.get() };
-        const std::filesystem::path logsDir = std::filesystem::path(localAppDataRaw.get()) / L"IntelligentTerminal" / L"logs";
 
         // create_directories is a no-op if the path already exists. We do this so
         // tar always has *something* to archive, even on a brand-new install where
@@ -1928,24 +1957,70 @@ namespace winrt::TerminalApp::implementation
 
     safe_void_coroutine TerminalPage::_InitShellIntegration(const ShellIntegrationTarget target)
     {
+        // Publish "user clicked Install -> desired = true" SYNCHRONOUSLY,
+        // before the first suspension. If we deferred this until after the
+        // resume_background() below, a settings reload that publishes
+        // `false` between the click and our resumption could complete its
+        // uninstall first, and then this coroutine would stamp `true`
+        // back over it and reinstall — leaving $PROFILE installed while
+        // the toggle is off. Publishing pre-suspension makes the
+        // last-writer-wins semantics depend on UI-thread ordering (which
+        // matches user intent ordering), not on coroutine resume ordering.
+        _shellIntegrationDesiredEnabled.store(true, std::memory_order_release);
+
         const auto weak = get_weak();
         const auto dispatcher = Dispatcher();
 
         co_await winrt::resume_background();
 
+        // Acquire a strong reference *before* touching any more member
+        // state so a page destroyed while this coroutine was queued
+        // doesn't leave us chasing freed members. Mirrors the pattern in
+        // _ReconcileShellIntegration.
+        auto self = weak.get();
+        if (!self)
+        {
+            co_return;
+        }
+
         namespace SI = ::Microsoft::Terminal::ShellIntegration;
 
-        // Install for both PowerShell 7 and Windows PowerShell 5.1
-        const auto pwshResult = SI::InstallForTarget(SI::Target::Pwsh);
-        const auto wpResult = SI::InstallForTarget(SI::Target::WindowsPowerShell);
+        bool desiredAtRun = true;
+        bool pwshAlready = false;
+        bool wpAlready = false;
+        bool pwshOk = false;
+        bool wpOk = false;
+        {
+            std::lock_guard<std::mutex> guard{ _shellIntegrationReconcileMutex };
+            // Re-check after acquiring the lock. If a settings reload (toggle
+            // off) raced ahead and published `false`, that is a newer
+            // expression of intent than the Install button click; skip the
+            // install so we don't reinstall on top of the just-completed
+            // uninstall and leave the profile out of sync with the toggle.
+            desiredAtRun = _shellIntegrationDesiredEnabled.load(std::memory_order_acquire);
+            if (desiredAtRun)
+            {
+                const auto pwshResult = SI::InstallForTarget(SI::Target::Pwsh);
+                const auto wpResult = SI::InstallForTarget(SI::Target::WindowsPowerShell);
+                pwshAlready = pwshResult.alreadyInstalled;
+                wpAlready = wpResult.alreadyInstalled;
+                pwshOk = pwshResult.success;
+                wpOk = wpResult.success;
+            }
+        }
 
-        const bool allAlreadyInstalled = pwshResult.alreadyInstalled && wpResult.alreadyInstalled;
-        const bool anyFailure = !pwshResult.success || !wpResult.success;
+        const bool allAlreadyInstalled = pwshAlready && wpAlready;
+        const bool anyFailure = !pwshOk || !wpOk;
 
         co_await wil::resume_foreground(dispatcher);
         if (auto strong = weak.get())
         {
-            if (allAlreadyInstalled)
+            if (!desiredAtRun)
+            {
+                // Auto-detection was disabled between the click and the lock.
+                // No dialog: a reconcile has already brought $PROFILE in line.
+            }
+            else if (allAlreadyInstalled)
             {
                 // Already configured — no dialog needed
             }
@@ -1967,6 +2042,46 @@ namespace winrt::TerminalApp::implementation
     void TerminalPage::_OnSettingsInitShellIntegration(const IInspectable& /*sender*/, const ShellIntegrationTarget target)
     {
         _InitShellIntegration(target);
+    }
+
+    // Silent install/uninstall driven by EffectiveAutoErrorDetectionEnabled.
+    // Called from SetSettings on first-load and on every change of the
+    // effective detection setting. No dialog — this is the background
+    // reconcile that keeps $PROFILE in sync with the user's stored
+    // preference (including roaming/sync arrivals on fresh machines and
+    // toggle-OFF cleanup that the FRE/Settings-Save dialog path doesn't
+    // perform). Install/Uninstall are both idempotent.
+    safe_void_coroutine TerminalPage::_ReconcileShellIntegration()
+    {
+        auto weak = get_weak();
+        co_await winrt::resume_background();
+        auto self = weak.get();
+        if (!self)
+        {
+            co_return;
+        }
+
+        // Serialize against any other in-flight reconcile so back-to-back
+        // toggle changes (or file-watcher reload storms) can't interleave
+        // an earlier Install's write after a later Uninstall and leave
+        // the $PROFILE block stuck in the wrong state. Reading the
+        // desired flag inside the lock means the last acquirer always
+        // observes the latest UI-thread-published value, so the final
+        // on-disk state matches the latest setting.
+        std::lock_guard<std::mutex> guard{ _shellIntegrationReconcileMutex };
+        const bool enabled = _shellIntegrationDesiredEnabled.load(std::memory_order_acquire);
+
+        namespace SI = ::Microsoft::Terminal::ShellIntegration;
+        if (enabled)
+        {
+            SI::InstallForTarget(SI::Target::Pwsh);
+            SI::InstallForTarget(SI::Target::WindowsPowerShell);
+        }
+        else
+        {
+            SI::UninstallForTarget(SI::Target::Pwsh);
+            SI::UninstallForTarget(SI::Target::WindowsPowerShell);
+        }
     }
 
     void TerminalPage::_ShowShellIntegrationDialog(const winrt::hstring& title, const winrt::hstring& message)

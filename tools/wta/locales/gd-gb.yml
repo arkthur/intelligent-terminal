@@ -1,6 +1,6 @@
 # Tiotalan sgrìn stèidheachaidh
-# {Locked="Intelligent Terminal"} - ainm an toraidh, na eadar-theangaich
-setup.title.first_run: "Fàilte gu Intelligent Terminal!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Fàilte gu Tèirmineal Glic!"
 setup.title.agent_missing: "Cha deach an àidseant a lorg"
 setup.title.agent_error: "Dh'fhàillig ceangal an àidseant"
 setup.title.switch_agent: "Atharraich àidseant"
@@ -8,13 +8,13 @@ setup.title.not_available: "Chan eil an àidseant ri fhaighinn"
 setup.title.sign_in: "Feumaidh tu clàradh a-steach"
 
 # Thèid %{agent} a chur an àite ainm-taisbeanaidh an àidseant aig àm ruith.
-setup.subtitle.copilot_missing: "Chan eil an àidseant agad \"%{agent}\" air a stàladh. Lean na ceumannan gu h-ìosal gus a stàladh. Airson àidseant atharrachadh, rach gu Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "Chan eil an àidseant agad \"%{agent}\" air a stàladh. Ath-stàlaich e le làimh, an uair sin feuch a-rithist. Airson àidseant atharrachadh, rach gu Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "Feumaidh an àidseant agad \"%{agent}\" dearbhadh. Lean na ceumannan gu h-ìosal gus clàradh a-steach. Airson àidseant atharrachadh, rach gu Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "Feumaidh an àidseant agad \"%{agent}\" dearbhadh. Clàraich a-steach tron àidseant, an uair sin tagh \"Chlàraich mi a-steach\" gu h-ìosal. Airson àidseant atharrachadh, rach gu Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "Chan eil an àidseant agad \"%{agent}\" air a stàladh. Lean na ceumannan gu h-ìosal gus a stàladh. Airson àidseant atharrachadh, rach gu Tèirmineal Glic Settings > Agent."
+setup.subtitle.agent_missing: "Chan eil an àidseant agad \"%{agent}\" air a stàladh. Ath-stàlaich e le làimh, an uair sin feuch a-rithist. Airson àidseant atharrachadh, rach gu Tèirmineal Glic Settings > Agent."
+setup.subtitle.copilot_auth: "Feumaidh an àidseant agad \"%{agent}\" dearbhadh. Lean na ceumannan gu h-ìosal gus clàradh a-steach. Airson àidseant atharrachadh, rach gu Tèirmineal Glic Settings > Agent."
+setup.subtitle.agent_auth: "Feumaidh an àidseant agad \"%{agent}\" dearbhadh. Clàraich a-steach tron àidseant, an uair sin tagh \"Chlàraich mi a-steach\" gu h-ìosal. Airson àidseant atharrachadh, rach gu Tèirmineal Glic Settings > Agent."
 
-# {Locked="Intelligent Terminal"}, {Locked="Settings"}
-setup.description.fre_line1: "Tagh an àidseant bunaiteach a bu mhath leat a chleachdadh ann an Intelligent Terminal. 'S urrainn dhut"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}, {Locked="Settings"}
+setup.description.fre_line1: "Tagh an àidseant bunaiteach a bu mhath leat a chleachdadh ann an Tèirmineal Glic. 'S urrainn dhut"
 setup.description.fre_line2: "a dhol gu Settings gus an raon-obrach agad a rèiteachadh."
 
 setup.option.install: "Stàlaich %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Brùth Enter gus clàradh a-steach, Esc gus tilleadh"  # {L
 
 # ── Sealladh còmhraidh (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "A' smaoineachadh…"
-# {Locked="Intelligent Terminal"} - ainm an toraidh, na eadar-theangaich
-chat.welcome_title: "Fàilte gu Intelligent Terminal!"
-chat.welcome_disclaimer: "Bidh Intelligent Terminal a' cleachdadh AI. Thoir sùil airson mearachdan."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Fàilte gu Tèirmineal Glic!"
+chat.welcome_disclaimer: "Bidh Tèirmineal Glic a' cleachdadh AI. Thoir sùil airson mearachdan."
 chat.plan_header: "Plana:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -119,12 +119,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. gus panail àidseant a shealltainn/fhalach
 # ── Staid ceangail ────────────────────────────────────────────────────────
 connection.starting: "A' tòiseachadh an àidseant..."
 connection.reconnecting: "Ag ath-cheangal..."
+connection.connecting_activity: "A' ceangal ris an àidseant…"
+connection.lost: "Chaidh an ceangal ris an àidseant a chall. Sgrìobh /restart gus ath-cheangal."  # {Locked="/restart"}
 
 # ── Teachdaireachdan siostam (src/app.rs) ────────────────────────────────────
 system.cancelled: "Air a sgur dheth."
 system.no_prompt_in_flight: "Chan eil brodadh air an t-slighe."
 system.authentication_failed: "Dh'fhàillig an dearbhadh"
 system.command_copied_retry: "Àithne air a chopaigeadh — ruith e ann an teirmineal eile, an uair sin brùth Enter gus feuchainn a-rithist"  # {Locked="Enter"}
+system.stopped_max_tokens: "Chaidh am freagairt a ghearradh às dèidh crìoch toraidh a' mhodail a ruighinn."
+system.stopped_max_turn_requests: "Stad an riochdaire às dèidh a chrìoch iarrtais airson a' chuairt seo a ruighinn."
+system.stopped_refusal: "Dhiùlt an riochdaire leantainn air adhart leis an iarrtas seo."
+system.agent_busy: "Tha an t-àidseant trang air an taba seo — fuirich gus an crìochnaich am brosnachadh làithreach."
+system.resuming_session: "Ag ath-thòiseachadh seisean %{session_id}..."
+system.unknown_command: "Àithne neo-aithnichte \"%{command}\" — air a cur mar bhrosnachadh. Taidhp /help airson an liosta."
+system.busy_use_stop: "Fuirich gus an crìochnaich am brosnachadh làithreach, no cleachd /stop an toiseach."
+system.cannot_focus_session: "Cha ghabh fòcas a chur air seisean %{session_id}: tha e a’ coimhead beò ach chan eil GUID pana ceangailte fhathast. Feuch ris a-rithist an ceann tiota."
+system.cannot_resume_no_load_session: "Cha ghabh ath-thòiseachadh ann am pana àidseint: cha do dh’ainmich %{agent} comas ACP `loadSession`. Brùth Enter (gun Shift) gus ath-thòiseachadh ann am pana teirmineil ùr na àite."
+system.cannot_resume_no_resume_flag: "Cha ghabh seisean %{agent} ath-thòiseachadh: chan eil bratach stoidhle `--resume` aig an àidseant seo. Brùth Shift+Enter gus feuchainn ri ath-thòiseachadh taobh a-staigh pana an àidseint tro ACP na àite."
+system.cannot_resume_unknown_agent: "Cha ghabh seisean %{session_id} ath-thòiseachadh: chan eil an t-àidseant tùsail aithnichte dhan togail seo."
+system.cannot_resume_phantom_via_flag: "Cha ghabh seisean %{agent} %{session_id} ath-thòiseachadh: chaidh a thòiseachadh ach cha do chruinnich e còmhradh sam bith, mar sin dhiùltadh %{agent} fhèin an ath-thòiseachadh. A’ toirt air falbh an ràigh."
+system.cannot_resume_phantom_via_load: "Cha ghabh seisean %{agent} %{session_id} ath-thòiseachadh: chaidh a thòiseachadh ach cha do chruinnich e còmhradh sam bith, mar sin dhiùltadh %{agent} an luchdadh. A’ toirt air falbh an ràigh."
+system.fallback.this_agent: "an t-àidseant seo"
+system.fallback.connected_agent: "an t-àidseant ceangailte"
 
 # ── Toradh CLI àm-ruith (src/main.rs) ────────────────────────────────────
 output.no_windows: "Cha deach uinneagan a lorg."
@@ -170,3 +187,6 @@ time.hour_singular: "%{count} uair a thìde air ais"
 time.hours_other: "%{count} uairean a thìde air ais"
 time.day_singular: "%{count} latha air ais"
 time.days_other: "%{count} làithean air ais"
+
+# ── Cur an gnìomh molaidh (src/coordinator.rs) ───────────────────────────
+system.choice_execution_failed: "Dh’fhàillig roghainn %{choice}: %{error}"

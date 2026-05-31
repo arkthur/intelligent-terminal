@@ -123,7 +123,6 @@ BPPF
 branchconfig
 brandings
 Browsable
-Bspace
 bspace
 BTNFACE
 bufferout
@@ -962,6 +961,7 @@ maxval
 maxversiontested
 MAXWORD
 maybenull
+mbr
 MBUTTON
 MBUTTONDBLCLK
 MBUTTONDOWN

@@ -4,7 +4,7 @@
 //! mirror). Master maintains it as the authoritative view of "which sessions
 //! are connected right now"; helpers receive `intellterm.wta/session_added`
 //! and `session_removed` ext-notifications and apply them locally so the
-//! F2 session-manager Enter routing can decide focus vs. resume with zero
+//! session-manager Enter routing can decide focus vs. resume with zero
 //! IPC round-trip.
 //!
 //! The trait surface is intentionally tiny and async (matching the master's
@@ -37,11 +37,17 @@ pub const WTA_META_NAMESPACE: &str = "wta";
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct WtaMeta {
     pub pane_session_id: Option<String>,
+    /// The WT tab StableId (`--owner-tab-id`) of the agent pane that
+    /// owns this session. Carried so master can address per-tab events
+    /// (notably `restart_agent_pane` on helper crash recovery) by the
+    /// same StableId C++ routes every other per-tab event with. `None`
+    /// for non-agent-pane helpers / legacy callers.
+    pub owner_tab_id: Option<String>,
 }
 
 impl WtaMeta {
     pub fn is_empty(&self) -> bool {
-        self.pane_session_id.is_none()
+        self.pane_session_id.is_none() && self.owner_tab_id.is_none()
     }
 }
 
@@ -73,6 +79,11 @@ pub fn extract_wta_meta(meta: &mut Option<acp::Meta>) -> WtaMeta {
             .get("pane_session_id")
             .and_then(|v| v.as_str())
             .map(String::from),
+        owner_tab_id: obj
+            .get("owner_tab_id")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(String::from),
     }
 }
 
@@ -97,6 +108,12 @@ pub fn inject_wta_meta(meta: &mut Option<acp::Meta>, wta: &WtaMeta) {
             serde_json::Value::String(pid.clone()),
         );
     }
+    if let Some(tab) = &wta.owner_tab_id {
+        wta_obj.insert(
+            "owner_tab_id".to_string(),
+            serde_json::Value::String(tab.clone()),
+        );
+    }
     map.insert(
         WTA_META_NAMESPACE.to_string(),
         serde_json::Value::Object(wta_obj),
@@ -118,6 +135,7 @@ pub fn to_acp_session_info(info: &SessionInfo) -> acp::SessionInfo {
         &mut out.meta,
         &WtaMeta {
             pane_session_id: info.pane_session_id.clone(),
+            ..Default::default()
         },
     );
     out
@@ -632,7 +650,7 @@ pub fn build_session_hook_response(applied: bool) -> acp::ExtResponse {
     acp::ExtResponse::new(raw.into())
 }
 
-/// One row in the registry. Mirrors the fields the F2 view needs:
+/// One row in the registry. Mirrors the fields the session management view needs:
 ///
 /// * `session_id` — the ACP session GUID (truth-source key).
 /// * `cwd`        — required by ACP `SessionInfo` for `session/list`
@@ -710,7 +728,7 @@ impl SessionInfo {
 ///
 /// Used by master at startup to seed the registry with historical
 /// rows scanned from `~/.copilot/`, `~/.claude/`, `~/.gemini/` so
-/// `wta sessions list` and F2 viewers see the full set, not just live
+/// `wta sessions list` and session management viewers see the full set, not just live
 /// sessions created via `session/new` after master booted.
 pub fn agent_session_to_session_info(s: &AgentSession) -> SessionInfo {
     let last_activity_at_ms = s
@@ -778,7 +796,7 @@ pub trait SessionRegistry: Send + Sync {
     /// Mirrors the helper-side `AgentSessionRegistry::upgrade_title_if_synthetic`
     /// (see `agent_sessions.rs`). Master needs the same surface so it can
     /// upgrade titles from disk after a `session_hook` ExtRequest applies an
-    /// event — without it, F2 (which renders master's snapshot) keeps showing
+    /// event — without it, the session management view (which renders master's snapshot) keeps showing
     /// the synthetic cwd-basename title even after the CLI writes the real
     /// chat title to disk.
     ///
@@ -1005,7 +1023,7 @@ fn apply_event_locked(state: &mut RegistryState, ev: SessionEvent) -> bool {
             // later with a DIFFERENT pane (e.g. the workspace shell where
             // a Get-ChildItem ran) must NOT overwrite the helper's pane,
             // because doing so:
-            //   1. Breaks focus: F2 Enter on the agent-pane row sends the
+            //   1. Breaks focus: session management Enter on the agent-pane row sends the
             //      shell-pane GUID to wtcli, which focuses the wrong pane.
             //   2. Cross-contaminates: multiple agents running tools in
             //      the same shell all claim that shell's pane, so master's
@@ -1082,10 +1100,10 @@ fn apply_event_locked(state: &mut RegistryState, ev: SessionEvent) -> bool {
             // active_by_pane handoff), a straggling ToolStarting hook
             // would re-promote status to Working while pane_session_id
             // stays None — the row would appear as "Working with no
-            // pane" in F2, fail decide_enter_action's LiveWithoutPane
+            // pane" in session management view, fail decide_enter_action's LiveWithoutPane
             // guard, and visually duplicate the synthetic pane:<guid>
             // row that took over the binding. Reject the resurrection
-            // so the demotion stays sticky and F2 shows a single Live
+            // so the demotion stays sticky and session management view shows a single Live
             // row at the pane.
             if matches!(entry.status, Some(AgentStatus::Ended | AgentStatus::Historical)) {
                 return false;
@@ -1215,7 +1233,7 @@ fn apply_event_locked(state: &mut RegistryState, ev: SessionEvent) -> bool {
 ///
 /// Setting `loaded` to `true` flips the helper from "we haven't heard
 /// from master yet, fall back to legacy behavior" to "registry is
-/// authoritative". The F2 routing layer reads this flag to avoid
+/// authoritative". The session management routing layer reads this flag to avoid
 /// misclassifying an actually-Live row as Ended during the startup
 /// window between helper boot and the first `session/list` response.
 ///
@@ -1975,7 +1993,7 @@ mod tests {
         // 3. PowerShell hooks in that shell pane fire SessionStarted
         //    with the SHELL pane's GUID, not the helper's.
         // 4. Before this fix: master's reducer clobbered the row's
-        //    pane_session_id with the shell GUID. F2 Enter on the row
+        //    pane_session_id with the shell GUID. session management Enter on the row
         //    then focused the shell pane instead of the helper pane.
         // 5. With multiple agents sharing a shell, EVERY hook claimed
         //    that shell pane, so sessions thrashed each other off it.
@@ -2056,7 +2074,7 @@ mod tests {
         // SessionStarted-at-same-pane handoff ended the row used to
         // re-promote status to Working while leaving pane_session_id
         // None, producing the "Working with no pane" zombie the user
-        // sees as a duplicate row in F2.
+        // sees as a duplicate row in session management view.
         use crate::agent_sessions::{AgentStatus, SessionEvent};
         let reg = InMemoryRegistry::new();
         let mut info = SessionInfo::new(acp::SessionId::new("ended-sid"), PathBuf::from("/repo"));
@@ -2382,6 +2400,7 @@ mod tests {
             &mut meta,
             &WtaMeta {
                 pane_session_id: Some("pane-A".to_string()),
+                ..Default::default()
             },
         );
         let map = meta.expect("meta created");
@@ -2399,6 +2418,7 @@ mod tests {
             &mut meta,
             &WtaMeta {
                 pane_session_id: Some("pane-A".to_string()),
+                ..Default::default()
             },
         );
         let map = meta.unwrap();
@@ -2414,6 +2434,7 @@ mod tests {
     fn inject_then_extract_is_identity() {
         let original = WtaMeta {
             pane_session_id: Some("pane-X".to_string()),
+            owner_tab_id: Some("{tab-owner-X}".to_string()),
         };
         let mut meta: Option<acp::Meta> = None;
         inject_wta_meta(&mut meta, &original);

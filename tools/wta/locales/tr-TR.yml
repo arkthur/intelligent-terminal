@@ -1,6 +1,6 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
-setup.title.first_run: "Intelligent Terminal'e hoş geldiniz!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Akıllı Terminal'e hoş geldiniz!"
 setup.title.agent_missing: "Aracı bulunamadı"
 setup.title.agent_error: "Aracı bağlantısı başarısız oldu"
 setup.title.switch_agent: "Aracı değiştir"
@@ -8,13 +8,13 @@ setup.title.not_available: "Aracı kullanılamıyor"
 setup.title.sign_in: "Oturum açma gerekli"
 
 # %{agent} is replaced with the agent display name at runtime.
-setup.subtitle.copilot_missing: "Aracınız \"%{agent}\" yüklü değil. Yüklemek için aşağıdaki adımları izleyin. Aracı değiştirmek için Intelligent Terminal Settings > Agent'e gidin."
-setup.subtitle.agent_missing: "Aracınız \"%{agent}\" yüklü değil. Lütfen elle yeniden yükleyin, ardından tekrar deneyin. Aracı değiştirmek için Intelligent Terminal Settings > Agent'e gidin."
-setup.subtitle.copilot_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Oturum açmak için aşağıdaki adımları izleyin. Aracı değiştirmek için Intelligent Terminal Settings > Agent'e gidin."
-setup.subtitle.agent_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Lütfen aracı üzerinden oturum açın, ardından aşağıda \"Oturum açtım\" seçeneğini belirleyin. Aracı değiştirmek için Intelligent Terminal Settings > Agent'e gidin."
+setup.subtitle.copilot_missing: "Aracınız \"%{agent}\" yüklü değil. Yüklemek için aşağıdaki adımları izleyin. Aracı değiştirmek için Akıllı Terminal Settings > Agent'e gidin."
+setup.subtitle.agent_missing: "Aracınız \"%{agent}\" yüklü değil. Lütfen elle yeniden yükleyin, ardından tekrar deneyin. Aracı değiştirmek için Akıllı Terminal Settings > Agent'e gidin."
+setup.subtitle.copilot_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Oturum açmak için aşağıdaki adımları izleyin. Aracı değiştirmek için Akıllı Terminal Settings > Agent'e gidin."
+setup.subtitle.agent_auth: "Aracınız \"%{agent}\" kimlik doğrulama gerektiriyor. Lütfen aracı üzerinden oturum açın, ardından aşağıda \"Oturum açtım\" seçeneğini belirleyin. Aracı değiştirmek için Akıllı Terminal Settings > Agent'e gidin."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Intelligent Terminal'de kullanmak istediğiniz varsayılan aracı seçin. Çalışma alanınızı"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Akıllı Terminal'de kullanmak istediğiniz varsayılan aracı seçin. Çalışma alanınızı"
 setup.description.fre_line2: "yapılandırmak ve ayarlamak için Settings'e gidebilirsiniz."
 
 setup.option.install: "%{agent} yükle"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Oturum açmak için Enter, geri dönmek için Esc tuşuna b
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Düşünüyor…"
-# {Locked="Intelligent Terminal"} - product name, do not translate
-chat.welcome_title: "Intelligent Terminal'e hoş geldiniz!"
-chat.welcome_disclaimer: "Intelligent Terminal, AI kullanır. Hataları kontrol edin."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Akıllı Terminal'e hoş geldiniz!"
+chat.welcome_disclaimer: "Akıllı Terminal, AI kullanır. Hataları kontrol edin."
 chat.plan_header: "Plan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -130,12 +130,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. aracı panelini göster/gizle • Ctrl+Shi
 # ── Connection state ────────────────────────────────────────────────────────
 connection.starting: "Aracı başlatılıyor..."
 connection.reconnecting: "Yeniden bağlanılıyor..."
+connection.connecting_activity: "Aracıya bağlanılıyor…"
+connection.lost: "Aracı bağlantısı kesildi. Yeniden bağlanmak için /restart yazın."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "İptal edildi."
 system.no_prompt_in_flight: "Devam eden istem yok."
 system.authentication_failed: "Kimlik doğrulama başarısız"
 system.command_copied_retry: "Komut kopyalandı — başka bir terminalde çalıştırın, ardından tekrar denemek için Enter tuşuna basın"  # {Locked="Enter"}
+system.stopped_max_tokens: "Modelin çıktı sınırına ulaşıldıktan sonra yanıt kesildi."
+system.stopped_max_turn_requests: "Aracı, bu tur için istek sınırına ulaştıktan sonra durdu."
+system.stopped_refusal: "Aracı, bu isteği sürdürmeyi reddetti."
+system.agent_busy: "Aracı bu sekmede meşgul — geçerli istemin bitmesini bekleyin."
+system.resuming_session: "%{session_id} oturumu sürdürülüyor..."
+system.unknown_command: "Bilinmeyen komut \"%{command}\" — istem olarak gönderildi. Liste için /help yazın."  # {Locked="/help"}
+system.busy_use_stop: "Geçerli istemin bitmesini bekleyin veya önce /stop kullanın."  # {Locked="/stop"}
+system.cannot_focus_session: "%{session_id} oturumuna odaklanılamıyor: canlı görünüyor ancak henüz hiçbir bölme GUID’i bağlanmamış. Birazdan tekrar deneyin."
+system.cannot_resume_no_load_session: "Aracı bölmesinde sürdürülemiyor: %{agent} ACP `loadSession` özelliğini duyurmadı. Bunun yerine yeni bir terminal bölmesinde sürdürmek için Enter (Shift olmadan) tuşuna basın."  # {Locked="ACP","loadSession","Enter","Shift"}
+system.cannot_resume_no_resume_flag: "%{agent} oturumu sürdürülemiyor: bu aracının `--resume` tarzı bayrağı yok. Bunun yerine ACP üzerinden aracı bölmesinde sürdürmeyi denemek için Shift+Enter tuşlarına basın."  # {Locked="--resume","Shift","Enter","ACP"}
+system.cannot_resume_unknown_agent: "%{session_id} oturumu sürdürülemiyor: kaynak aracı bu WTA derlemesi tarafından bilinmiyor."
+system.cannot_resume_phantom_via_flag: "%{agent} oturumu %{session_id} sürdürülemiyor: başlatılmış ancak hiç konuşma biriktirmemiş, bu yüzden %{agent} sürdürmeyi reddederdi. Satır kaldırılıyor."
+system.cannot_resume_phantom_via_load: "%{agent} oturumu %{session_id} sürdürülemiyor: başlatılmış ancak hiç konuşma biriktirmemiş, bu yüzden %{agent} yüklemeyi reddederdi. Satır kaldırılıyor."
+system.fallback.this_agent: "bu aracı"
+system.fallback.connected_agent: "bağlı aracı"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Pencere bulunamadı."
@@ -181,3 +198,6 @@ time.hour_singular: "%{count} saat önce"
 time.hours_other: "%{count} saat önce"
 time.day_singular: "%{count} gün önce"
 time.days_other: "%{count} gün önce"
+
+# ── Öneri yürütme (src/coordinator.rs) ──────────────────────────────────────
+system.choice_execution_failed: "%{choice} seçimi başarısız oldu: %{error}"

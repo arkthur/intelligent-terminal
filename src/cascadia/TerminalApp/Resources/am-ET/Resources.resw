@@ -6,15 +6,15 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>እንኣን ወደ Intelligent Terminal በደህና መጡ</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>እንኣን ወደ ብልህ ተርሚናል በደህና መጡ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>የብት ውስጥ አገልጋይዎን ያቅኑ ስህተቶችን ለማብራራት፣ ትዕዛዞችን ለመድመቅ እና መጣርሆችን ለማንሳት መስሪያ በሚሰሩበት ያግዙዎት። </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>ስለ Intelligent Terminal ተጨማሪ ለማወቅ</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>ስለ ብልህ ተርሚናል ተጨማሪ ለማወቅ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>ከብት ውስጥ AI ኤጅንትዎ ጋር በፍስፍስ ይቀጡ</value>
@@ -36,8 +36,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>እንኣን ወደ Intelligent Terminal በደህና መጡ</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>እንኣን ወደ ብልህ ተርሚናል በደህና መጡ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>አሁን ምን ማዋቀር እንደሚፈልጉ ይምረጡ። እነዚህን በማንኛውም ጊዜ መቀየር ይችላሉ። </value>
@@ -68,8 +68,8 @@
     <value>የክፍለጣ አስተዳደር</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>ለ Intelligent Terminal የኤጅንቶችዎን ሁኔታ ለመከታተል ፍቃድ ይስጡ።</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>ለ ብልህ ተርሚናል የኤጅንቶችዎን ሁኔታ ለመከታተል ፍቃድ ይስጡ።</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ ይህን ማንቃት በኤጅንቶችዎ ውስጥ ክፍለጊዜዎችን ለመከታተል የውህደት hooks ይጭናል።</value>
@@ -115,17 +115,6 @@
     <value>⚠ Node.js መጠቀም አልተሳካም። የመረብዎን ይፈትሩ እና እንደገና ይሞክሩ።</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ session hooks መጫን አልተሳካም። የክፍለ ጊዜ አስተዳደር ጠፍቷል። እንደገና ማንቃት እና መሞከር ይችላሉ፣ ወይም ያለ እሱ ለመቀጠል ያስቀምጡ።</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ የሼል ውህደት መጫን አልተሳካም። የስህተት ማወቂያ ጠፍቷል። እንደገና ማንቃት እና መሞከር ይችላሉ፣ ወይም ያለ እሱ ለመቀጠል ያስቀምጡ።</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>ይህንን በእጅ እንዴት እንደሚያስተካክሉ ይወቁ</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>እንቅ</value>
   </data>
@@ -145,8 +134,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>{0}ን ጠቅ ያድርጉ ስህተቱን ለማስተካከል</value>
+    <value>የቀረበ ማስተካከያ ከወኪሉ ለመጠየቅ {0}ን ጠቅ ያድርጉ ወይም ይጫኑ</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>ማስተካከያ ዝግጁ ነው። ለመገምገም {0}ን ይጫኑ</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>የቀረበውን ማስተካከያ ለመገምገም የወኪሉን ሰሌዳ ይክፈቱ</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>ስህተት ተገኝቷል። ለመመርመር እና መፍትሄ ለመጠቆም AI ወኪልን ለመጠየቅ {0}ን ጠቅ ያድርጉ ወይም ይጫኑ።</value>
@@ -194,4 +191,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Intelligent Terminal ወደ ሼልዎ መድረስ እና ስህተቶችን ራስ-ሰር እንዲያውቅ ይፍቀዱ።</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ የሼል ውህደት መጫን አልተሳካም። የስህተት ማወቂያ ጠፍቷል። እንደገና ማንቃት እና መሞከር ይችላሉ፣ ወይም ያለ እሱ ለመቀጠል ያስቀምጡ።</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ session hooks መጫን አልተሳካም። የክፍለ ጊዜ አስተዳደር ጠፍቷል። እንደገና ማንቃት እና መሞከር ይችላሉ፣ ወይም ያለ እሱ ለመቀጠል ያስቀምጡ።</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>ይህንን በእጅ እንዴት እንደሚያስተካክሉ ይወቁ</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

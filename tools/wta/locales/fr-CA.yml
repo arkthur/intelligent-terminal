@@ -1,6 +1,6 @@
 # Titres de l'écran de configuration
-# {Locked="Intelligent Terminal"} - nom du produit, ne pas traduire
-setup.title.first_run: "Bienvenue dans Intelligent Terminal !"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Bienvenue dans Terminal Intelligent !"
 setup.title.agent_missing: "Agent introuvable"
 setup.title.agent_error: "Impossible de se connecter à l'agent"
 setup.title.switch_agent: "Changer d'agent"
@@ -8,13 +8,13 @@ setup.title.not_available: "Agent non disponible"
 setup.title.sign_in: "Connexion requise"
 
 # %{agent} est remplacé par le nom d'affichage de l'agent à l'exécution.
-setup.subtitle.copilot_missing: "Votre agent « %{agent} » n'est pas installé. Suivez les étapes ci-dessous pour l'installer. Pour changer d'agent, allez dans les paramètres Intelligent Terminal > Agent."
-setup.subtitle.agent_missing: "Votre agent « %{agent} » n'est pas installé. Veuillez le réinstaller manuellement, puis réessayer. Pour changer d'agent, allez dans les paramètres Intelligent Terminal > Agent."
-setup.subtitle.copilot_auth: "Votre agent « %{agent} » nécessite une authentification. Suivez les étapes ci-dessous pour vous connecter. Pour changer d'agent, allez dans les paramètres Intelligent Terminal > Agent."
-setup.subtitle.agent_auth: "Votre agent « %{agent} » nécessite une authentification. Veuillez vous connecter via l'agent, puis sélectionnez « Je me suis connecté » ci-dessous. Pour changer d'agent, allez dans les paramètres Intelligent Terminal > Agent."
+setup.subtitle.copilot_missing: "Votre agent « %{agent} » n'est pas installé. Suivez les étapes ci-dessous pour l'installer. Pour changer d'agent, allez dans les paramètres Terminal Intelligent > Agent."
+setup.subtitle.agent_missing: "Votre agent « %{agent} » n'est pas installé. Veuillez le réinstaller manuellement, puis réessayer. Pour changer d'agent, allez dans les paramètres Terminal Intelligent > Agent."
+setup.subtitle.copilot_auth: "Votre agent « %{agent} » nécessite une authentification. Suivez les étapes ci-dessous pour vous connecter. Pour changer d'agent, allez dans les paramètres Terminal Intelligent > Agent."
+setup.subtitle.agent_auth: "Votre agent « %{agent} » nécessite une authentification. Veuillez vous connecter via l'agent, puis sélectionnez « Je me suis connecté » ci-dessous. Pour changer d'agent, allez dans les paramètres Terminal Intelligent > Agent."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Choisissez la CLI d'agent par défaut que vous souhaitez utiliser dans Intelligent Terminal. Vous pouvez"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Choisissez la CLI d'agent par défaut que vous souhaitez utiliser dans Terminal Intelligent. Vous pouvez"
 setup.description.fre_line2: "accéder aux paramètres pour configurer et paramétrer votre espace de travail."
 
 setup.option.install: "Installer %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Appuyez sur Enter pour vous connecter, Esc pour revenir"  #
 
 # ── Vue de conversation (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Réflexion en cours…"
-# {Locked="Intelligent Terminal"} - nom du produit, ne pas traduire
-chat.welcome_title: "Bienvenue dans Intelligent Terminal !"
-chat.welcome_disclaimer: "Intelligent Terminal utilise l'IA. Vérifiez les erreurs."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Bienvenue dans Terminal Intelligent !"
+chat.welcome_disclaimer: "Terminal Intelligent utilise l'IA. Vérifiez les erreurs."
 chat.plan_header: "Plan :"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -119,12 +119,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. pour afficher/masquer le volet de l'agent 
 # ── État de la connexion ────────────────────────────────────────────────────────────
 connection.starting: "Démarrage de l'agent..."
 connection.reconnecting: "Reconnexion..."
+connection.connecting_activity: "Connexion à l'agent…"
+connection.lost: "La connexion à l'agent a été perdue. Tapez /restart pour vous reconnecter."  # {Locked="/restart"}
 
 # ── Messages système (src/app.rs) ────────────────────────────────────────────────
 system.cancelled: "Annulé."
 system.no_prompt_in_flight: "Aucune invite en cours."
 system.authentication_failed: "Échec de l'authentification"
 system.command_copied_retry: "Commande copiée — exécutez-la dans un autre terminal, puis appuyez sur Enter pour réessayer"  # {Locked="Enter"}
+system.stopped_max_tokens: "La réponse a été tronquée après avoir atteint la limite de sortie du modèle."
+system.stopped_max_turn_requests: "L'agent s'est arrêté après avoir atteint sa limite de requêtes pour ce tour."
+system.stopped_refusal: "L'agent a refusé de poursuivre cette requête."
+system.agent_busy: "L’agent est occupé dans cet onglet — attendez que l’invite actuelle soit terminée."
+system.resuming_session: "Reprise de la session %{session_id}..."
+system.unknown_command: "Commande inconnue \"%{command}\" — envoyée comme invite. Tapez /help pour afficher la liste."
+system.busy_use_stop: "Attendez que l’invite actuelle soit terminée, ou utilisez d’abord /stop."
+system.cannot_focus_session: "Impossible de cibler la session %{session_id} : elle semble active, mais aucun GUID de volet n’est encore lié. Réessayez dans un instant."
+system.cannot_resume_no_load_session: "Impossible de reprendre dans le volet de l’agent : %{agent} n’a pas annoncé la capacité ACP `loadSession`. Appuyez sur Enter (sans Shift) pour reprendre plutôt dans un nouveau volet de terminal."
+system.cannot_resume_no_resume_flag: "Impossible de reprendre la session %{agent} : cet agent n’a pas d’indicateur de type `--resume`. Appuyez sur Shift+Enter pour tenter une reprise dans le volet de l’agent via ACP."
+system.cannot_resume_unknown_agent: "Impossible de reprendre la session %{session_id} : son agent source est inconnu de cette version."
+system.cannot_resume_phantom_via_flag: "Impossible de reprendre la session %{agent} %{session_id} : elle a été démarrée, mais n’a jamais accumulé de conversation; %{agent} rejetterait donc lui-même la reprise. Suppression de la ligne."
+system.cannot_resume_phantom_via_load: "Impossible de reprendre la session %{agent} %{session_id} : elle a été démarrée, mais n’a jamais accumulé de conversation; %{agent} rejetterait donc le chargement. Suppression de la ligne."
+system.fallback.this_agent: "cet agent"
+system.fallback.connected_agent: "l’agent connecté"
 
 # ── Sortie CLI d'exécution (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Aucune fenêtre trouvée."
@@ -181,3 +198,6 @@ commands.new.summary: "Démarrer une nouvelle session ACP (efface l’historique
 commands.restart.summary: "Redémarrer l’agent"
 commands.stop.summary: "Annuler la requête en cours"
 commands.sessions.summary: "Ouvrir le sélecteur de sessions précédentes (Ctrl+Shift+/)"
+
+# ── Exécution des recommandations (src/coordinator.rs) ───────────────────────────
+system.choice_execution_failed: "Le choix %{choice} a échoué : %{error}"

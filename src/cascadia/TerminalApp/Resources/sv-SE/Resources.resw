@@ -229,17 +229,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>⚠ Det gick inte att installera Node.js. Kontrollera din nätverksanslutning och försök igen.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Det gick inte att installera session hooks. Sessionshantering har inaktiverats. Du kan aktivera det igen och försöka på nytt, eller spara för att fortsätta utan det.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Det gick inte att installera skalintegrering. Feldetektering har inaktiverats. Du kan aktivera det igen och försöka på nytt, eller spara för att fortsätta utan det.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Lär dig hur du åtgärdar detta manuellt</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>På</value>
   </data>
@@ -259,8 +248,16 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Klicka på {0} för att åtgärda felet</value>
+    <value>Klicka eller tryck på {0} för att be agenten om en föreslagen åtgärd</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Korrigeringen är klar. Tryck på {0} för att granska</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Öppna agentpanelen för att granska den föreslagna åtgärden</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Fel har upptäckts. Klicka eller tryck på {0} för att be AI-agenten diagnostisera och föreslå en lösning.</value>
@@ -308,4 +305,12 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Ge Intelligent Terminal behörighet att komma åt skalet och automatiskt identifiera fel.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Det gick inte att installera skalintegrering. Feldetektering har inaktiverats. Du kan aktivera det igen och försöka på nytt, eller spara för att fortsätta utan det.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Det gick inte att installera session hooks. Sessionshantering har inaktiverats. Du kan aktivera det igen och försöka på nytt, eller spara för att fortsätta utan det.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Lär dig hur du åtgärdar detta manuellt</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

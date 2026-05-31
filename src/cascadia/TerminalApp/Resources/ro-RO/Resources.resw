@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Bun venit la Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Bun venit la Terminal Inteligent</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Configurați asistentul integrat pentru a vă ajuta să explicați erori, să creați comenzi și să deblocați sarcini chiar acolo unde lucrați. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Aflați mai multe despre Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Aflați mai multe despre Terminal Inteligent</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Rămâneți în flux cu agentul AI integrat</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Bun venit la Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Bun venit la Terminal Inteligent</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Alegeți ce doriți să configurați acum. Puteți modifica aceste setări oricând. </value>
@@ -181,8 +181,8 @@
     <value>Gestionarea sesiunilor</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Acordați Intelligent Terminal permisiunea de a urmări starea agenților în execuție sau activi.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Acordați Terminal Inteligent permisiunea de a urmări starea agenților în execuție sau activi.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Activarea acestei opțiuni va instala hooks de integrare pentru urmărirea sesiunilor între agenții dvs.</value>
@@ -228,17 +228,6 @@
     <value>⚠ Instalarea Node.js a eșuat. Verificați conexiunea la rețea și încercați din nou.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Instalarea session hooks a eșuat. Gestionarea sesiunilor a fost dezactivată. Puteți să o reactivați și să încercați din nou, sau să salvați pentru a continua fără aceasta.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Instalarea integrării shell a eșuat. Detectarea erorilor a fost dezactivată. Puteți să o reactivați și să încercați din nou, sau să salvați pentru a continua fără aceasta.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Aflați cum să remediați manual</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Activat</value>
   </data>
@@ -258,8 +247,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Apasă pe {0} pentru a remedia eroarea</value>
+    <value>Fă clic sau apasă pe {0} pentru a cere agentului o remediere sugerată</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Remedierea este gata. Apasă pe {0} pentru a examina</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Deschide panoul agentului pentru a examina remedierea sugerată</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Eroare detectată. Fă clic sau apasă {0} pentru a cere agentului AI să diagnosticheze și să sugereze o remediere.</value>
@@ -307,4 +304,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Permiteți Intelligent Terminal să acceseze shell-ul și să detecteze automat erorile.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Instalarea integrării shell a eșuat. Detectarea erorilor a fost dezactivată. Puteți să o reactivați și să încercați din nou, sau să salvați pentru a continua fără aceasta.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Instalarea session hooks a eșuat. Gestionarea sesiunilor a fost dezactivată. Puteți să o reactivați și să încercați din nou, sau să salvați pentru a continua fără aceasta.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Aflați cum să remediați manual</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

@@ -6,15 +6,15 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Բարի գալուստ Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Բարի գալուստ Խելացի տերմինալ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Կարգավորեք ձեր ներկառուց օգնականին՝ օգնելու ձեզ բացատրել սխալները, կազմել հրամաններ և ապաշստել առաջադրանքները հենց այնտեղ, որտեղ աշխատում եք։ </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Իմացեք ավելին Intelligent Terminal-ի մասին</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Իմացեք ավելին Խելացի տերմինալ-ի մասին</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Մնացեք հոսքի մեջ ձեր ներկառուց AI գործակալով</value>
@@ -36,8 +36,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Բարի գալուստ Intelligent Terminal</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Բարի գալուստ Խելացի տերմինալ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Ընտրեք, թdelays delays delays delays delays ի՛նdelays delays delays delays delays delays </value>
@@ -68,8 +68,8 @@
     <value>Նիստերի կառավարում</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Թույլատրեք Intelligent Terminal-ին հետևել ձեր գործող կամ ակտիվ գործակալների կարգավիճակը:</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Թույլատրեք Խելացի տերմինալ-ին հետևել ձեր գործող կամ ակտիվ գործակալների կարգավիճակը:</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Սա միացնելը կտեղադրի ինտեգրացիոն hooks՝ ձեր գործակալներում նիստերին հետևելու համար:</value>
@@ -115,17 +115,6 @@
     <value>⚠ Node.js-ի տեղադրումը ձախողվեց։ Ստուգեք ցանցի հանգույցը և նորից փորձեք:</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Session hooks տեղադրումը ձախողվեց։ Նիստերի կառավարումը անջատվել է։ Կարող եք նորից միացնել և նորից փորձել, կամ պահել առանց դրա շարունակելու համար։</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Shell-ի ինտեգրացիայի տեղադրումը ձախողվեց։ Սխալների հայտնաբերումը անջատվել է։ Կարող եք նորից միացնել և նորից փորձել, կամ պահել առանց դրա շարունակելու համար։</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Իմացեք, թե ինչպես սա շտկել ձեռքով</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Միաց</value>
   </data>
@@ -145,8 +134,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Սեղմեք {0}՝ սխալը շտկելու համար</value>
+    <value>Սեղմեք կամ հպեք {0}-ին՝ գործակալից առաջարկվող շտկում խնդրելու համար</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Շտկումը պատրաստ է։ Սեղմեք {0}՝ դիտարկելու համար</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Բացեք գործակալի վահանակը՝ առաջարկվող շտկումը դիտարկելու համար</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Սխալ է հայտնաբերվել։ Սեղմեք կամ հպեք {0}-ին, որպեսզի AI գործակալը ախտորոշի և առաջարկի լուծում։</value>
@@ -194,4 +191,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Թույլ տվեք Intelligent Terminal-ին մուտք գործել ձեր թաղանթ և ավտոմատ կերպով հայտնաբերել սխալները։</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Shell-ի ինտեգրացիայի տեղադրումը ձախողվեց։ Սխալների հայտնաբերումը անջատվել է։ Կարող եք նորից միացնել և նորից փորձել, կամ պահել առանց դրա շարունակելու համար։</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Session hooks տեղադրումը ձախողվեց։ Նիստերի կառավարումը անջատվել է։ Կարող եք նորից միացնել և նորից փորձել, կամ պահել առանց դրա շարունակելու համար։</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Իմացեք, թե ինչպես սա շտկել ձեռքով</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

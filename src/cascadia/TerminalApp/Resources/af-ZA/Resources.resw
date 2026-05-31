@@ -6,15 +6,15 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Welkom by Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Welkom by Intelligente Terminaal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Stel jou ingeboude assistent op om jou te help om foute te verduidelik, opdragte op te stel en take te deblokkeer reg waar jy werk. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Kom meer te wete oor Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Kom meer te wete oor Intelligente Terminaal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Bly in die vloei met jou ingeboude KI-agent</value>
@@ -36,8 +36,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Welkom by Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Welkom by Intelligente Terminaal</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Kies wat om nou op te stel. Jy kan dit enige tyd verander. </value>
@@ -68,8 +68,8 @@
     <value>Sessiebestuur</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Gee Intelligent Terminal toestemming om die status van jou lopende of aktiewe agente na te spoor.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Gee Intelligente Terminaal toestemming om die status van jou lopende of aktiewe agente na te spoor.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Deur dit te aktiveer, sal integrasie-hooks geïnstalleer word om sessies oor jou agente na te spoor.</value>
@@ -115,17 +115,6 @@
     <value>⚠ Kon nie Node.js installeer nie. Kontroleer jou netwerkverbinding en probeer weer.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Kon nie session hooks installeer nie. Sessiebestuur is afgeskakel. Jy kan dit weer aktiveer en weer probeer, of stoor om sonder dit voort te gaan.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Kon nie dop-integrasie installeer nie. Foutopsporing is afgeskakel. Jy kan dit weer aktiveer en weer probeer, of stoor om sonder dit voort te gaan.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Leer hoe om dit handmatig reg te stel</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Aan</value>
   </data>
@@ -145,8 +134,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Klik {0} om die fout reg te stel</value>
+    <value>Klik of druk {0} om die agent vir 'n voorgestelde oplossing te vra</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Regstelling gereed. Druk {0} om te hersien</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Maak die agentpaneel oop om die voorgestelde oplossing te hersien</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Fout bespeur. Klik of druk {0} om die KI-agent te vra om te diagnoseer en 'n oplossing voor te stel.</value>
@@ -194,4 +191,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Gee Intelligent Terminal toestemming om toegang tot jou dop te verkry en foute outomaties op te spoor.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Kon nie dop-integrasie installeer nie. Foutopsporing is afgeskakel. Jy kan dit weer aktiveer en weer probeer, of stoor om sonder dit voort te gaan.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Kon nie session hooks installeer nie. Sessiebestuur is afgeskakel. Jy kan dit weer aktiveer en weer probeer, of stoor om sonder dit voort te gaan.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Leer hoe om dit handmatig reg te stel</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

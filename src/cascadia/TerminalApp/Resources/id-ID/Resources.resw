@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Selamat datang di Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.</comment>
+    <value>Selamat datang di Terminal Cerdas</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Siapkan asisten bawaan Anda untuk membantu menjelaskan kesalahan, menyusun perintah, dan mengatasi tugas yang terhambat langsung di tempat Anda bekerja. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Pelajari selengkapnya tentang Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.</comment>
+    <value>Pelajari selengkapnya tentang Terminal Cerdas</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Tetap produktif dengan agen AI bawaan</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Selamat datang di Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.</comment>
+    <value>Selamat datang di Terminal Cerdas</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Pilih apa yang ingin Anda atur sekarang. Anda dapat mengubahnya kapan saja. </value>
@@ -181,9 +181,8 @@
     <value>Manajemen sesi</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Izinkan Intelligent Terminal melacak status agen yang sedang berjalan atau aktif.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name. Keep it in English.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <value>Izinkan Terminal Cerdas melacak status agen yang sedang berjalan atau aktif.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Mengaktifkan ini akan menginstal hooks integrasi untuk melacak sesi di seluruh agen Anda.</value>
@@ -229,17 +228,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>⚠ Gagal menginstal Node.js. Periksa jaringan Anda dan coba lagi.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Gagal menginstal session hooks. Manajemen sesi telah dinonaktifkan. Anda dapat mengaktifkannya kembali dan mencoba lagi, atau simpan untuk melanjutkan tanpanya.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Gagal menginstal integrasi shell. Deteksi kesalahan telah dinonaktifkan. Anda dapat mengaktifkannya kembali dan mencoba lagi, atau simpan untuk melanjutkan tanpanya.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Pelajari cara memperbaikinya secara manual</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Aktif</value>
   </data>
@@ -252,4 +240,12 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Izinkan Intelligent Terminal mengakses shell Anda dan mendeteksi kesalahan secara otomatis.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Gagal menginstal integrasi shell. Deteksi kesalahan telah dinonaktifkan. Anda dapat mengaktifkannya kembali dan mencoba lagi, atau simpan untuk melanjutkan tanpanya.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Gagal menginstal session hooks. Manajemen sesi telah dinonaktifkan. Anda dapat mengaktifkannya kembali dan mencoba lagi, atau simpan untuk melanjutkan tanpanya.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Pelajari cara memperbaikinya secara manual</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

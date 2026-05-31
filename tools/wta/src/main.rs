@@ -9,6 +9,7 @@ mod agent_sessions;
 mod app;
 mod commands;
 mod coordinator;
+mod cwd_util;
 mod event;
 mod helper;
 mod history_loader;
@@ -176,7 +177,7 @@ struct Cli {
 
     /// Initial TUI view to show on startup. `chat` (default) starts in the
     /// chat view; `sessions` starts in the Agents (session list) view —
-    /// equivalent to the user pressing F2 right after the pane opens.
+    /// equivalent to the user pressing Ctrl+Shift+/ right after the pane opens.
     /// Wired to WT's Ctrl+Shift+/ binding via TerminalPage.
     #[arg(long, value_enum, default_value_t = InitialView::Chat)]
     initial_view: InitialView,
@@ -201,7 +202,7 @@ struct Cli {
     /// Boot-time hint: instead of letting the helper create a fresh ACP
     /// session via `session/new`, immediately resume the given session id
     /// via `session/load`. Used by the "Enter on Historical/Ended row in
-    /// F2 session manager" path: C++ spawns a new helper for the new
+    /// session manager" path: C++ spawns a new helper for the new
     /// agent pane and bundles the resume request via these flags so the
     /// resume is atomic — no separate `load_session` VT broadcast that
     /// could race the helper's pipe-attach.
@@ -407,11 +408,14 @@ enum Command {
         target: Option<String>,
     },
 
-    /// Delegate a prompt to a new tab with a configured agent (fire-and-forget)
+    /// Open a configured delegate agent in a new tab (fire-and-forget). With a
+    /// PROMPT, the prompt is baked into the agent's launch; omit PROMPT to open
+    /// the agent interactively with no startup prompt.
     Delegate {
-        /// The prompt to send to the delegate agent
+        /// The prompt to send to the delegate agent. Omit to open the agent
+        /// interactively in a new tab with no startup prompt.
         #[arg(value_name = "PROMPT")]
-        prompt: String,
+        prompt: Option<String>,
 
         /// Agent CLI command (used to derive delegate agent commandline)
         #[arg(long, default_value = agent_registry::DEFAULT_ACP_COMMAND)]
@@ -470,7 +474,40 @@ enum SessionsAction {
         /// Override the wta-master named pipe path.
         #[arg(long, value_name = "PIPE_NAME")]
         master: Option<String>,
+
+        /// Restrict the list to a session origin. `all` (default) shows
+        /// every row — that matches the historical debug behavior.
+        /// `shell` shows only user-started shell-pane sessions (the
+        /// MVP sessions default). `agent-pane` shows only sessions that
+        /// WTA spawned for an Intelligent Terminal agent pane.
+        #[arg(long, value_enum, default_value_t = SessionsOriginArg::All)]
+        origin: SessionsOriginArg,
     },
+}
+
+/// CLI value for `wta sessions list --origin`. Mirrors
+/// [`agent_sessions::OriginFilter`] but lives in `main.rs` so the
+/// clap derive can attach `ValueEnum` without polluting the library
+/// crate with clap as a dependency.
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum SessionsOriginArg {
+    /// Shell-pane sessions only (Class B). Matches the MVP sessions picker.
+    Shell,
+    /// Agent-pane sessions only (Class A). Hidden from the MVP sessions
+    /// picker; surfaced here for debugging.
+    AgentPane,
+    /// Every row in the registry — historical debug default.
+    All,
+}
+
+impl SessionsOriginArg {
+    fn to_filter(self) -> agent_sessions::OriginFilter {
+        match self {
+            SessionsOriginArg::Shell     => agent_sessions::OriginFilter::ShellOnly,
+            SessionsOriginArg::AgentPane => agent_sessions::OriginFilter::AgentPaneOnly,
+            SessionsOriginArg::All       => agent_sessions::OriginFilter::All,
+        }
+    }
 }
 
 /// Subcommands for `wta hooks`.
@@ -540,6 +577,17 @@ async fn main() -> Result<()> {
     //   2. sys_locale (GetUserPreferredUILanguages — automatic OS detection)
     //      — aligns with C++ side's MRT fallback when Language is empty
     let cli = Cli::parse();
+
+    // Initialize file logging exactly once, as the very first thing after
+    // arg parsing, so even early-startup failures (locale, ETW registration,
+    // legacy-flag dispatch) are captured. The global tracing subscriber can
+    // only be set once per process, so every mode routes through here — the
+    // per-mode handlers below no longer init their own. The appender's guard
+    // is held in a global and flushed via `logging::shutdown_flush()` on every
+    // exit path (see the calls below and before each `process::exit`).
+    logging::init(&process_label(&cli));
+    tracing::info!(version = env!("CARGO_PKG_VERSION"), "=== wta starting ===");
+
     let locale = cli
         .language
         .clone()
@@ -555,14 +603,24 @@ async fn main() -> Result<()> {
 
     // Legacy flags first (backward compat)
     if cli.test_pipe {
-        return run_test_pipe().await;
+        let r = run_test_pipe().await;
+        if let Err(err) = &r {
+            tracing::error!(error = ?err, "wta exiting with error");
+        }
+        logging::shutdown_flush();
+        return r;
     }
     if cli.info {
-        return run_info_mode().await;
+        let r = run_info_mode().await;
+        if let Err(err) = &r {
+            tracing::error!(error = ?err, "wta exiting with error");
+        }
+        logging::shutdown_flush();
+        return r;
     }
     let json_mode = cli.json;
 
-    match cli.command {
+    let result = match cli.command {
         // Subcommand aliases for legacy modes
         Some(Command::Info) => run_info_mode().await,
         Some(Command::TestPipe) => run_test_pipe().await,
@@ -770,7 +828,7 @@ async fn main() -> Result<()> {
             cwd,
         }) => {
             run_delegate(
-                &prompt,
+                prompt.as_deref(),
                 &agent,
                 delegate_agent.as_deref(),
                 delegate_model.as_deref(),
@@ -784,7 +842,9 @@ async fn main() -> Result<()> {
 
         // ── Master session registry CLI ──
         Some(Command::Sessions { action }) => match action {
-            SessionsAction::List { master } => run_sessions_list(master, json_mode).await,
+            SessionsAction::List { master, origin } => {
+                run_sessions_list(master, origin.to_filter(), json_mode).await
+            }
         },
 
         // ── Manage agent hooks (install/status/uninstall) ──
@@ -812,6 +872,48 @@ async fn main() -> Result<()> {
                 run_default_tui(cli).await
             }
         }
+    };
+
+    // Last-resort diagnostic: any propagated failure (named-pipe connect,
+    // agent spawn, ACP initialize, etc.) is otherwise only printed to stderr
+    // and lost. Log it to file so connection failures are always recoverable
+    // from the logs. Mode-specific context (target=master / target=helper)
+    // is added closer to the source in run_master_mode / the helper path.
+    if let Err(err) = &result {
+        tracing::error!(error = ?err, "wta exiting with error");
+    }
+    // Flush the file appender before returning (its guard lives in a global,
+    // not a local, so it is not dropped automatically on return).
+    logging::shutdown_flush();
+    result
+}
+
+/// Pick the log file label for this process from its launch mode. Drives the
+/// `wta-<label>.log` filename in [`logging::init`]. Singleton-service modes are
+/// selected by flags (`--master` / `--connect-master`); everything else by the
+/// subcommand. Short-lived `wtcli`-style commands all share `cli`.
+fn process_label(cli: &Cli) -> String {
+    if cli.master.is_some() {
+        return "main_master".to_string();
+    }
+    if cli.connect_master.is_some() {
+        // Per-PID so concurrent per-tab helpers don't interleave into one
+        // file (and can be reclaimed individually — see logging::housekeeping).
+        return format!("main_helper-{}", std::process::id());
+    }
+    // Legacy diagnostic flags are short-lived clients, not the TUI.
+    if cli.test_pipe || cli.info {
+        return "cli".to_string();
+    }
+    match &cli.command {
+        None => "main".to_string(),
+        Some(Command::Delegate { .. }) => "delegate".to_string(),
+        Some(Command::ProbeModels { .. }) => "probe".to_string(),
+        Some(Command::Hooks {
+            action: HooksAction::Install { .. },
+        }) => "install-hooks".to_string(),
+        // All other subcommands are short-lived wtcli-style clients.
+        Some(_) => "cli".to_string(),
     }
 }
 
@@ -819,10 +921,8 @@ async fn main() -> Result<()> {
 /// (the ACP client connection is `!Send`), serialize the result to
 /// stdout, force-exit. See exit notes below.
 async fn run_probe_models(agent: &str) -> Result<()> {
-    // Logging must go to file, not stderr — the Settings UI captures
-    // our stdout for the JSON payload, and stderr would be folded
-    // into the same pipe and pollute the parser.
-    let _guard = logging::init("probe");
+    // Logging is initialized in `main()` (file, not stderr — the Settings UI
+    // captures our stdout for the JSON payload and stderr would pollute it).
     tracing::info!("probe-models start: agent={}", agent);
 
     let local = tokio::task::LocalSet::new();
@@ -835,6 +935,8 @@ async fn run_probe_models(agent: &str) -> Result<()> {
             tracing::error!("probe-models failed: {:#}", e);
             eprintln!("probe-models failed: {:#}", e);
             let _ = std::io::Write::flush(&mut std::io::stderr());
+            // Flush the file appender — process::exit skips the guard drop.
+            logging::shutdown_flush();
             // See exit rationale below.
             std::process::exit(1);
         }
@@ -856,15 +958,16 @@ async fn run_probe_models(agent: &str) -> Result<()> {
     // handle, exit now. Orphan grandchildren self-exit shortly after
     // when they notice their pipes are broken.
     let _ = std::io::Write::flush(&mut std::io::stdout());
+    // Flush the file appender — process::exit skips the guard drop.
+    logging::shutdown_flush();
     std::process::exit(0);
 }
 
 // ─── Hooks subcommand handlers ──────────────────────────────────────────────
 
 fn run_hooks_install(cli: HooksCliFilter) -> Result<()> {
-    // Initialize logging so the install attempt is observable in
+    // Logging is initialized in `main()`; the install attempt is observable in
     // %LOCALAPPDATA%\IntelligentTerminal\logs\wta-install-hooks.log.
-    let _guard = logging::init("install-hooks");
     agent_hooks_installer::ensure_installed_scoped(cli.into_scope());
     println!("{}", t!("hooks.install_attempted"));
     Ok(())
@@ -1064,15 +1167,28 @@ impl acp::Client for SessionsCliClient {
     }
 }
 
-async fn run_sessions_list(master_override: Option<String>, json_mode: bool) -> Result<()> {
+async fn run_sessions_list(
+    master_override: Option<String>,
+    origin_filter: agent_sessions::OriginFilter,
+    json_mode: bool,
+) -> Result<()> {
     let local = tokio::task::LocalSet::new();
     let sessions = local
         .run_until(fetch_sessions_from_master(master_override))
         .await?;
+    // Origin filter is applied client-side: master always returns the
+    // full registry so this command can act as the debug eye-of-god
+    // view (default `--origin all`). `--origin shell` matches what
+    // the MVP sessions picker shows; `--origin agent-pane` surfaces the
+    // rows MVP sessions hides.
+    let filtered: Vec<session_registry::SessionInfo> = sessions
+        .into_iter()
+        .filter(|s| origin_filter.matches_opt(s.origin.as_ref()))
+        .collect();
     if json_mode {
-        print!("{}", format_sessions_json_lines(&sessions)?);
+        print!("{}", format_sessions_json_lines(&filtered)?);
     } else {
-        print!("{}", format_sessions_table(&sessions));
+        print!("{}", format_sessions_table(&filtered));
     }
     Ok(())
 }
@@ -1165,17 +1281,18 @@ fn format_sessions_table(sessions: &[session_registry::SessionInfo]) -> String {
         return out;
     }
     out.push_str(&format!(
-        "{:<24} {:<10} {:<10} {:<20} {:<20} {}\n",
-        "SESSION", "STATUS", "CLI", "PANE", "UPDATED", "TITLE"
+        "{:<24} {:<10} {:<10} {:<10} {:<20} {:<20} {}\n",
+        "SESSION", "STATUS", "CLI", "ORIGIN", "PANE", "UPDATED", "TITLE"
     ));
     for session in sessions {
         let sid = session.session_id.to_string();
         let short_sid = if sid.len() > 24 { &sid[..24] } else { sid.as_str() };
         out.push_str(&format!(
-            "{:<24} {:<10} {:<10} {:<20} {:<20} {}\n",
+            "{:<24} {:<10} {:<10} {:<10} {:<20} {:<20} {}\n",
             short_sid,
             status_label(session.status.as_ref()),
             cli_source_label(session.cli_source.as_ref()),
+            origin_label(session.origin.as_ref()),
             session.pane_session_id.as_deref().unwrap_or("-"),
             session.updated_at.as_deref().unwrap_or("-"),
             session.title.as_deref().unwrap_or("-"),
@@ -1195,6 +1312,19 @@ fn cli_source_label(source: Option<&agent_sessions::CliSource>) -> String {
         Some(agent_sessions::CliSource::Gemini) => "Gemini".to_string(),
         Some(agent_sessions::CliSource::Unknown(s)) if !s.is_empty() => s.clone(),
         _ => "-".to_string(),
+    }
+}
+
+/// Render a `SessionOrigin` for the `wta sessions list` table. `None`
+/// is the on-the-wire representation for "field absent" (legacy rows
+/// or notification paths that don't carry origin) — we print `-`
+/// rather than fabricating an origin so the operator can tell
+/// "untagged" from "shell".
+fn origin_label(origin: Option<&agent_sessions::SessionOrigin>) -> &'static str {
+    match origin {
+        Some(agent_sessions::SessionOrigin::AgentPane) => "AgentPane",
+        Some(agent_sessions::SessionOrigin::Unknown)   => "Shell",
+        None                                           => "-",
     }
 }
 
@@ -1451,14 +1581,15 @@ async fn run_listen(pane_filter: Option<&str>) -> Result<()> {
 // ─── Delegate prompt to new tab agent ────────────────────────────────────────
 
 async fn run_delegate(
-    prompt: &str,
+    prompt: Option<&str>,
     agent_cmd: &str,
     delegate_agent_cmd: Option<&str>,
     delegate_model: Option<&str>,
     cwd: Option<&str>,
 ) -> Result<()> {
-    let _guard = logging::init("delegate");
-    tracing::info!(prompt, agent = agent_cmd, cwd, "run_delegate started");
+    // Log the prompt length, not the text — the prompt is user content.
+    tracing::info!(prompt_chars = prompt.map(|p| p.chars().count()), agent = agent_cmd, cwd, "run_delegate started");
+    tracing::trace!(target: "delegate.content", prompt = ?prompt, "run_delegate prompt");
 
     let (debug_tx, _) = tokio::sync::mpsc::unbounded_channel::<app::DebugMessage>();
     let channel = match connect_to_wt_protocol(debug_tx).await {
@@ -1501,42 +1632,12 @@ async fn run_delegate(
 /// the user's working pane, so a single query is enough.
 async fn delegate_with_context(
     shell_mgr: &ShellManager,
-    prompt: &str,
+    prompt: Option<&str>,
     agent_cmd: &str,
     delegate_agent_cmd: Option<&str>,
     delegate_model: Option<&str>,
     cwd: Option<&str>,
 ) -> Result<()> {
-    let active = shell_mgr.wt_get_active_pane().await.ok();
-    let active_pane_id = active
-        .as_ref()
-        .and_then(|v| v.get("session_id"))
-        .and_then(|v| match v {
-            serde_json::Value::String(s) => Some(s.clone()),
-            serde_json::Value::Number(n) => Some(n.to_string()),
-            _ => None,
-        });
-
-    let pane_context = if let Some(ref pane_id) = active_pane_id {
-        match shell_mgr.wt_read_pane_output(pane_id, Some(30)).await {
-            Ok(value) => value
-                .get("content")
-                .and_then(|c| c.as_str())
-                .map(|s| s.to_string()),
-            Err(_) => None,
-        }
-    } else {
-        None
-    };
-
-    let full_prompt = match (pane_context, active_pane_id) {
-        (Some(context), Some(pane_id)) => format!(
-            "{}\n\n## Terminal Context (pane {})\n```\n{}\n```",
-            prompt, pane_id, context
-        ),
-        _ => prompt.to_string(),
-    };
-
     let delegate_agents = crate::coordinator::default_delegate_agent_runtimes(
         delegate_agent_cmd,
         Some(agent_cmd),
@@ -1546,9 +1647,50 @@ async fn delegate_with_context(
         .first()
         .ok_or_else(|| anyhow::anyhow!("no delegate agent configured"))?;
 
-    let commandline = crate::coordinator::build_delegate_commandline(runtime, &full_prompt)?;
+    let commandline = match prompt {
+        // Prompt present → enrich it with the active pane's recent output and
+        // bake it into the new tab's agent CLI (the `?<prompt>` path).
+        Some(prompt) if !prompt.trim().is_empty() => {
+            let active = shell_mgr.wt_get_active_pane().await.ok();
+            let active_pane_id = active
+                .as_ref()
+                .and_then(|v| v.get("session_id"))
+                .and_then(|v| match v {
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    serde_json::Value::Number(n) => Some(n.to_string()),
+                    _ => None,
+                });
 
-    tracing::debug!(commandline, cwd, "delegate_with_context: launching");
+            let pane_context = if let Some(ref pane_id) = active_pane_id {
+                match shell_mgr.wt_read_pane_output(pane_id, Some(30)).await {
+                    Ok(value) => value
+                        .get("content")
+                        .and_then(|c| c.as_str())
+                        .map(|s| s.to_string()),
+                    Err(_) => None,
+                }
+            } else {
+                None
+            };
+
+            let full_prompt = match (pane_context, active_pane_id) {
+                (Some(context), Some(pane_id)) => format!(
+                    "{}\n\n## Terminal Context (pane {})\n```\n{}\n```",
+                    prompt, pane_id, context
+                ),
+                _ => prompt.to_string(),
+            };
+
+            crate::coordinator::build_delegate_commandline(runtime, &full_prompt)?
+        }
+        // No prompt → open the delegate agent interactively in the new tab.
+        _ => crate::coordinator::build_delegate_interactive_commandline(runtime)?,
+    };
+
+    // The commandline bakes in the user prompt (`-i "<prompt>"`); keep it out
+    // of the debug log and only emit it at trace.
+    tracing::debug!(cwd, "delegate_with_context: launching");
+    tracing::trace!(target: "delegate.content", commandline, cwd, "delegate_with_context commandline");
 
     shell_mgr
         .wt_create_tab(Some(&commandline), cwd, None)
@@ -1560,7 +1702,6 @@ async fn delegate_with_context(
 // ─── Default ACP TUI mode ───────────────────────────────────────────────────
 
 async fn run_default_tui(cli: Cli) -> Result<()> {
-    let _guard = logging::init("main");
     tracing::info!("=== run_default_tui started ===");
 
     // Debug channel for TUI debug panel (WT protocol traffic viewer)
@@ -1614,7 +1755,6 @@ async fn run_default_tui(cli: Cli) -> Result<()> {
 /// "spawn agent CLI" path: the helper attaches to wta-master over the
 /// supplied named pipe and forwards ACP traffic over it.
 pub(crate) async fn run_default_tui_over_pipe(cli: Cli, pipe_name: String) -> Result<()> {
-    let _guard = logging::init("main_helper");
     tracing::info!(target: "helper", pipe = %pipe_name, "=== wta-helper starting (TUI) ===");
 
     // Debug channel — same wiring as run_default_tui.
@@ -1646,6 +1786,10 @@ pub(crate) async fn run_default_tui_over_pipe(cli: Cli, pipe_name: String) -> Re
         None
     };
 
+    // Connection failures to wta-master (pipe connect give-up, ACP initialize
+    // timeout/failure) are logged at their source (target=helper) and again in
+    // `run_acp_tui_mode`'s exit branch, which `process::exit`s rather than
+    // returning Err — so there's no point wrapping the result here.
     run_acp_tui_mode(
         cli,
         shell_mgr,
@@ -1751,7 +1895,15 @@ async fn run_acp_tui_mode(
     terminal.show_cursor()?;
 
     if let Err(e) = result {
+        // This is the real exit point for a TUI/helper failure (connection
+        // failures to wta-master propagate up to here). `process::exit` below
+        // bypasses both `main()`'s catch-all and any caller's wrapper, so log
+        // it here before exiting — it lands in this process's log file
+        // (wta-main_helper-{pid}.log in helper mode).
+        tracing::error!(error = ?e, "wta TUI exiting with error");
         eprintln!("Error: {e:?}");
+        // Flush the file appender — process::exit skips the guard drop.
+        logging::shutdown_flush();
         std::process::exit(1);
     }
     Ok(())
@@ -1952,12 +2104,16 @@ async fn run_acp_app(
                 let wt_event_tx = event_tx.clone();
                 tokio::task::spawn_local(async move {
                     while let Some(event_json) = wt_rx.recv().await {
-                        tracing::debug!(event = %event_json, "wt_event_rx: received event");
                         let method = event_json
                             .get("method")
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
+                        // The full event envelope carries `vt_sequence` (raw
+                        // terminal output/scrollback) — keep it out of debug;
+                        // log only the method there, full JSON at trace.
+                        tracing::debug!(method = %method, "wt_event_rx: received event");
+                        tracing::trace!(target: "wt_event.content", event = %event_json, "wt_event_rx: full event");
 
                         let params = event_json
                             .get("params")
@@ -2055,6 +2211,12 @@ async fn run_acp_app(
             };
             let (master_ext_tx, master_ext_rx) = tokio::sync::mpsc::unbounded_channel();
 
+            // Seed the process-wide owner tab StableId so `inject_wta_pane_meta`
+            // stamps `_meta.wta.owner_tab_id` on every session/new + session/load.
+            // Master needs it to address `restart_agent_pane` crash-recovery
+            // events by the same StableId C++ routes per-tab events with.
+            protocol::acp::client::set_helper_owner_tab_id(cli.owner_tab_id.as_deref());
+
             // Spawn the ACP client -- but not in setup mode, where the user
             // hasn't chosen an agent yet. Store params for deferred start.
             //
@@ -2096,8 +2258,19 @@ async fn run_acp_app(
                             error = %e,
                             "run_acp_client_over_pipe failed"
                         );
+                        // Recover the typed classification: an auth error
+                        // attached at the handshake `new_session` site survives
+                        // the `?`-collapse into `anyhow` via downcast, so it
+                        // still routes to the sign-in screen; other handshake
+                        // failures fall back to `HandshakeFailed`. The raw
+                        // `{e:#}` is also in the log above for diagnosis.
+                        let failure = protocol::acp::failure::classify_anyhow(
+                            &e,
+                            protocol::acp::failure::HandshakeStage::Initialize,
+                        );
                         let _ = event_tx_for_pipe.send(app::AppEvent::AgentError {
                             session_id: None,
+                            failure,
                             message: format!("helper ACP transport failed: {e:#}"),
                         });
                     }
@@ -2309,7 +2482,18 @@ async fn run_acp_app(
                                 .initial_load_cwd
                                 .as_deref()
                                 .map(str::to_string)
-                                .filter(|s| !s.is_empty());
+                                .filter(|s| !s.is_empty())
+                                .and_then(|s| {
+                                    let v = crate::cwd_util::validate_starting_directory(&s);
+                                    if v.is_none() {
+                                        tracing::warn!(
+                                            target: "acp_load_session",
+                                            cwd = %s,
+                                            "--initial-load-cwd refers to a missing directory; dropping from load_session params",
+                                        );
+                                    }
+                                    v
+                                });
                             tracing::info!(
                                 target: "acp_load_session",
                                 session_id = sid,
@@ -2356,7 +2540,7 @@ async fn run_acp_app(
             drop(initial_load_tx);
 
             // Apply --initial-view: if `sessions`, jump straight into the
-            // Agents view (mirrors the F2 Chat→Agents toggle). Wired to
+            // agent session view (mirrors the Chat→Agents toggle). Wired to
             // WT's Ctrl+Shift+/ binding via `--initial-view sessions` on
             // the wta cmdline. Must run after set_agent_event_tx so that
             // ensure_history_loaded()'s event_tx clone is populated —
@@ -2366,7 +2550,7 @@ async fn run_acp_app(
             // Skip in setup mode: --setup takes the FRE path and the user
             // shouldn't be dropped into an empty session list.
             if cli.setup.is_none() && cli.initial_view == InitialView::Sessions {
-                tracing::info!(target: "initial_view", "starting in Agents view");
+                tracing::info!(target: "initial_view", "starting in agent session view");
                 let tab_id = app_state
                     .tab_id
                     .clone()
@@ -2395,14 +2579,14 @@ async fn run_acp_app(
             // NOTE: historical agent sessions used to be loaded here via
             // `history_loader::load_all()` (later as a `spawn_blocking`).
             // That work is now deferred — the registry is scanned lazily
-            // on the first F2 press via `App::ensure_history_loaded()`.
+            // on the first Ctrl+Shift+/ press via `App::ensure_history_loaded()`.
             //
             // Why: load_all() is hundreds of file opens (one per Copilot
             // session-state dir, reading events.jsonl for the autofix
             // fingerprint). On a populated machine it's ~10s of disk I/O.
             // Every wta spawn — including every model switch in the agent
             // pane — paid that cost, even though the data is only ever
-            // consumed by the Agents view. Lazy-loading on F2 keeps the
+            // consumed by the agent session view. Lazy-loading on Ctrl+Shift+/ keeps the
             // model-switch path free of this overhead entirely.
 
             // Enter setup mode if --setup <reason> was passed.
@@ -2444,11 +2628,11 @@ async fn run_acp_app(
             app_state.set_event_tx(event_tx.clone());
 
             // Kick the historical-session scan immediately on agent-pane
-            // startup so the F2 sessions view is populated by the time the
+            // startup so the sessions view is populated by the time the
             // user opens it. The scan runs on a `spawn_blocking` thread and
             // posts `HistoricalSessionsLoaded` back, so it never blocks the
             // LocalSet or the first frame. Subsequent `ensure_history_loaded`
-            // calls (from F2 / `/sessions`) short-circuit on `Loading`/`Loaded`.
+            // calls (from `/sessions`) short-circuit on `Loading`/`Loaded`.
             //
             // Only the ACP TUI path reaches here — `wta delegate`, `wta mcp`,
             // and CLI subcommands never construct an App that wires
@@ -2558,104 +2742,4 @@ async fn run_acp_app(
 }
 
 #[cfg(test)]
-mod cli_tests {
-    use super::*;
-    use clap::Parser;
-
-    // Plan-C boot-time initial-load flags: WT bundles a session resume
-    // with helper spawn by passing `--initial-load-session-id` (and
-    // optionally `--initial-load-cwd`) on the helper's command line.
-    // Replaces the race-prone "spawn helper, then broadcast a separate
-    // `load_session` VT event" path that often misrouted.
-
-    #[test]
-    fn cli_parses_initial_load_session_id() {
-        let cli = Cli::try_parse_from([
-            "wta",
-            "--initial-load-session-id",
-            "abc-123",
-            "--initial-load-cwd",
-            "C:/foo/bar",
-        ])
-        .expect("flags must parse");
-        assert_eq!(cli.initial_load_session_id.as_deref(), Some("abc-123"));
-        assert_eq!(cli.initial_load_cwd.as_deref(), Some("C:/foo/bar"));
-    }
-
-    #[test]
-    fn cli_initial_load_session_id_defaults_to_none() {
-        let cli = Cli::try_parse_from(["wta"]).expect("no flags must parse");
-        assert!(cli.initial_load_session_id.is_none());
-        assert!(cli.initial_load_cwd.is_none());
-    }
-
-    #[test]
-    fn cli_initial_load_session_id_without_cwd_is_allowed() {
-        // cwd is optional — the helper falls back to its process cwd when
-        // omitted (matches the runtime `load_session` arm's behavior).
-        let cli = Cli::try_parse_from(["wta", "--initial-load-session-id", "sid-only"])
-            .expect("session id alone must parse");
-        assert_eq!(cli.initial_load_session_id.as_deref(), Some("sid-only"));
-        assert!(cli.initial_load_cwd.is_none());
-    }
-
-    #[test]
-    fn sessions_list_cli_parses_json_and_master_override() {
-        let cli = Cli::try_parse_from([
-            "wta",
-            "sessions",
-            "list",
-            "--json",
-            "--master",
-            r"\\.\pipe\wta-master-test",
-        ])
-        .expect("sessions list parses");
-
-        assert!(cli.json);
-        match cli.command {
-            Some(Command::Sessions { action: SessionsAction::List { master } }) => {
-                assert_eq!(master.as_deref(), Some(r"\\.\pipe\wta-master-test"));
-            }
-            other => panic!("expected sessions list command, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn sessions_json_lines_prints_one_session_info_per_line() {
-        let mut row = session_registry::SessionInfo::new(
-            agent_client_protocol::SessionId::new("sid-json"),
-            std::path::PathBuf::from("C:\\repo"),
-        );
-        row.status = Some(agent_sessions::AgentStatus::Working);
-        row.cli_source = Some(agent_sessions::CliSource::Copilot);
-        row.current_tool = Some("shell".into());
-
-        let out = format_sessions_json_lines(&[row]).expect("format jsonl");
-        let lines: Vec<&str> = out.lines().collect();
-        assert_eq!(lines.len(), 1);
-        let value: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
-        assert_eq!(value["session_id"], "sid-json");
-        assert_eq!(value["status"], "Working");
-        assert_eq!(value["cli_source"], "Copilot");
-        assert_eq!(value["current_tool"], "shell");
-    }
-
-    #[test]
-    fn sessions_table_prints_header_and_rows() {
-        let mut row = session_registry::SessionInfo::new(
-            agent_client_protocol::SessionId::new("sid-table"),
-            std::path::PathBuf::from("C:\\repo"),
-        );
-        row.title = Some("fix build".into());
-        row.status = Some(agent_sessions::AgentStatus::Idle);
-        row.cli_source = Some(agent_sessions::CliSource::Claude);
-        row.pane_session_id = Some("pane-table".into());
-
-        let out = format_sessions_table(&[row]);
-        assert!(out.contains("SESSION"));
-        assert!(out.contains("sid-table"));
-        assert!(out.contains("Idle"));
-        assert!(out.contains("Claude"));
-        assert!(out.contains("pane-table"));
-    }
-}
+mod cli_tests;

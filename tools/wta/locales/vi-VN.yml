@@ -1,6 +1,6 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - tên sản phẩm, không dịch
-setup.title.first_run: "Chào mừng bạn đến Intelligent Terminal!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Chào mừng bạn đến Đầu cuối thông minh!"
 setup.title.agent_missing: "Không tìm thấy tác nhân AI"
 setup.title.agent_error: "Kết nối tới tác nhân AI thất bại"
 setup.title.switch_agent: "Chuyển tác nhân AI"
@@ -8,13 +8,13 @@ setup.title.not_available: "Tác nhân AI không khả dụng"
 setup.title.sign_in: "Cần đăng nhập"
 
 # %{agent} được thay thế bằng tên hiển thị của tác nhân AI khi chạy.
-setup.subtitle.copilot_missing: "Tác nhân AI \"%{agent}\" của bạn chưa được cài đặt. Thực hiện theo các bước bên dưới để cài đặt. Để chuyển tác nhân AI, hãy đi tới Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "Tác nhân AI \"%{agent}\" của bạn chưa được cài đặt. Vui lòng cài đặt lại thủ công, sau đó thử lại. Để chuyển tác nhân AI, hãy đi tới Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "Tác nhân AI \"%{agent}\" của bạn yêu cầu xác thực. Thực hiện theo các bước bên dưới để đăng nhập. Để chuyển tác nhân AI, hãy đi tới Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "Tác nhân AI \"%{agent}\" của bạn yêu cầu xác thực. Vui lòng đăng nhập qua tác nhân AI, sau đó chọn \"Tôi đã đăng nhập\" bên dưới. Để chuyển tác nhân AI, hãy đi tới Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "Tác nhân AI \"%{agent}\" của bạn chưa được cài đặt. Thực hiện theo các bước bên dưới để cài đặt. Để chuyển tác nhân AI, hãy đi tới Đầu cuối thông minh Settings > Agent."
+setup.subtitle.agent_missing: "Tác nhân AI \"%{agent}\" của bạn chưa được cài đặt. Vui lòng cài đặt lại thủ công, sau đó thử lại. Để chuyển tác nhân AI, hãy đi tới Đầu cuối thông minh Settings > Agent."
+setup.subtitle.copilot_auth: "Tác nhân AI \"%{agent}\" của bạn yêu cầu xác thực. Thực hiện theo các bước bên dưới để đăng nhập. Để chuyển tác nhân AI, hãy đi tới Đầu cuối thông minh Settings > Agent."
+setup.subtitle.agent_auth: "Tác nhân AI \"%{agent}\" của bạn yêu cầu xác thực. Vui lòng đăng nhập qua tác nhân AI, sau đó chọn \"Tôi đã đăng nhập\" bên dưới. Để chuyển tác nhân AI, hãy đi tới Đầu cuối thông minh Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Chọn CLI tác nhân AI mặc định mà bạn muốn sử dụng trong Intelligent Terminal. Bạn có thể"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Chọn CLI tác nhân AI mặc định mà bạn muốn sử dụng trong Đầu cuối thông minh. Bạn có thể"
 setup.description.fre_line2: "đi tới Settings để cấu hình và thiết lập không gian làm việc của bạn."
 
 setup.option.install: "Cài đặt %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Nhấn Enter để đăng nhập, Esc để quay lại"  # 
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Đang suy nghĩ…"
-# {Locked="Intelligent Terminal"} - tên sản phẩm, không dịch
-chat.welcome_title: "Chào mừng bạn đến Intelligent Terminal!"
-chat.welcome_disclaimer: "Intelligent Terminal sử dụng AI. Hãy kiểm tra lỗi."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Chào mừng bạn đến Đầu cuối thông minh!"
+chat.welcome_disclaimer: "Đầu cuối thông minh sử dụng AI. Hãy kiểm tra lỗi."
 chat.plan_header: "Kế hoạch:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -119,12 +119,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. để hiện/ẩn bảng tác nhân AI •
 # ── Connection state ────────────────────────────────────────────────────────
 connection.starting: "Đang khởi động tác nhân AI..."
 connection.reconnecting: "Đang kết nối lại..."
+connection.connecting_activity: "Đang kết nối với tác nhân AI…"
+connection.lost: "Đã mất kết nối với tác nhân AI. Nhập /restart để kết nối lại."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Đã hủy."
 system.no_prompt_in_flight: "Không có lệnh nào đang chạy."
 system.authentication_failed: "Xác thực thất bại"
 system.command_copied_retry: "Đã sao chép lệnh — chạy trong terminal khác, sau đó nhấn Enter để thử lại"  # {Locked="Enter"}
+system.stopped_max_tokens: "Phản hồi đã bị cắt sau khi đạt đến giới hạn đầu ra của mô hình."
+system.stopped_max_turn_requests: "Tác nhân đã dừng sau khi đạt đến giới hạn yêu cầu cho lượt này."
+system.stopped_refusal: "Tác nhân đã từ chối tiếp tục với yêu cầu này."
+system.agent_busy: "Tác nhân đang bận trên tab này — hãy đợi lời nhắc hiện tại hoàn tất."
+system.resuming_session: "Đang tiếp tục phiên %{session_id}..."
+system.unknown_command: "Lệnh không xác định \"%{command}\" — đã gửi dưới dạng lời nhắc. Nhập /help để xem danh sách."  # {Locked="/help"}
+system.busy_use_stop: "Hãy đợi lời nhắc hiện tại hoàn tất, hoặc chạy /stop trước."  # {Locked="/stop"}
+system.cannot_focus_session: "Không thể tập trung vào phiên %{session_id}: phiên có vẻ đang hoạt động nhưng chưa có GUID bảng nào được liên kết. Hãy thử lại sau giây lát."
+system.cannot_resume_no_load_session: "Không thể tiếp tục trong bảng tác nhân: %{agent} không quảng bá khả năng ACP `loadSession`. Thay vào đó, nhấn Enter (không nhấn Shift) để tiếp tục trong bảng terminal mới."  # {Locked="ACP","loadSession","Enter","Shift"}
+system.cannot_resume_no_resume_flag: "Không thể tiếp tục phiên %{agent}: tác nhân này không có cờ kiểu `--resume`. Nhấn Shift+Enter để thử tiếp tục bên trong bảng tác nhân thông qua ACP."  # {Locked="--resume","Shift","Enter","ACP"}
+system.cannot_resume_unknown_agent: "Không thể tiếp tục phiên %{session_id}: tác nhân nguồn của phiên không được bản dựng này nhận dạng."
+system.cannot_resume_phantom_via_flag: "Không thể tiếp tục phiên %{agent} %{session_id}: phiên đã được khởi tạo nhưng chưa từng tích lũy cuộc trò chuyện nào, nên chính %{agent} sẽ từ chối tiếp tục. Đang xóa hàng."
+system.cannot_resume_phantom_via_load: "Không thể tiếp tục phiên %{agent} %{session_id}: phiên đã được khởi tạo nhưng chưa từng tích lũy cuộc trò chuyện nào, nên %{agent} sẽ từ chối tải. Đang xóa hàng."
+system.fallback.this_agent: "tác nhân này"
+system.fallback.connected_agent: "tác nhân đã kết nối"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Không tìm thấy cửa sổ nào."
@@ -171,3 +188,6 @@ time.hour_singular: "%{count} giờ trước"
 time.hours_other: "%{count} giờ trước"
 time.day_singular: "%{count} ngày trước"
 time.days_other: "%{count} ngày trước"
+
+# ── Thực thi đề xuất (src/coordinator.rs) ───────────────────────────
+system.choice_execution_failed: "Lựa chọn %{choice} không thành công: %{error}"

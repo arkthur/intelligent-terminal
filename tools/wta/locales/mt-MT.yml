@@ -1,6 +1,6 @@
 # Titli tal-iskrin tas-setup
-# {Locked="Intelligent Terminal"} - isem il-prodott, tittradux
-setup.title.first_run: "Merħba fl-Intelligent Terminal!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Merħba fl-Terminal Intelliġenti!"
 setup.title.agent_missing: "L-aġent ma nstabx"
 setup.title.agent_error: "Il-konnessjoni mal-aġent falliet"
 setup.title.switch_agent: "Ibdel l-aġent"
@@ -8,13 +8,13 @@ setup.title.not_available: "L-aġent mhuwiex disponibbli"
 setup.title.sign_in: "Hemm bżonn li tidħol"
 
 # %{agent} jiġi sostitwit bl-isem tal-aġent waqt l-eżekuzzjoni.
-setup.subtitle.copilot_missing: "L-aġent tiegħek \"%{agent}\" mhuwiex installat. Segwi l-passi t'hawn taħt biex tinstallaw. Biex tibdel l-aġenti, mur għal Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "L-aġent tiegħek \"%{agent}\" mhuwiex installat. Erġa' installah manwalment, imbagħad erġa' pprova. Biex tibdel l-aġenti, mur għal Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "L-aġent tiegħek \"%{agent}\" jeħtieġ awtentikazzjoni. Segwi l-passi t'hawn taħt biex tidħol. Biex tibdel l-aġenti, mur għal Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "L-aġent tiegħek \"%{agent}\" jeħtieġ awtentikazzjoni. Idħol permezz tal-aġent, imbagħad agħżel \"Dħalt\" hawn taħt. Biex tibdel l-aġenti, mur għal Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "L-aġent tiegħek \"%{agent}\" mhuwiex installat. Segwi l-passi t'hawn taħt biex tinstallaw. Biex tibdel l-aġenti, mur għal Terminal Intelliġenti Settings > Agent."
+setup.subtitle.agent_missing: "L-aġent tiegħek \"%{agent}\" mhuwiex installat. Erġa' installah manwalment, imbagħad erġa' pprova. Biex tibdel l-aġenti, mur għal Terminal Intelliġenti Settings > Agent."
+setup.subtitle.copilot_auth: "L-aġent tiegħek \"%{agent}\" jeħtieġ awtentikazzjoni. Segwi l-passi t'hawn taħt biex tidħol. Biex tibdel l-aġenti, mur għal Terminal Intelliġenti Settings > Agent."
+setup.subtitle.agent_auth: "L-aġent tiegħek \"%{agent}\" jeħtieġ awtentikazzjoni. Idħol permezz tal-aġent, imbagħad agħżel \"Dħalt\" hawn taħt. Biex tibdel l-aġenti, mur għal Terminal Intelliġenti Settings > Agent."
 
-# {Locked="Intelligent Terminal"}, {Locked="Settings"}
-setup.description.fre_line1: "Agħżel l-aġent awtomatiku li tixtieq tuża fl-Intelligent Terminal. Tista'"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}, {Locked="Settings"}
+setup.description.fre_line1: "Agħżel l-aġent awtomatiku li tixtieq tuża fl-Terminal Intelliġenti. Tista'"
 setup.description.fre_line2: "tmur għal Settings biex tikkonfigura u twaqqaf l-ispazju tax-xogħol tiegħek."
 
 setup.option.install: "Installa %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Agħfas Enter biex tidħol, Esc biex tmur lura"  # {Locked=
 
 # ── Vista taċ-ċatt (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Qed jaħseb…"
-# {Locked="Intelligent Terminal"} - isem il-prodott, tittradux
-chat.welcome_title: "Merħba fl-Intelligent Terminal!"
-chat.welcome_disclaimer: "Intelligent Terminal juża l-AI. Iċċekkja għall-iżbalji."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Merħba fl-Terminal Intelliġenti!"
+chat.welcome_disclaimer: "Terminal Intelliġenti juża l-AI. Iċċekkja għall-iżbalji."
 chat.plan_header: "Pjan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -119,12 +119,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. biex turi/taħbi l-pannell tal-aġent • 
 # ── Stat tal-konnessjoni ────────────────────────────────────────────────────────
 connection.starting: "L-aġent qed jibda..."
 connection.reconnecting: "Qed jerġa' jikkonnettja..."
+connection.connecting_activity: "Qed tikkonnettja mal-aġent…"
+connection.lost: "Il-konnessjoni mal-aġent intilfet. Ittajpja /restart biex terġa' tikkonnettja."  # {Locked="/restart"}
 
 # ── Messaġġi tas-sistema (src/app.rs) ────────────────────────────────────────
 system.cancelled: "Ikkanċellat."
 system.no_prompt_in_flight: "L-ebda prompt fl-arja."
 system.authentication_failed: "L-awtentikazzjoni falliet"
 system.command_copied_retry: "Kmand ikkupjat — ħaddmu f'terminal ieħor, imbagħad agħfas Enter biex terġa' tipprova"  # {Locked="Enter"}
+system.stopped_max_tokens: "It-tweġiba nqatgħet wara li ntlaħaq il-limitu tal-output tal-mudell."
+system.stopped_max_turn_requests: "L-aġent waqaf wara li laħaq il-limitu tat-talbiet tiegħu għal din id-dawra."
+system.stopped_refusal: "L-aġent irrifjuta li jkompli b'din it-talba."
+system.agent_busy: "L-aġent huwa okkupat fuq din it-tab — stenna sakemm jintemm il-prompt kurrenti."
+system.resuming_session: "Qed tkompli s-sessjoni %{session_id}..."
+system.unknown_command: "Kmand mhux magħruf \"%{command}\" — intbagħat bħala prompt. Ittajpja /help għal-lista."
+system.busy_use_stop: "Stenna sakemm jintemm il-prompt kurrenti, jew uża /stop l-ewwel."
+system.cannot_focus_session: "Ma tistax tiffoka s-sessjoni %{session_id}: tidher live iżda għad m’hemm l-ebda GUID tal-panew marbut. Erġa’ pprova fi ftit."
+system.cannot_resume_no_load_session: "Ma tistax tkompli fil-panew tal-aġent: %{agent} ma ħabbarx il-kapaċità ACP `loadSession`. Agħfas Enter (mingħajr Shift) biex minflok tkompli f’panew tat-terminal ġdid."
+system.cannot_resume_no_resume_flag: "Ma tistax tkompli s-sessjoni ta’ %{agent}: dan l-aġent m’għandux flag stil `--resume`. Agħfas Shift+Enter biex tipprova tkompli ġewwa l-panew tal-aġent permezz ta’ ACP minflok."
+system.cannot_resume_unknown_agent: "Ma tistax tkompli s-sessjoni %{session_id}: l-aġent tas-sors tagħha mhuwiex magħruf għal din il-build."
+system.cannot_resume_phantom_via_flag: "Ma tistax tkompli s-sessjoni ta’ %{agent} %{session_id}: inbdiet iżda qatt ma akkumulat konverżazzjoni, għalhekk %{agent} innifsu jirrifjuta t-tkomplija. Qed titneħħa r-ringiela."
+system.cannot_resume_phantom_via_load: "Ma tistax tkompli s-sessjoni ta’ %{agent} %{session_id}: inbdiet iżda qatt ma akkumulat konverżazzjoni, għalhekk %{agent} jirrifjuta t-tagħbija. Qed titneħħa r-ringiela."
+system.fallback.this_agent: "dan l-aġent"
+system.fallback.connected_agent: "l-aġent konness"
 
 # ── Output CLI waqt l-eżekuzzjoni (src/main.rs) ────────────────────────────────────
 output.no_windows: "Ma nstabet l-ebda tieqa."
@@ -170,3 +187,6 @@ time.hour_singular: "%{count} siegħa ilu"
 time.hours_other: "%{count}-il siegħa ilu"
 time.day_singular: "%{count} ġurnata ilu"
 time.days_other: "%{count}-il ġurnata ilu"
+
+# ── Eżekuzzjoni tar-rakkomandazzjoni (src/coordinator.rs) ───────────────────────────
+system.choice_execution_failed: "L-għażla %{choice} falliet: %{error}"

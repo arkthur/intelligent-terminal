@@ -6,15 +6,15 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Ongi etorri Intelligent Terminal-era</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Ongi etorri Terminal Adimenduna-era</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Konfiguratu zure laguntza integratua erroreak azaltzeko, komandoak idazteko eta atazak desblokeatzeko zure lanean zauden lekuan bertan laguntzeko. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Intelligent Terminal-i buruz gehiago jakin</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Terminal Adimenduna-i buruz gehiago jakin</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Jarraitu fluxuan zure AI agente integratuarekin</value>
@@ -36,8 +36,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Ongi etorri Intelligent Terminal-era</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Ongi etorri Terminal Adimenduna-era</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Aukeratu zer konfiguratu nahi duzun orain. Hauek edozein unetan alda ditzakezu. </value>
@@ -68,9 +68,8 @@
     <value>Saio-kudeaketa</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Eman Intelligent Terminal-i zure agente aktiboen egoera jarraitzeko baimena.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <value>Eman Terminal Adimenduna-i zure agente aktiboen egoera jarraitzeko baimena.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Hau gaitzeak integrazio-hooks instalatuko ditu zure agente guztietan saioen jarraipena egiteko.</value>
@@ -116,17 +115,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>⚠ Node.js instalatzeak huts egin du. Egiaztatu sare-konexioa eta saiatu berriro.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Session hooks instalatzeak huts egin du. Saio-kudeaketa desaktibatu da. Berriro aktibatu eta berriro saiatu dezakezu, edo gorde hori gabe jarraitzeko.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Shell integrazioa instalatzeak huts egin du. Erroreen detekzioa desaktibatu da. Berriro aktibatu eta berriro saiatu dezakezu, edo gorde hori gabe jarraitzeko.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Ikasi nola konpondu hau eskuz</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Aktibatuta</value>
   </data>
@@ -139,4 +127,12 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Eman baimena Intelligent Terminal-i zure shell-era sartzeko eta erroreak automatikoki detektatzeko.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Shell integrazioa instalatzeak huts egin du. Erroreen detekzioa desaktibatu da. Berriro aktibatu eta berriro saiatu dezakezu, edo gorde hori gabe jarraitzeko.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Session hooks instalatzeak huts egin du. Saio-kudeaketa desaktibatu da. Berriro aktibatu eta berriro saiatu dezakezu, edo gorde hori gabe jarraitzeko.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Ikasi nola konpondu hau eskuz</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

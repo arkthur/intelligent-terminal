@@ -6,15 +6,15 @@
   <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Nāu mai ki Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Nāu mai ki Iho Atamai</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Whakaritea tō kaitiaki mō-roto hei āwhina i a koe ki te whakamarama i ngā hapa, tuhi tono, me te wewete mahi i te wāhi e mahi ana koe. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>He atu kōrero mō Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>He atu kōrero mō Iho Atamai</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Noho i te rere me tō kaitiaki AI mō-roto</value>
@@ -36,8 +36,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Nāu mai ki Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Nāu mai ki Iho Atamai</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Kōwhiria he aha hei whakarite ināianei. Ka taea e koe te huri i ēnei i ngā wā katoa. </value>
@@ -68,8 +68,8 @@
     <value>Whakahaere wāhanga</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Tukua a Intelligent Terminal ki te aroturuki i te tūranga o ō kaitiaki e haere ana, e mahi ana rānei.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Tukua a Iho Atamai ki te aroturuki i te tūranga o ō kaitiaki e haere ana, e mahi ana rānei.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Mā te whakakā i tēnei ka tāuta ngā hooks hono hei aroturuki wāhanga puta noa i ō kaitiaki.</value>
@@ -115,17 +115,6 @@
     <value>⚠ I rahua te tāuta i a Node.js. Tirohia tō hononga whatuao ka ngana anō.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ I rahua te tāuta i ngā session hooks. Kua whakawetohia te whakahaere whakatūnga. Ka taea e koe te whakahoki anō me te ngana anō, te tiaki rānei kia haere tonu i te kore.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ I rahua te tāuta i te whakaurunga anga. Kua whakawetohia te kitenga hapa. Ka taea e koe te whakahoki anō me te ngana anō, te tiaki rānei kia haere tonu i te kore.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Akona me pēhea te whakatika i tēnei mā te ringa</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Kā</value>
   </data>
@@ -145,8 +134,16 @@
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Pāwhiritia {0} hei whakatika i te hapa</value>
+    <value>Pāwhiritia, pēhia rānei {0} hei tono i te pokapū mō tētahi whakatikatika e marohitia ana</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Kua rite te whakatika. Pēhia {0} hei arotake</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Whakatuwheratia te paewhiri pokapū hei arotake i te whakatikatika e marohitia ana</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Kua kitea he hapa. Pāwhiri, pēhia rānei i {0} kia tono ai i te kaihoko AI ki te tātari me te taunaki whakatikatika.</value>
@@ -194,4 +191,12 @@
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Tukua a Intelligent Terminal kia uru ki tō anga me te kimi hapa aunoa.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ I rahua te tāuta i te whakaurunga anga. Kua whakawetohia te kitenga hapa. Ka taea e koe te whakahoki anō me te ngana anō, te tiaki rānei kia haere tonu i te kore.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ I rahua te tāuta i ngā session hooks. Kua whakawetohia te whakahaere whakatūnga. Ka taea e koe te whakahoki anō me te ngana anō, te tiaki rānei kia haere tonu i te kore.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Akona me pēhea te whakatika i tēnei mā te ringa</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

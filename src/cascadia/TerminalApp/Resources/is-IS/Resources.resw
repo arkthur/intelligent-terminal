@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Velkomin í Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Velkomin í Snjallútstöð</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>Settu upp innbyggða aðstoðina þína til að hjálpa þér að útskýra villur, semja skipanir og leysa verkefni beint þar sem þú vinnur. </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Frekari upplýsingar um Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Frekari upplýsingar um Snjallútstöð</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>Haltu flæðinu með innbyggða AI-agentinum þínum</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Velkomin í Intelligent Terminal</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>Velkomin í Snjallútstöð</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>Veldu hvað á að setja upp núna. Þú getur breytt þessu hvenær sem er. </value>
@@ -181,9 +181,8 @@
     <value>Lotustjórnun</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Veittu Intelligent Terminal heimild til að rekja stöðu þinna keyrandi eða virkra agenta.</value>
-    <comment>{Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <value>Veittu Snjallútstöð heimild til að rekja stöðu þinna keyrandi eða virkra agenta.</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ Virkjun þessa mun setja upp samþættingar-hooks til að rekja lotur þvert á agentana þína.</value>
@@ -229,17 +228,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>⚠ Ekki tókst að setja upp Node.js. Athugaðu nettenginguna og reyndu aftur.</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ Ekki tókst að setja upp session hooks. Slökkt hefur verið á lotustjórnun. Þú getur virkjað hana aftur og reynt aftur, eða vistað til að halda áfram án hennar.</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ Ekki tókst að setja upp skeljasamþættingu. Slökkt hefur verið á villuleit. Þú getur virkjað hana aftur og reynt aftur, eða vistað til að halda áfram án hennar.</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>Lærðu hvernig á að laga þetta handvirkt</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>Kveikt</value>
   </data>
@@ -259,8 +247,16 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>Smelltu á {0} til að laga villuna</value>
+    <value>Smelltu eða ýttu á {0} til að biðja vélmennið um tillögu að lagfæringu</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>Lagfæring tilbúin. Ýttu á {0} til að yfirfara</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>Opnaðu vélmennisrúðuna til að yfirfara tillöguna að lagfæringu</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>Villa fannst. Smelltu eða ýttu á {0} til að biðja gervigreindarvélina að greina og leggja til lagfæringu.</value>
@@ -308,4 +304,12 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Veittu Intelligent Terminal heimild til að fá aðgang að skelinni þinni og greina villur sjálfkrafa.</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ Ekki tókst að setja upp skeljasamþættingu. Slökkt hefur verið á villuleit. Þú getur virkjað hana aftur og reynt aftur, eða vistað til að halda áfram án hennar.</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ Ekki tókst að setja upp session hooks. Slökkt hefur verið á lotustjórnun. Þú getur virkjað hana aftur og reynt aftur, eða vistað til að halda áfram án hennar.</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>Lærðu hvernig á að laga þetta handvirkt</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>

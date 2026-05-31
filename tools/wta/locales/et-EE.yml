@@ -1,6 +1,6 @@
 # Setup screen titles
-# {Locked="Intelligent Terminal"} - product name, do not translate
-setup.title.first_run: "Tere tulemast Intelligent Terminali!"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.title.first_run: "Tere tulemast Nutikas Terminali!"
 setup.title.agent_missing: "Agenti ei leitud"
 setup.title.agent_error: "Agendiga ühenduse loomine nurjus"
 setup.title.switch_agent: "Vaheta agenti"
@@ -8,13 +8,13 @@ setup.title.not_available: "Agent pole saadaval"
 setup.title.sign_in: "Sisselogimine nõutav"
 
 # %{agent} is replaced with the agent display name at runtime.
-setup.subtitle.copilot_missing: "Teie agent \"%{agent}\" pole installitud. Järgige allolevaid juhiseid selle installimiseks. Agendi vahetamiseks avage Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_missing: "Teie agent \"%{agent}\" pole installitud. Installige see käsitsi uuesti ja proovige seejärel uuesti. Agendi vahetamiseks avage Intelligent Terminal Settings > Agent."
-setup.subtitle.copilot_auth: "Teie agent \"%{agent}\" nõuab autentimist. Järgige allolevaid juhiseid sisselogimiseks. Agendi vahetamiseks avage Intelligent Terminal Settings > Agent."
-setup.subtitle.agent_auth: "Teie agent \"%{agent}\" nõuab autentimist. Logige sisse agendi kaudu ja valige seejärel allpool \"Olen sisse loginud\". Agendi vahetamiseks avage Intelligent Terminal Settings > Agent."
+setup.subtitle.copilot_missing: "Teie agent \"%{agent}\" pole installitud. Järgige allolevaid juhiseid selle installimiseks. Agendi vahetamiseks avage Nutikas Terminal Settings > Agent."
+setup.subtitle.agent_missing: "Teie agent \"%{agent}\" pole installitud. Installige see käsitsi uuesti ja proovige seejärel uuesti. Agendi vahetamiseks avage Nutikas Terminal Settings > Agent."
+setup.subtitle.copilot_auth: "Teie agent \"%{agent}\" nõuab autentimist. Järgige allolevaid juhiseid sisselogimiseks. Agendi vahetamiseks avage Nutikas Terminal Settings > Agent."
+setup.subtitle.agent_auth: "Teie agent \"%{agent}\" nõuab autentimist. Logige sisse agendi kaudu ja valige seejärel allpool \"Olen sisse loginud\". Agendi vahetamiseks avage Nutikas Terminal Settings > Agent."
 
-# {Locked="Intelligent Terminal"}
-setup.description.fre_line1: "Valige vaikeagent, mida soovite kasutada Intelligent Terminalis. Saate"
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+setup.description.fre_line1: "Valige vaikeagent, mida soovite kasutada Nutikas Terminalis. Saate"
 setup.description.fre_line2: "avada Settings, et oma tööruumi seadistada ja konfigureerida."
 
 setup.option.install: "Installi %{agent}"
@@ -43,9 +43,9 @@ auth.hint_footer: "  Vajutage Enter sisselogimiseks, Esc tagasi minemiseks"  # {
 
 # ── Chat view (src/ui/chat.rs) ──────────────────────────────────────────────
 chat.activity_thinking: "Mõtleb..."
-# {Locked="Intelligent Terminal"} - product name, do not translate
-chat.welcome_title: "Tere tulemast Intelligent Terminali!"
-chat.welcome_disclaimer: "Intelligent Terminal kasutab AI-d. Kontrollige vigu."
+# {Locked=qps-ploc,qps-ploca,qps-plocm}
+chat.welcome_title: "Tere tulemast Nutikas Terminali!"
+chat.welcome_disclaimer: "Nutikas Terminal kasutab AI-d. Kontrollige vigu."
 chat.plan_header: "Plaan:"
 chat.plan_marker_completed: "[x]"  # {Locked}
 chat.plan_marker_in_progress: "[>]"  # {Locked}
@@ -119,12 +119,29 @@ layout.welcome_hint: "  (Ctrl+Shift+. agendipaneeli kuvamiseks/peitmiseks • Ct
 # ── Connection state ────────────────────────────────────────────────────────
 connection.starting: "Agendi käivitamine..."
 connection.reconnecting: "Taasühendamine..."
+connection.connecting_activity: "Agendiga ühenduse loomine…"
+connection.lost: "Ühendus agendiga katkes. Uuesti ühendamiseks tippige /restart."  # {Locked="/restart"}
 
 # ── System messages (src/app.rs) ────────────────────────────────────────────
 system.cancelled: "Tühistatud."
 system.no_prompt_in_flight: "Aktiivset päringut pole."
 system.authentication_failed: "Autentimine nurjus"
 system.command_copied_retry: "Käsk kopeeritud — käivitage see teises terminalis ja vajutage seejärel Enter uuesti proovimiseks"  # {Locked="Enter"}
+system.stopped_max_tokens: "Vastus katkestati pärast mudeli väljundpiiri saavutamist."
+system.stopped_max_turn_requests: "Agent peatus pärast selle vooru päringupiiri saavutamist."
+system.stopped_refusal: "Agent keeldus selle päringuga jätkamast."
+system.agent_busy: "Agent on sellel vahekaardil hõivatud — oodake, kuni praegune viip lõpeb."
+system.resuming_session: "Seansi %{session_id} jätkamine..."
+system.unknown_command: "Tundmatu käsk \"%{command}\" — saadeti viibana. Loendi jaoks tippige /help."  # {Locked="/help"}
+system.busy_use_stop: "Oodake, kuni praegune viip lõpeb, või kasutage esmalt /stop."  # {Locked="/stop"}
+system.cannot_focus_session: "Seanssi %{session_id} ei saa fookusesse võtta: see näib olevat aktiivne, kuid ühtegi paani GUID-i pole veel seotud. Proovige hetke pärast uuesti."
+system.cannot_resume_no_load_session: "Agendipaanil ei saa jätkata: %{agent} ei reklaaminud ACP `loadSession` võimekust. Vajutage Enter (ilma Shiftita), et jätkata selle asemel uuel terminalipaanil."  # {Locked="ACP","loadSession","Enter","Shift"}
+system.cannot_resume_no_resume_flag: "%{agent} seanssi ei saa jätkata: sellel agendil pole `--resume`-stiilis lippu. Vajutage Shift+Enter, et proovida jätkamist agendipaani sees ACP kaudu."  # {Locked="--resume","Shift","Enter","ACP"}
+system.cannot_resume_unknown_agent: "Seanssi %{session_id} ei saa jätkata: selle lähteagent on sellele WTA järgule tundmatu."
+system.cannot_resume_phantom_via_flag: "%{agent} seanssi %{session_id} ei saa jätkata: see käivitati, kuid vestlust ei kogunenud, seega lükkaks %{agent} ise jätkamise tagasi. Rida eemaldatakse."
+system.cannot_resume_phantom_via_load: "%{agent} seanssi %{session_id} ei saa jätkata: see käivitati, kuid vestlust ei kogunenud, seega lükkaks %{agent} laadimise tagasi. Rida eemaldatakse."
+system.fallback.this_agent: "see agent"
+system.fallback.connected_agent: "ühendatud agent"
 
 # ── Runtime CLI output (src/main.rs) ────────────────────────────────────────
 output.no_windows: "Aknaid ei leitud."
@@ -171,3 +188,6 @@ time.hour_singular: "%{count} tund tagasi"
 time.hours_other: "%{count} tundi tagasi"
 time.day_singular: "%{count} päev tagasi"
 time.days_other: "%{count} päeva tagasi"
+
+# ── Soovituse täitmine (src/coordinator.rs) ─────────────────────────────────
+system.choice_execution_failed: "Valik %{choice} nurjus: %{error}"

@@ -119,15 +119,15 @@
   </resheader>
   <!-- ═══ FRE Welcome Page ═══ -->
   <data name="FreOverlay_WelcomeTitle.Text" xml:space="preserve">
-    <value>Intelligent Terminal ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>ਇੰਟੈਲੀਜੈਂਟ ਟਰਮੀਨਲ ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_WelcomeSubtitlePrefix" xml:space="preserve">
     <value>ਗਲਤੀਆਂ ਸਮਝਾਉਣ, ਕਮਾਂਡਾਂ ਦਾ ਖਰੜਾ ਤਿਆਰ ਕਰਨ ਅਤੇ ਕੰਮਾਂ ਨੂੰ ਅਨਬਲੌਕ ਕਰਨ ਵਿੱਚ ਮਦਦ ਲਈ ਆਪਣਾ ਬਿਲਟ-ਇਨ ਸਹਾਇਕ ਸੈੱਟ ਅੱਪ ਕਰੋ, ਜਿੱਥੇ ਤੁਸੀਂ ਕੰਮ ਕਰਦੇ ਹੋ ਉੱਥੇ ਹੀ। </value>
   </data>
   <data name="FreOverlay_WelcomeSubtitleLink" xml:space="preserve">
-    <value>Intelligent Terminal ਬਾਰੇ ਹੋਰ ਜਾਣੋ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>ਇੰਟੈਲੀਜੈਂਟ ਟਰਮੀਨਲ ਬਾਰੇ ਹੋਰ ਜਾਣੋ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_Card1Title.Text" xml:space="preserve">
     <value>ਆਪਣੇ ਬਿਲਟ-ਇਨ AI ਏਜੰਟ ਨਾਲ ਪ੍ਰਵਾਹ ਵਿੱਚ ਰਹੋ</value>
@@ -149,8 +149,8 @@
   </data>
   <!-- ═══ FRE Settings Page ═══ -->
   <data name="FreOverlay_SettingsTitle.Text" xml:space="preserve">
-    <value>Intelligent Terminal ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.</comment>
+    <value>ਇੰਟੈਲੀਜੈਂਟ ਟਰਮੀਨਲ ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name.</comment>
   </data>
   <data name="FreOverlay_SettingsSubtitlePrefix" xml:space="preserve">
     <value>ਚੁਣੋ ਕਿ ਹੁਣ ਕੀ ਸੈੱਟ ਅੱਪ ਕਰਨਾ ਹੈ। ਤੁਸੀਂ ਇਹਨਾਂ ਨੂੰ ਕਿਸੇ ਵੀ ਸਮੇਂ ਬਦਲ ਸਕਦੇ ਹੋ। </value>
@@ -181,9 +181,8 @@
     <value>ਸੈਸ਼ਨ ਪ੍ਰਬੰਧਨ</value>
   </data>
   <data name="FreOverlay_SessionDescription.Text" xml:space="preserve">
-    <value>Intelligent Terminal ਨੂੰ ਤੁਹਾਡੇ ਚੱਲ ਰਹੇ ਜਾਂ ਸਕ੍ਰਿਯ ਏਜੰਟਾਂ ਦੀ ਸਥਿਤੀ ਟਰੈਕ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ।</value>
-    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} {Locked="Intelligent Terminal"} "Intelligent Terminal" is the product name.
-In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
+    <value>ਇੰਟੈਲੀਜੈਂਟ ਟਰਮੀਨਲ ਨੂੰ ਤੁਹਾਡੇ ਚੱਲ ਰਹੇ ਜਾਂ ਸਕ੍ਰਿਯ ਏਜੰਟਾਂ ਦੀ ਸਥਿਤੀ ਟਰੈਕ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ।</value>
+    <comment>{Locked=qps-ploc,qps-ploca,qps-plocm} "Intelligent Terminal" is the product name. In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), not a human agent or representative.</comment>
   </data>
   <data name="FreOverlay_SessionHint.Text" xml:space="preserve">
     <value>ℹ ਇਸਨੂੰ ਸਮਰੱਥ ਕਰਨ ਨਾਲ ਤੁਹਾਡੇ ਏਜੰਟਾਂ ਵਿੱਚ ਸੈਸ਼ਨਾਂ ਨੂੰ ਟਰੈਕ ਕਰਨ ਲਈ ਇੰਟੀਗ੍ਰੇਸ਼ਨ hooks ਇੰਸਟਾਲ ਹੋਣਗੇ।</value>
@@ -229,17 +228,6 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>⚠ Node.js ਇੰਸਟਾਲ ਕਰਨ ਵਿੱਚ ਅਸਫਲ। ਆਪਣਾ ਨੈੱਟਵਰਕ ਜਾਂਚੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।</value>
     <comment>{Locked="Node.js"}</comment>
   </data>
-  <data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
-    <value>⚠ session hooks ਇੰਸਟਾਲ ਕਰਨ ਵਿੱਚ ਅਸਫਲ। ਸੈਸ਼ਨ ਪ੍ਰਬੰਧਨ ਬੰਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ। ਤੁਸੀਂ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰ ਸਕਦੇ ਹੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰ ਸਕਦੇ ਹੋ, ਜਾਂ ਇਸ ਤੋਂ ਬਿਨਾਂ ਜਾਰੀ ਰੱਖਣ ਲਈ ਸੇਵ ਕਰੋ।</value>
-    <comment>{Locked="hooks"}</comment>
-  </data>
-  <data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
-    <value>⚠ ਸ਼ੈੱਲ ਏਕੀਕਰਣ ਇੰਸਟਾਲ ਕਰਨ ਵਿੱਚ ਅਸਫਲ। ਗਲਤੀ ਖੋਜ ਬੰਦ ਕਰ ਦਿੱਤੀ ਗਈ ਹੈ। ਤੁਸੀਂ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰ ਸਕਦੇ ਹੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰ ਸਕਦੇ ਹੋ, ਜਾਂ ਇਸ ਤੋਂ ਬਿਨਾਂ ਜਾਰੀ ਰੱਖਣ ਲਈ ਸੇਵ ਕਰੋ।</value>
-  </data>
-  <data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
-    <value>ਇਸ ਨੂੰ ਹੱਥੀਂ ਠੀਕ ਕਰਨ ਦਾ ਤਰੀਕਾ ਜਾਣੋ</value>
-    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
-  </data>
   <data name="FreOverlay_ToggleOn" xml:space="preserve">
     <value>ਚਾਲੂ</value>
   </data>
@@ -259,8 +247,16 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <comment>Short status label shown next to the diagnostics button when a fix is ready. {0} is replaced with the keyboard shortcut.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedLabelFormat" xml:space="preserve">
-    <value>ਗਲਤੀ ਠੀਕ ਕਰਨ ਲਈ {0} 'ਤੇ ਕਲਿੱਕ ਕਰੋ</value>
+    <value>ਸੁਝਾਏ ਗਏ ਹੱਲ ਲਈ ਏਜੰਟ ਨੂੰ ਪੁੱਛਣ ਵਾਸਤੇ {0} 'ਤੇ ਕਲਿੱਕ ਕਰੋ ਜਾਂ ਦਬਾਓ</value>
     <comment>Short status label shown next to the diagnostics button when an error is detected and a fix can be requested. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewLabelFormat" xml:space="preserve">
+    <value>ਹੱਲ ਤਿਆਰ ਹੈ। ਸਮੀਖਿਆ ਕਰਨ ਲਈ {0} ਦਬਾਓ</value>
+    <comment>Short status label shown next to the diagnostics button when an analysis result is ready and the agent pane is closed; pressing the shortcut opens the pane to review. {0} is replaced with the keyboard shortcut.</comment>
+  </data>
+  <data name="Diagnostics_ReviewTooltip" xml:space="preserve">
+    <value>ਸੁਝਾਏ ਗਏ ਹੱਲ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਏਜੰਟ ਪੈਨ ਖੋਲ੍ਹੋ</value>
+    <comment>Tooltip on the diagnostics button when an analysis result is ready to review in the agent pane.</comment>
   </data>
   <data name="Diagnostics_ErrorDetectedTooltipFormat" xml:space="preserve">
     <value>ਗਲਤੀ ਮਿਲੀ। AI ਏਜੰਟ ਨੂੰ ਨਿਦਾਨ ਕਰਨ ਅਤੇ ਹੱਲ ਸੁਝਾਉਣ ਲਈ {0} 'ਤੇ ਕਲਿੱਕ ਕਰੋ ਜਾਂ ਦਬਾਓ।</value>
@@ -308,4 +304,12 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   <data name="FreOverlay_AutoDetectDescription.Text" xml:space="preserve">
     <value>Intelligent Terminal ਨੂੰ ਤੁਹਾਡੇ ਸ਼ੈੱਲ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਅਤੇ ਗਲਤੀਆਂ ਨੂੰ ਆਪਣੇ ਆਪ ਖੋਜਣ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ।</value>
   </data>
-</root>
+<data name="FreOverlay_InstallErrorShellIntegration" xml:space="preserve">
+    <value>⚠ ਸ਼ੈੱਲ ਏਕੀਕਰਣ ਇੰਸਟਾਲ ਕਰਨ ਵਿੱਚ ਅਸਫਲ। ਗਲਤੀ ਖੋਜ ਬੰਦ ਕਰ ਦਿੱਤੀ ਗਈ ਹੈ। ਤੁਸੀਂ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰ ਸਕਦੇ ਹੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰ ਸਕਦੇ ਹੋ, ਜਾਂ ਇਸ ਤੋਂ ਬਿਨਾਂ ਜਾਰੀ ਰੱਖਣ ਲਈ ਸੇਵ ਕਰੋ।</value>
+  </data><data name="FreOverlay_InstallErrorHooks" xml:space="preserve">
+    <value>⚠ session hooks ਇੰਸਟਾਲ ਕਰਨ ਵਿੱਚ ਅਸਫਲ। ਸੈਸ਼ਨ ਪ੍ਰਬੰਧਨ ਬੰਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ। ਤੁਸੀਂ ਇਸਨੂੰ ਦੁਬਾਰਾ ਚਾਲੂ ਕਰ ਸਕਦੇ ਹੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰ ਸਕਦੇ ਹੋ, ਜਾਂ ਇਸ ਤੋਂ ਬਿਨਾਂ ਜਾਰੀ ਰੱਖਣ ਲਈ ਸੇਵ ਕਰੋ।</value>
+    <comment>{Locked="hooks"}</comment>
+  </data><data name="FreOverlay_ErrorHelpLink" xml:space="preserve">
+    <value>ਇਸ ਨੂੰ ਹੱਥੀਂ ਠੀਕ ਕਰਨ ਦਾ ਤਰੀਕਾ ਜਾਣੋ</value>
+    <comment>Hyperlink shown below an FRE setup error message. Opens step-by-step manual setup instructions in the browser.</comment>
+  </data></root>
