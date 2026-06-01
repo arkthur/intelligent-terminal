@@ -8,6 +8,7 @@
 #include <string>
 
 #include "../WinRTUtils/inc/WtExeUtils.h"
+#include <til/env.h>
 
 namespace winrt::TerminalApp::implementation
 {
@@ -260,6 +261,15 @@ namespace winrt::TerminalApp::implementation
         // (no job → no KILL_ON_JOB_CLOSE containment).
         DWORD creationFlags = CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED;
 
+        // Build a fresh environment from the Windows registry so the
+        // master sees PATH entries added after Terminal launched (e.g.
+        // WinGet\Links after FRE installs copilot). Without this the
+        // master inherits Terminal's startup-time PATH which may not
+        // include freshly-installed CLIs.
+        til::env masterEnv;
+        masterEnv.regenerate();
+        auto envBlock = masterEnv.to_string();
+
         std::wstring mutableCmdLine{ commandline };
         if (!CreateProcessW(
                 /* lpApplicationName    */ nullptr,
@@ -268,7 +278,7 @@ namespace winrt::TerminalApp::implementation
                 /* lpThreadAttributes   */ nullptr,
                 /* bInheritHandles      */ FALSE,
                 /* dwCreationFlags      */ creationFlags,
-                /* lpEnvironment        */ nullptr,
+                /* lpEnvironment        */ envBlock.empty() ? nullptr : envBlock.data(),
                 /* lpCurrentDirectory   */ nullptr,
                 /* lpStartupInfo        */ &si,
                 /* lpProcessInformation */ &pi))
