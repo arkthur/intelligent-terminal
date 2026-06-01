@@ -30,6 +30,7 @@ on its own, including:
    - 3.3 [OpenAI Codex (bring your own)](#33-openai-codex-bring-your-own)
    - 3.4 [Gemini CLI (bring your own)](#34-gemini-cli-bring-your-own)
    - 3.5 [Signing in to your agent](#35-signing-in-to-your-agent)
+   - 3.6 [Agent hooks for session management](#36-agent-hooks-for-session-management)
 4. [PowerShell shell integration](#4-powershell-shell-integration)
 
 ---
@@ -323,6 +324,119 @@ installed:
 
 After signing in, restart Intelligent Terminal once so the agent pane picks
 up the new credentials.
+
+---
+
+### 3.6 Agent hooks for session management
+
+**Why you need it:** Intelligent Terminal's **session management** feature
+— the multi-session sidebar in the agent pane that lets you switch between
+parallel conversations on the same tab — is powered by a small bundle of
+**agent hooks** (`wt-agent-hooks`) that the agent CLI loads as a plugin /
+extension. The first-run experience installs these hooks for you the
+first time you save the FRE with **Session management** enabled.
+
+You only need to follow this section if:
+
+- The FRE reported that hooks installation failed (for example because
+  the agent CLI was not yet on `PATH`, or your network blocked the agent
+  CLI's plugin store).
+- You installed the agent CLI **after** completing the FRE and now want
+  to enable session management.
+
+#### Step 3.6.1 — Make sure the agent CLI is installed and on PATH
+
+The hooks are registered through the agent CLI's own plugin / extension
+system, so the CLI itself must be installed first. Complete the matching
+sub-section above before continuing:
+
+- **GitHub Copilot** → [Section 3.1](#31-github-copilot-cli)
+- **Claude Code** → [Section 3.2](#32-claude-code-bring-your-own)
+- **OpenAI Codex** → [Section 3.3](#33-openai-codex-bring-your-own)
+- **Gemini CLI** → [Section 3.4](#34-gemini-cli-bring-your-own)
+
+Verify the CLI you intend to use prints a version number, then close and
+reopen your terminal so any new install directory is on `PATH`.
+
+#### Step 3.6.2 — Run `wta hooks install`
+
+Intelligent Terminal ships a `wta hooks install` command that runs the
+same installer the FRE uses. Open a **new** Intelligent Terminal window
+(so `wta` and the agent CLI both pick up the current `PATH`) and run
+**one** of the following — whichever matches the agent you selected in
+the FRE:
+
+```powershell
+wta hooks install --cli copilot
+wta hooks install --cli claude
+wta hooks install --cli codex
+wta hooks install --cli gemini
+```
+
+Or install for every agent CLI that is currently on `PATH` in one go:
+
+```powershell
+wta hooks install
+```
+
+Under the hood this runs each agent CLI's native plugin / extension
+command against the `wt-agent-hooks` bundle shipped inside the
+Intelligent Terminal package:
+
+| Agent          | Native commands invoked by `wta hooks install`                                                                              |
+|----------------|-----------------------------------------------------------------------------------------------------------------------------|
+| GitHub Copilot | `copilot plugin marketplace add <bundle>\copilot` then `copilot plugin install wt-agent-hooks@wt-local`                     |
+| Claude Code    | `claude plugin marketplace add <bundle>\claude` then `claude plugin install wt-agent-hooks@wt-local`                        |
+| OpenAI Codex   | `codex plugin marketplace add <bundle>\codex` then `codex plugin add wt-agent-hooks@wt-local` *(note: `add`, not `install`)* |
+| Gemini CLI     | `gemini extensions install <bundle>\gemini-extension --consent --skip-settings` *(with `GEMINI_CLI_TRUST_WORKSPACE=true` to bypass Gemini's folder-trust prompt)* |
+
+You do not need to run these directly — `wta hooks install` is the
+supported entry point and handles bundle staging, idempotency, and
+diagnostic logging for you.
+
+> [!IMPORTANT]
+> **Codex needs a one-time `/hooks` trust step.** After
+> `wta hooks install --cli codex` succeeds, hook events will not fire
+> until you launch Codex once and run the `/hooks` slash command to
+> trust the `wt-agent-hooks` plugin. This is a Codex security
+> requirement that no external installer can satisfy on your behalf;
+> the other three CLIs do not need this step.
+
+#### Step 3.6.3 — Verify the install and re-enable session management
+
+Check the status report to confirm each agent CLI is wired up:
+
+```powershell
+wta hooks status
+```
+
+You should see `installed` for the agent you selected. Then, back in
+**Settings → AI Agents**, turn **Session management** back on (the FRE
+turns it off when hooks installation fails so you can save and continue
+without it) and restart Intelligent Terminal once.
+
+> [!TIP]
+> If `wta hooks install` still fails, diagnostics are written to
+> `wta-install-hooks.log` under the Intelligent Terminal package's log
+> directory:
+>
+> ```text
+> %LOCALAPPDATA%\Packages\<PackageFamilyName>\LocalCache\Local\IntelligentTerminal\logs\<version>\wta-install-hooks.log
+> ```
+>
+> The most common causes of failure are: the agent CLI was not on
+> `PATH` when `wta` ran (open a fresh window and retry), or the agent
+> CLI has not been signed in yet (see
+> [Section 3.5](#35-signing-in-to-your-agent)). The log identifies
+> which step failed and prints the exit code from the underlying
+> `plugin install` / `plugin add` / `extensions install` invocation.
+
+> [!WARNING]
+> If your organization disables agent session hooks through Group
+> Policy, the **Session management** toggle in the FRE and in
+> **Settings → AI Agents** is locked off and the FRE will not run the
+> hooks installer for you. Contact your IT administrator if you
+> believe this is in error.
 
 ---
 

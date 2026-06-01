@@ -476,8 +476,9 @@ namespace winrt::TerminalApp::implementation
             break;
         case FreProblemKind::Hooks:
             ErrorText().Text(RS_(L"FreOverlay_InstallErrorHooks"));
+            url += L"#36-agent-hooks-for-session-management";
             // Remediation: turn off session management so the user can save and
-            // continue without it. (No section anchor yet — base doc.)
+            // continue without it.
             SessionManagementToggle().IsOn(false);
             break;
         }
