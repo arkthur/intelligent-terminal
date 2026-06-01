@@ -968,9 +968,36 @@ async fn run_probe_models(agent: &str) -> Result<()> {
 fn run_hooks_install(cli: HooksCliFilter) -> Result<()> {
     // Logging is initialized in `main()`; the install attempt is observable in
     // %LOCALAPPDATA%\IntelligentTerminal\logs\wta-install-hooks.log.
-    agent_hooks_installer::ensure_installed_scoped(cli.into_scope());
-    println!("{}", t!("hooks.install_attempted"));
-    Ok(())
+    let scope = cli.into_scope();
+    agent_hooks_installer::ensure_installed_scoped(scope);
+
+    // Verify the install actually landed by checking on-disk status.
+    // ensure_installed_scoped is fire-and-forget (silent on failure),
+    // so we inspect the result independently.
+    let report = agent_hooks_installer::status();
+    let failed: Vec<&str> = report
+        .clis
+        .iter()
+        .filter(|c| {
+            let in_scope = match scope {
+                agent_hooks_installer::CliScope::All => true,
+                agent_hooks_installer::CliScope::One(kind) => c.name == kind.name(),
+            };
+            // A CLI is "failed" if it's in scope, present on the machine
+            // (cli_found), but hooks are not installed.
+            in_scope && c.binary_on_path && !c.plugin_installed
+        })
+        .map(|c| c.name)
+        .collect();
+
+    if failed.is_empty() {
+        println!("{}", t!("hooks.install_attempted"));
+        Ok(())
+    } else {
+        let names = failed.join(", ");
+        tracing::error!(target: "agent_hooks", clis = %names, "hooks install verification failed");
+        anyhow::bail!("hooks installation failed for: {}", names)
+    }
 }
 
 fn run_hooks_status(json_mode: bool) -> Result<()> {
