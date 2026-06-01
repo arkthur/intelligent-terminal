@@ -462,7 +462,7 @@ fn badge_style(s: &AgentSession) -> Style {
     }
 }
 
-/// Show the CLI provider (`copilot`, `claude`, `gemini`) only on the
+/// Show the CLI provider (`claude`, `codex`, `copilot`, `gemini`) only on the
 /// active row or the keyboard-selected row — matches the Figma where the
 /// agent icon appears only on the currently-engaged session and avoids
 /// cluttering the historical list.
@@ -473,6 +473,7 @@ fn cli_suffix_for(s: &AgentSession, selected: bool) -> String {
     }
     let label = match s.cli_source {
         CliSource::Claude => "claude",
+        CliSource::Codex => "codex",
         CliSource::Copilot => "copilot",
         CliSource::Gemini => "gemini",
         CliSource::Unknown(_) => return String::new(),
@@ -862,5 +863,28 @@ mod tests {
         assert!(s.contains("April"), "expected month name in {:?}", s);
         assert!(s.contains("20"), "expected day in {:?}", s);
         assert!(s.contains("2026"), "expected year in {:?}", s);
+    }
+
+    #[test]
+    fn cli_suffix_renders_codex_label_on_selected_row() {
+        let s = AgentSession {
+            key:              "k".to_string(),
+            cli_source:       CliSource::Codex,
+            pane_session_id:  None,
+            window_id:        None,
+            tab_id:           None,
+            title:            "codex — test".to_string(),
+            cwd:              std::path::PathBuf::from("."),
+            started_at:       SystemTime::now(),
+            last_activity_at: SystemTime::now(),
+            status:           AgentStatus::Idle,
+            last_error:       None,
+            current_tool:     None,
+            attention_reason: None,
+            log_path:         None,
+            origin:           SessionOrigin::default(),
+        };
+        assert_eq!(cli_suffix_for(&s, true),  "· codex");
+        assert_eq!(cli_suffix_for(&s, false), String::new());
     }
 }

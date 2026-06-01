@@ -2000,6 +2000,22 @@ impl Default for HistoryLoadState {
     }
 }
 
+/// Reverse of `CliSource::from_agent_id` — yields the lowercase CLI id
+/// used by the command-synthesis template and dispatch routing.
+/// Returns `None` for `CliSource::Unknown(_)` so each call-site retains
+/// its current Unknown-handling semantics (display fallback / bool
+/// false / early return — they differ).
+pub(crate) fn known_cli_id(src: &crate::agent_sessions::CliSource) -> Option<&'static str> {
+    use crate::agent_sessions::CliSource;
+    match src {
+        CliSource::Claude  => Some("claude"),
+        CliSource::Codex   => Some("codex"),
+        CliSource::Copilot => Some("copilot"),
+        CliSource::Gemini  => Some("gemini"),
+        CliSource::Unknown(_) => None,
+    }
+}
+
 pub(crate) fn session_info_to_agent_session(
     info: &crate::session_registry::SessionInfo,
 ) -> crate::agent_sessions::AgentSession {
@@ -2358,21 +2374,14 @@ impl App {
             decide_enter_action, liveness_from_status, EnterAction, NotResumableReason, RowSnapshot,
         };
         // Ambient: load_session capability is set during ACP init;
-        // resume-flag support is a per-CLI profile constant (false for
-        // Codex today; true for Claude/Copilot/Gemini).
-        let cli_supports_resume_flag = match s.cli_source {
-            crate::agent_sessions::CliSource::Unknown(_) => false,
-            ref known => {
-                let id = match known {
-                    crate::agent_sessions::CliSource::Claude => "claude",
-                    crate::agent_sessions::CliSource::Copilot => "copilot",
-                    crate::agent_sessions::CliSource::Gemini => "gemini",
-                    crate::agent_sessions::CliSource::Unknown(_) => unreachable!(),
-                };
-                !crate::agent_registry::lookup_profile_by_id(id)
-                    .resume_flag
-                    .is_empty()
-            }
+        // resume-flag support is a per-CLI profile constant — true for
+        // Claude / Codex / Copilot / Gemini (all four CLIs accept some
+        // form of `--resume`/`resume <id>` re-attach surface).
+        let cli_supports_resume_flag = match known_cli_id(&s.cli_source) {
+            Some(id) => !crate::agent_registry::lookup_profile_by_id(id)
+                .resume_flag
+                .is_empty(),
+            None => false,
         };
         let row = RowSnapshot {
             origin: s.origin.clone(),
@@ -2416,25 +2425,11 @@ impl App {
                 // Surface a user-visible system message scoped to the
                 // current tab so the user can read it from the
                 // agent session view (which is rendered in-tab).
-                let agent_display: String = match s.cli_source {
-                    crate::agent_sessions::CliSource::Claude => {
-                        crate::agent_registry::lookup_profile_by_id("claude")
-                            .display_name
-                            .to_string()
-                    }
-                    crate::agent_sessions::CliSource::Copilot => {
-                        crate::agent_registry::lookup_profile_by_id("copilot")
-                            .display_name
-                            .to_string()
-                    }
-                    crate::agent_sessions::CliSource::Gemini => {
-                        crate::agent_registry::lookup_profile_by_id("gemini")
-                            .display_name
-                            .to_string()
-                    }
-                    crate::agent_sessions::CliSource::Unknown(_) => {
-                        t!("system.fallback.this_agent").into_owned()
-                    }
+                let agent_display: String = match known_cli_id(&s.cli_source) {
+                    Some(id) => crate::agent_registry::lookup_profile_by_id(id)
+                        .display_name
+                        .to_string(),
+                    None => t!("system.fallback.this_agent").into_owned(),
                 };
                 let msg = match reason {
                     NotResumableReason::LiveWithoutPane => {
@@ -2555,7 +2550,7 @@ impl App {
     /// Open a new WT tab whose primary pane runs `<cli> <resume_flag>
     /// <session_key>` to rehydrate a Historical/Ended agent session from
     /// the CLI's on-disk session store. Silent no-op for CLIs without a
-    /// resume flag (Codex today) or unknown CLI sources.
+    /// resume flag or unknown CLI sources.
     ///
     /// Flow:
     ///   1. Apply `ResumeDispatched` synchronously so a rapid second Enter
@@ -2575,11 +2570,9 @@ impl App {
     ///      (Gemini), allowing a later `PaneClosed` to transition the
     ///      row back to Ended.
     fn dispatch_resume(&mut self, s: &crate::agent_sessions::AgentSession) {
-        let cli_id = match s.cli_source {
-            crate::agent_sessions::CliSource::Claude => "claude",
-            crate::agent_sessions::CliSource::Copilot => "copilot",
-            crate::agent_sessions::CliSource::Gemini => "gemini",
-            crate::agent_sessions::CliSource::Unknown(_) => {
+        let cli_id = match known_cli_id(&s.cli_source) {
+            Some(id) => id,
+            None => {
                 tracing::debug!(
                     target: "agents_view",
                     key = %s.key,
@@ -2843,25 +2836,11 @@ impl App {
                 "dispatch_resume_in_agent_pane: refusing to load phantom session; pruning row",
             );
             let short_key: String = s.key.chars().take(8).collect();
-            let agent_display: String = match s.cli_source {
-                crate::agent_sessions::CliSource::Claude => {
-                    crate::agent_registry::lookup_profile_by_id("claude")
-                        .display_name
-                        .to_string()
-                }
-                crate::agent_sessions::CliSource::Copilot => {
-                    crate::agent_registry::lookup_profile_by_id("copilot")
-                        .display_name
-                        .to_string()
-                }
-                crate::agent_sessions::CliSource::Gemini => {
-                    crate::agent_registry::lookup_profile_by_id("gemini")
-                        .display_name
-                        .to_string()
-                }
-                crate::agent_sessions::CliSource::Unknown(_) => {
-                    t!("system.fallback.this_agent").into_owned()
-                }
+            let agent_display: String = match known_cli_id(&s.cli_source) {
+                Some(id) => crate::agent_registry::lookup_profile_by_id(id)
+                    .display_name
+                    .to_string(),
+                None => t!("system.fallback.this_agent").into_owned(),
             };
             let msg = t!(
                 "system.cannot_resume_phantom_via_load",
@@ -12995,5 +12974,20 @@ mod tests {
             app.tab_mut(DEFAULT_TAB_ID).last_emitted_chip_override,
             None,
         );
+    }
+
+    #[test]
+    fn known_cli_id_returns_some_for_all_first_party_clis() {
+        use crate::agent_sessions::CliSource;
+        assert_eq!(known_cli_id(&CliSource::Claude),  Some("claude"));
+        assert_eq!(known_cli_id(&CliSource::Codex),   Some("codex"));
+        assert_eq!(known_cli_id(&CliSource::Copilot), Some("copilot"));
+        assert_eq!(known_cli_id(&CliSource::Gemini),  Some("gemini"));
+    }
+
+    #[test]
+    fn known_cli_id_returns_none_for_unknown_variant() {
+        use crate::agent_sessions::CliSource;
+        assert_eq!(known_cli_id(&CliSource::Unknown("anything".to_string())), None);
     }
 }

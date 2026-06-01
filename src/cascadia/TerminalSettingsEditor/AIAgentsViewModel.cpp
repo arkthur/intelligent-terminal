@@ -861,22 +861,27 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             _copilotCliDetected = false;
             _claudeCliDetected = false;
             _geminiCliDetected = false;
+            _codexCliDetected = false;
             _showCopilotHookRow = false;
             _showClaudeHookRow = false;
             _showGeminiHookRow = false;
+            _showCodexHookRow = false;
             _copilotHooksSubtitle = {};
             _claudeHooksSubtitle = {};
             _geminiHooksSubtitle = {};
+            _codexHooksSubtitle = {};
         }
         else
         {
             const auto* copilot = FindCli(*report, "copilot");
             const auto* claude = FindCli(*report, "claude");
             const auto* gemini = FindCli(*report, "gemini");
+            const auto* codex = FindCli(*report, "codex");
 
             _copilotCliDetected = copilot && copilot->binaryOnPath;
             _claudeCliDetected = claude && claude->binaryOnPath;
             _geminiCliDetected = gemini && gemini->binaryOnPath;
+            _codexCliDetected = codex && codex->binaryOnPath;
 
             const auto hasState = [](const CliStatus* cli) {
                 return cli && (cli->marketplaceRegistered || cli->pluginInstalled);
@@ -884,26 +889,32 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             _showCopilotHookRow = hasState(copilot);
             _showClaudeHookRow = hasState(claude);
             _showGeminiHookRow = hasState(gemini);
+            _showCodexHookRow = hasState(codex);
 
             _copilotHooksSubtitle = _ComputeHooksSubtitle(copilot);
             _claudeHooksSubtitle = _ComputeHooksSubtitle(claude);
             _geminiHooksSubtitle = _ComputeHooksSubtitle(gemini);
+            _codexHooksSubtitle = _ComputeHooksSubtitle(codex);
         }
 
         _NotifyChanges(L"IsCopilotCliDetected",
                        L"IsClaudeCliDetected",
                        L"IsGeminiCliDetected",
+                       L"IsCodexCliDetected",
                        L"IsAnyAgentCliDetected",
                        L"CanInstallAgentHooks",
                        L"ShowCopilotHookRow",
                        L"ShowClaudeHookRow",
                        L"ShowGeminiHookRow",
+                       L"ShowCodexHookRow",
                        L"CopilotHooksSubtitle",
                        L"ClaudeHooksSubtitle",
                        L"GeminiHooksSubtitle",
+                       L"CodexHooksSubtitle",
                        L"ShowCopilotHooksSubtitle",
                        L"ShowClaudeHooksSubtitle",
-                       L"ShowGeminiHooksSubtitle");
+                       L"ShowGeminiHooksSubtitle",
+                       L"ShowCodexHooksSubtitle");
     }
 
     void AIAgentsViewModel::RefreshAgentHooksStatus()
@@ -967,6 +978,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         _agentHooksInstallSummary = RS_(L"AIAgents_HooksRemovingGeminiSummary");
         _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
         _RunHooksWtaAsync(L"hooks uninstall --cli gemini");
+    }
+
+    void AIAgentsViewModel::RemoveCodexHooks()
+    {
+        if (_installingAgentHooks) return;
+        _installingAgentHooks = true;
+        _agentHooksInstallSummary = RS_(L"AIAgents_HooksRemovingCodexSummary");
+        _NotifyChanges(L"IsInstallingAgentHooks", L"AgentHooksInstallSummary", L"HasAgentHooksInstallSummary");
+        _RunHooksWtaAsync(L"hooks uninstall --cli codex");
     }
 
     winrt::fire_and_forget AIAgentsViewModel::_RunHooksWtaAsync(std::wstring wtaArgs)

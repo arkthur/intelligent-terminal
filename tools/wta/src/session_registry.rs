@@ -457,6 +457,7 @@ impl From<&crate::agent_sessions::CliSource> for SessionHookCliSource {
     fn from(value: &crate::agent_sessions::CliSource) -> Self {
         match value {
             crate::agent_sessions::CliSource::Claude => Self::Known("Claude".to_string()),
+            crate::agent_sessions::CliSource::Codex => Self::Known("Codex".to_string()),
             crate::agent_sessions::CliSource::Copilot => Self::Known("Copilot".to_string()),
             crate::agent_sessions::CliSource::Gemini => Self::Known("Gemini".to_string()),
             crate::agent_sessions::CliSource::Unknown(value) => Self::Unknown {
@@ -471,6 +472,7 @@ impl From<SessionHookCliSource> for crate::agent_sessions::CliSource {
         match value {
             SessionHookCliSource::Known(value) => match value.as_str() {
                 "Claude" | "claude" => Self::Claude,
+                "Codex"  | "codex"  => Self::Codex,
                 "Copilot" | "copilot" => Self::Copilot,
                 "Gemini" | "gemini" => Self::Gemini,
                 other => Self::Unknown(other.to_string()),
@@ -2195,6 +2197,24 @@ mod tests {
             "pane binding must stay None after handoff");
     }
 
+    #[tokio::test]
+    async fn registry_assigns_codex_cli_source_when_session_started_via_agent_id() {
+        use crate::agent_sessions::{CliSource, SessionEvent};
+        let reg = InMemoryRegistry::new();
+        let cli = CliSource::from_agent_id("codex")
+            .expect("from_agent_id('codex') must yield Some(Codex)");
+        let event = SessionEvent::SessionStarted {
+            key: "codex-fan-in-test".to_string(),
+            cli_source: cli.clone(),
+            pane_session_id: "p1".to_string(),
+            cwd: PathBuf::from(r#"C:\x"#),
+            title: "fan-in test".to_string(),
+        };
+        reg.apply_event(event).await;
+        let row = reg.lookup(&acp::SessionId::new("codex-fan-in-test")).await.expect("row inserted");
+        assert_eq!(row.cli_source, Some(CliSource::Codex));
+    }
+
     #[test]
     fn sessions_list_response_round_trips_session_info_with_typed_fields() {
         let mut info = SessionInfo::new(acp::SessionId::new("sid-1"), PathBuf::from("/repo"));
@@ -2379,6 +2399,25 @@ mod tests {
         let parsed = parse_session_hook_params(&request.params)
             .expect("unknown cli_source must round-trip");
         assert_eq!(parsed, event);
+    }
+
+    #[test]
+    fn session_hook_cli_source_round_trips_codex() {
+        use crate::agent_sessions::CliSource;
+        let typed = CliSource::Codex;
+        let wire: SessionHookCliSource = (&typed).into();
+        assert!(matches!(wire, SessionHookCliSource::Known(ref s) if s == "Codex"),
+                "Codex must serialize to Known(\"Codex\"), got {:?}", wire);
+        let back: CliSource = wire.into();
+        assert_eq!(back, CliSource::Codex);
+    }
+
+    #[test]
+    fn session_hook_cli_source_accepts_lowercase_codex() {
+        use crate::agent_sessions::CliSource;
+        let wire = SessionHookCliSource::Known("codex".to_string());
+        let typed: CliSource = wire.into();
+        assert_eq!(typed, CliSource::Codex);
     }
 
     #[test]

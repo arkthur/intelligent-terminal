@@ -377,6 +377,42 @@
                                     MinWidth="120" />
                         </Grid>
                     </Border>
+                    <Border Visibility="{x:Bind ViewModel.ShowCodexHookRow, Mode=OneWay}"
+                            BorderThickness="0,1,0,0"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            Padding="0,16,0,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="Codex CLI" TextWrapping="Wrap" />
+                                <TextBlock Text="{x:Bind ViewModel.CodexHooksSubtitle, Mode=OneWay}"
+                                           Visibility="{x:Bind ViewModel.ShowCodexHooksSubtitle, Mode=OneWay}"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Opacity="0.6"
+                                           TextWrapping="Wrap" />
+                                <!--  Codex is the only CLI whose hook commands must be
+                                      individually trusted by the user before they fire.
+                                      Surface the one-line "run /hooks and approve"
+                                      reminder right under the row title so users see it
+                                      both before clicking Install (anticipation) and
+                                      after install (the row only becomes visible once
+                                      Codex has any hook state, which is the moment the
+                                      reminder is most actionable).  -->
+                                <TextBlock x:Uid="AIAgents_CodexTrustHint"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Opacity="0.6"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    x:Uid="AIAgents_HooksRemoveButton"
+                                    Click="{x:Bind ViewModel.RemoveCodexHooks}"
+                                    IsEnabled="{x:Bind ViewModel.CanInstallAgentHooks, Mode=OneWay}"
+                                    MinWidth="120" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
             </local:SettingContainer>
 

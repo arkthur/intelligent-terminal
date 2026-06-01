@@ -1,11 +1,10 @@
 # send-event.ps1 — Telemetry hook for WTA agent session tracking.
 #
 # ── EXIT-CODE CONTRACT ──────────────────────────────────────────────────
-# This script MUST exit 0 unconditionally. It is wired to Claude / Copilot
-# PreToolUse, UserPromptSubmit, Stop, SubagentStop, and other lifecycle
+# This script MUST exit 0 unconditionally. It is wired to lifecycle
 # events where a non-zero exit has *semantic* consequences:
 #   * Exit 2  → blocks the tool call / erases the user prompt /
-#               forces Claude to keep going past Stop
+#               forces to keep going past Stop
 #   * Other   → shows "<hook> hook error" + first line of stderr in the
 #               transcript on every fire
 # Two guarantees defend the contract:
@@ -24,7 +23,7 @@
 #
 # ── CLI-source identification ───────────────────────────────────────────
 # The installer hard-codes which CLI invokes this script via the
-# `-CliSource` parameter (claude / copilot / gemini). That is the
+# `-CliSource` parameter (claude / codex / copilot / gemini). That is the
 # ONLY reliable signal — env-var heuristics are unreliable because
 # Copilot CLI inherits Claude's plugin shape and sets CLAUDE_PLUGIN_ROOT,
 # making it indistinguishable from a real Claude run by env vars alone.
@@ -88,6 +87,7 @@ try {
         if ($env:COPILOT_SESSION_ID) { 'copilot' }
         elseif ($env:GEMINI_SESSION_ID) { 'gemini' }
         elseif ($env:CLAUDE_SESSION_ID) { 'claude' }
+        elseif ($env:CODEX_SESSION_ID) { 'codex' }
         elseif ($env:GEMINI_CLI)   { 'gemini' }
         elseif ($env:COPILOT_CLI)  { 'copilot' }
         elseif ($env:CLAUDE_PLUGIN_ROOT) { 'claude' }
@@ -130,7 +130,7 @@ try {
         $parsed = $hookData | ConvertFrom-Json
     }
 
-    # Extract agent_session_id from stdin JSON (Claude/Gemini), env (Copilot), or empty.
+    # Extract agent_session_id from stdin JSON (Claude/Gemini/Codex), env (Copilot), or empty.
     $agentSessionId = ""
     if ($parsed -and ($parsed.PSObject.Properties.Name -contains "session_id")) {
         $agentSessionId = [string]$parsed.session_id
@@ -140,6 +140,8 @@ try {
         $agentSessionId = $env:CLAUDE_SESSION_ID
     } elseif ($env:GEMINI_SESSION_ID) {
         $agentSessionId = $env:GEMINI_SESSION_ID
+    } elseif ($env:CODEX_SESSION_ID) {
+        $agentSessionId = $env:CODEX_SESSION_ID
     }
 
     # Detect CLI source — priority order:
@@ -157,6 +159,7 @@ try {
         if     ($env:COPILOT_SESSION_ID) { $CliSource = "copilot" }
         elseif ($env:GEMINI_SESSION_ID)  { $CliSource = "gemini" }
         elseif ($env:CLAUDE_SESSION_ID)  { $CliSource = "claude" }
+        elseif ($env:CODEX_SESSION_ID)   { $CliSource = "codex" }
         elseif ($env:GEMINI_CLI)         { $CliSource = "gemini" }
         elseif ($env:COPILOT_CLI)        { $CliSource = "copilot" }
         elseif ($env:CLAUDE_PLUGIN_ROOT) { $CliSource = "claude" }

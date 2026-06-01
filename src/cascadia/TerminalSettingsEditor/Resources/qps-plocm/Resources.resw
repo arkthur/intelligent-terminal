@@ -2786,7 +2786,7 @@
   <data name="AIAgents_PanePosition_Left" xml:space="preserve">
     <value>Left</value>
     <comment>Value shown in the agent pane position dropdown (selects which side of the terminal the agent pane opens on). Translation should match the existing FreOverlay_PanePositionLeft string used in the first-run experience.</comment>
-  </data><data name="Globals_ConfirmOnCloseNever.Content" xml:space="preserve"><value>Never</value><comment>Option associated with Globals_ConfirmOnClose. "Never" means that the system will never display a warning when closing.</comment></data><data name="AIAgents_PanePosition.Header" xml:space="preserve"><value>Pane position</value><comment>Header for the setting that controls where the agent pane appears relative to the active pane.</comment></data><data name="AIAgents_AutoFix.HelpText" xml:space="preserve"><value>Detect command errors and suggest fixes automatically.</value><comment>Supplementary description for the auto-error-detection setting.</comment></data><data name="AIAgents_HooksInstall.HelpText" xml:space="preserve"><value>Track sessions across agents. Required for agent session management.</value><comment>Help text shown under the expandable section header.</comment></data><data name="AIAgents_HooksInstallButton.Content" xml:space="preserve"><value>Install hooks</value><comment>Button label that triggers installation of the wt-agent-hooks plugin/extension into all detected agent CLIs (Copilot, Claude, Gemini).</comment></data>
+  </data><data name="Globals_ConfirmOnCloseNever.Content" xml:space="preserve"><value>Never</value><comment>Option associated with Globals_ConfirmOnClose. "Never" means that the system will never display a warning when closing.</comment></data><data name="AIAgents_PanePosition.Header" xml:space="preserve"><value>Pane position</value><comment>Header for the setting that controls where the agent pane appears relative to the active pane.</comment></data><data name="AIAgents_AutoFix.HelpText" xml:space="preserve"><value>Detect command errors and suggest fixes automatically.</value><comment>Supplementary description for the auto-error-detection setting.</comment></data><data name="AIAgents_HooksInstall.HelpText" xml:space="preserve"><value>Track sessions across agents. Required for agent session management.</value><comment>Help text shown under the expandable section header.</comment></data><data name="AIAgents_HooksInstallButton.Content" xml:space="preserve"><value>Install hooks</value><comment>Button label that triggers installation of the wt-agent-hooks plugin/extension into all detected agent CLIs (Copilot, Claude, Codex, Gemini).</comment></data>
   <data name="AIAgents_PolicyLocked.Text" xml:space="preserve">
     <value>This setting is managed by your organization.</value>
     <comment>Text shown when Group Policy controls this feature. Standard Windows policy notice wording. {Locked=qps-ploc,qps-ploca,qps-plocm}</comment>
@@ -2806,6 +2806,14 @@
   <data name="AIAgents_HooksRemovingGeminiSummary" xml:space="preserve">
     <value>Removing Gemini hooks...</value>
     <comment>Status summary shown while removing agent session tracking hooks for Gemini. {Locked="Gemini","hooks"}</comment>
+  </data>
+  <data name="AIAgents_HooksRemovingCodexSummary" xml:space="preserve">
+    <value>Removing Codex hooks...</value>
+    <comment>Status summary shown while removing agent session tracking hooks for Codex. {Locked="Codex","hooks"}</comment>
+  </data>
+  <data name="AIAgents_CodexTrustHint.Text" xml:space="preserve">
+    <value>After installing, run /hooks in Codex and approve to trust the new event handlers.</value>
+    <comment>One-line reminder shown under the Codex CLI row in the Agent Hooks section. Codex requires per-command trust before hook handlers run; users must execute /hooks inside Codex and approve. {Locked="/hooks","Codex"}</comment>
   </data>
   <data name="AIAgents_HooksLocateWtaFailedSummary" xml:space="preserve">
     <value>Failed: could not locate wta.exe</value>
