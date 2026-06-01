@@ -235,7 +235,7 @@ namespace Microsoft::Terminal::WtaProcess
     // Reads system + user PATH from the registry, then appends any
     // directories not already present. Preserves session-specific
     // entries inherited from the parent process.
-    // Pure Win32 + std::wstring only — no til/env, no STL containers.
+    // Pure Win32 + std::wstring — no til/env or WinRT dependency.
     inline void RefreshProcessPath()
     {
         auto readRegPath = [](HKEY root, const wchar_t* subkey) -> std::wstring {
@@ -274,10 +274,14 @@ namespace Microsoft::Terminal::WtaProcess
                 if (needed > 0)
                 {
                     std::wstring expanded(needed, L'\0');
-                    ExpandEnvironmentStringsW(buf.c_str(), expanded.data(), needed);
-                    while (!expanded.empty() && expanded.back() == L'\0')
-                        expanded.pop_back();
-                    return expanded;
+                    DWORD written = ExpandEnvironmentStringsW(buf.c_str(), expanded.data(), needed);
+                    if (written > 0 && written <= needed)
+                    {
+                        while (!expanded.empty() && expanded.back() == L'\0')
+                            expanded.pop_back();
+                        return expanded;
+                    }
+                    // Expansion failed — fall through to return unexpanded buf
                 }
             }
             return buf;
