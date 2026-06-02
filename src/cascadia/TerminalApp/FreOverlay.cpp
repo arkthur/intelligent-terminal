@@ -31,12 +31,19 @@ namespace winrt::TerminalApp::implementation
 
     bool FreOverlay::_IsAgentInstalled(const wchar_t* name)
     {
-        wchar_t buf[MAX_PATH];
+        wchar_t buf[MAX_PATH]{};
         if (SearchPathW(nullptr, name, L".exe", MAX_PATH, buf, nullptr) > 0)
+        {
+            _agentPaneLog("[FRE] _IsAgentInstalled: " + winrt::to_string(winrt::hstring{ name }) + " found at " + winrt::to_string(winrt::hstring{ buf }));
             return true;
+        }
         const auto cmdName = std::wstring(name) + L".cmd";
         if (SearchPathW(nullptr, cmdName.c_str(), nullptr, MAX_PATH, buf, nullptr) > 0)
+        {
+            _agentPaneLog("[FRE] _IsAgentInstalled: " + winrt::to_string(winrt::hstring{ name }) + " found at " + winrt::to_string(winrt::hstring{ buf }));
             return true;
+        }
+        _agentPaneLog("[FRE] _IsAgentInstalled: " + winrt::to_string(winrt::hstring{ name }) + " NOT found on PATH");
         return false;
     }
 
@@ -653,6 +660,19 @@ namespace winrt::TerminalApp::implementation
             try
             {
                 ::Microsoft::Terminal::WtaProcess::RefreshProcessPath();
+
+                // Verify WinGet\Links is now on PATH
+                wchar_t localAppData[MAX_PATH]{};
+                GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+                if (localAppData[0])
+                {
+                    auto wingetLinks = std::wstring(localAppData) + L"\\Microsoft\\WinGet\\Links";
+                    wchar_t pathBuf[32767]{};
+                    GetEnvironmentVariableW(L"PATH", pathBuf, 32767);
+                    std::wstring path{ pathBuf };
+                    bool hasLinks = (path.find(wingetLinks) != std::wstring::npos);
+                    _agentPaneLog("[FRE] PATH after refresh: WinGet\\Links " + std::string(hasLinks ? "present" : "MISSING"));
+                }
             }
             catch (...)
             {
