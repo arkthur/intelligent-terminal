@@ -60,8 +60,9 @@ namespace winrt::TerminalApp::implementation
             WingetMissing = 0, // hard prerequisite — winget itself unavailable
             CopilotInstall = 1, // hard prerequisite — winget GitHub.Copilot
             NodeInstall = 2, // hard prerequisite — winget OpenJS.NodeJS.LTS
-            ShellIntegration = 3, // optional feature — error detection
-            Hooks = 4, // optional feature — session management
+            ShellIntegrationExecutionPolicy = 3, // optional feature — error detection blocked by PowerShell execution policy
+            ShellIntegration = 4, // optional feature — error detection (generic install failure)
+            Hooks = 5, // optional feature — session management
         };
 
         // Show a single problem: set the error message + manual-fix link, then
