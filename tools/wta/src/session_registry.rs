@@ -765,6 +765,17 @@ pub trait SessionRegistry: Send + Sync {
     /// twice with the same `session_id` keeps only the latest copy.
     async fn upsert(&self, info: SessionInfo);
 
+    /// Insert `info` ONLY if no row exists for `info.session_id`. Returns
+    /// `true` if the insert happened. The check + insert run under a
+    /// single lock so a concurrent live `apply_event` for the same SID
+    /// cannot race in between (which would otherwise let an
+    /// `upsert`-after-`lookup` clobber freshly-set live state like
+    /// `status=Working` / `current_tool`). Used by the periodic
+    /// history rescan in master to surface newly-created on-disk
+    /// sessions without overwriting any live row a hook has already
+    /// installed in the same window.
+    async fn insert_if_absent(&self, info: SessionInfo) -> bool;
+
     /// Remove the row for `sid`. Returns the prior value if any (the master
     /// uses this both for routing teardown and to know what to broadcast
     /// in `session_removed` ext-notifications).
@@ -841,6 +852,15 @@ impl SessionRegistry for InMemoryRegistry {
     async fn upsert(&self, info: SessionInfo) {
         let mut guard = self.inner.lock().await;
         upsert_locked(&mut guard, info);
+    }
+
+    async fn insert_if_absent(&self, info: SessionInfo) -> bool {
+        let mut guard = self.inner.lock().await;
+        if guard.sessions.contains_key(&info.session_id) {
+            return false;
+        }
+        upsert_locked(&mut guard, info);
+        true
     }
 
     async fn remove(&self, sid: &acp::SessionId) -> Option<SessionInfo> {
