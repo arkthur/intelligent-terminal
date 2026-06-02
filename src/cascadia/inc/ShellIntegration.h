@@ -194,26 +194,21 @@ namespace Microsoft::Terminal::ShellIntegration
     // effective policy after considering every scope plus the built-in default,
     // exactly the value the shell will obey when trying to load $PROFILE.
     //
-    // Cached per-host for the lifetime of the Terminal process: changing
-    // execution policy requires the user to restart their shells anyway, so
-    // re-querying within a single Terminal lifetime would not catch the
-    // change in time to matter.
+    // Re-queried on every call so that after the user fixes the policy outside
+    // (e.g. `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`) and clicks
+    // Save again, the Terminal picks up the new policy instead of returning a
+    // stale cached "blocked" verdict. The cost is one extra PowerShell spawn
+    // per Save / Install attempt, which is negligible next to the profile file
+    // I/O that follows.
     inline bool ExecutionPolicyBlocksShellIntegration(Target target) noexcept
     {
-        if (target == Target::Pwsh)
-        {
-            // pwsh.exe is optional. If it isn't installed QueryExecutionPolicy
-            // returns "" which doesn't match any blocking policy → not blocked,
-            // and the install attempt for that profile dir will succeed
-            // (creating a $PROFILE for a host the user hasn't installed is
-            // harmless — it sits inert until they install PowerShell 7).
-            static const bool blocked = details::PolicyNameBlocksUnsignedScripts(
-                details::QueryExecutionPolicy(L"pwsh.exe"));
-            return blocked;
-        }
-        static const bool blocked = details::PolicyNameBlocksUnsignedScripts(
-            details::QueryExecutionPolicy(L"powershell.exe"));
-        return blocked;
+        // pwsh.exe is optional. If it isn't installed QueryExecutionPolicy
+        // returns "" which doesn't match any blocking policy → not blocked,
+        // and the install attempt for that profile dir will succeed
+        // (creating a $PROFILE for a host the user hasn't installed is
+        // harmless — it sits inert until they install PowerShell 7).
+        const auto exe = target == Target::Pwsh ? L"pwsh.exe" : L"powershell.exe";
+        return details::PolicyNameBlocksUnsignedScripts(details::QueryExecutionPolicy(exe));
     }
 
     namespace details
