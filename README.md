@@ -25,6 +25,7 @@
   - [Command Palette](#command-palette)
 - [Data & Privacy](#data--privacy)
 - [Building the Code](#building-the-code)
+- [Known Issues](./doc/known-issues.md)
 - [Feedback](#feedback)
 - [Contributing](#contributing)
 - [Code of Conduct](#code-of-conduct)
@@ -103,6 +104,7 @@ All shortcuts are customizable through Intelligent Terminal settings.
 | <kbd>Ctrl+Alt+.</kbd> | Open agent pane with error context |
 | <kbd>Ctrl+Shift+/</kbd> | Open agent management |
 | <kbd>Alt+Shift+/</kbd> | Open Command Palette in prompt mode |
+| <kbd>Alt+Shift+B</kbd> | Open the delegate agent in a new tab (background agent, no prompt) |
 
 ---
 
@@ -214,7 +216,7 @@ Building Intelligent Terminal is the same as building Windows Terminal. See the 
 
 ## Feedback
 
-Intelligent Terminal is in an experimental stage. If you have a feature request or find a bug, [submit an issue](https://github.com/microsoft/intelligent-terminal/issues) on the GitHub repository.
+Intelligent Terminal is in an experimental stage. Before filing a bug, please check [Known Issues](./doc/known-issues.md) — many first-run quirks (session management on the very first tab, FRE install timing on slow networks, Windows 11–only requirement, agents installed after the FRE) have known workarounds. If your issue isn't covered there, [submit an issue](https://github.com/microsoft/intelligent-terminal/issues) on the GitHub repository.
 
 Intelligent Terminal ships as a separate app and installs next to your existing Windows Terminal. If you don't want agents in your terminal, nothing changes for you. With this model, we can learn, experiment, and iterate with you, the community, on what this evolution might look like without breaking your existing Windows Terminal flows.
 
