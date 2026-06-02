@@ -25,7 +25,7 @@
   - [Command Palette](#command-palette)
 - [Data & Privacy](#data--privacy)
 - [Building the Code](#building-the-code)
-- [Known Issues](./doc/known-issues.md)
+- [FAQ](./doc/faq.md)
 - [Feedback](#feedback)
 - [Contributing](#contributing)
 - [Code of Conduct](#code-of-conduct)
