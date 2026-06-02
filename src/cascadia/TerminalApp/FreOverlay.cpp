@@ -57,6 +57,17 @@ namespace winrt::TerminalApp::implementation
         return false;
     }
 
+    // Detect whether winget itself is available on PATH. When winget is
+    // missing (e.g. App Installer not installed, or stripped on LTSC/Server
+    // SKUs) the Copilot/Node bootstrap calls would fail with a generic
+    // "install failed" error that wrongly points at the package; surface a
+    // dedicated message that links to the winget setup docs instead.
+    bool FreOverlay::_IsWingetInstalled()
+    {
+        wchar_t buf[MAX_PATH];
+        return SearchPathW(nullptr, L"winget", L".exe", MAX_PATH, buf, nullptr) > 0;
+    }
+
     // ── Agent ComboBox ──────────────────────────────────────────────────
 
     // (Re)build the agent dropdown from the GPO-filtered registry. Each entry's
@@ -531,6 +542,10 @@ namespace winrt::TerminalApp::implementation
         // variable key.
         switch (kind)
         {
+        case FreProblemKind::WingetMissing:
+            ErrorText().Text(RS_(L"FreOverlay_InstallErrorWingetMissing"));
+            url += L"#1-winget-windows-package-manager";
+            break;
         case FreProblemKind::CopilotInstall:
             ErrorText().Text(RS_(L"FreOverlay_InstallErrorCopilot"));
             url += L"#31-github-copilot-cli";
@@ -622,6 +637,20 @@ namespace winrt::TerminalApp::implementation
             + " detect=" + (AutoDetectToggle().IsOn() ? "on" : "off")
             + " suggest=" + (AutoErrorToggle().IsOn() ? "on" : "off")
             + " hooks=" + (SessionManagementToggle().IsOn() ? "on" : "off"));
+
+        // If any bootstrap step needs winget, make sure winget itself is
+        // available before kicking off the install — otherwise the user
+        // gets a generic "install failed" error that wrongly points at
+        // the package's docs instead of the winget setup docs.
+        if (needsCopilot || needsNode)
+        {
+            if (!_IsWingetInstalled())
+            {
+                _agentPaneLog("[FRE] winget not found on PATH");
+                _ShowProblem(FreProblemKind::WingetMissing);
+                co_return;
+            }
+        }
 
         if (needsCopilot)
         {

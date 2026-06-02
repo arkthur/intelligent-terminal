@@ -1116,6 +1116,10 @@
     <value>⚠ Falha ao instalar o GitHub Copilot. Verifique sua conexão de rede e tente novamente.</value>
     <comment>{Locked="GitHub Copilot"}</comment>
   </data>
+  <data name="FreOverlay_InstallErrorWingetMissing" xml:space="preserve">
+    <value>⚠ O Gerenciador de Pacotes do Windows (winget) não está instalado ou não está disponível. Instale-o primeiro e tente novamente.</value>
+    <comment>{Locked="winget","PATH"} Error shown in the FRE setup overlay when a prerequisite install was attempted but the winget command is not on PATH.</comment>
+  </data>
   <data name="FreOverlay_InstallErrorNode" xml:space="preserve">
     <value>⚠ Falha ao instalar o Node.js. Verifique sua conexão de rede e tente novamente.</value>
     <comment>{Locked="Node.js"}</comment>

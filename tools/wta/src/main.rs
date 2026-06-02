@@ -2379,26 +2379,35 @@ async fn run_acp_app(
                     "current_agent_id assigned",
                 );
                 let agent_id = canonical_id.as_str();
-                let status = agent_check::check_agent(agent_id);
-                let preflight_result = app::PreflightResult {
-                    agent_id: status.id.clone(),
-                    display_name: status.display_name.clone(),
-                    cli_status: if status.cli_found {
-                        app::CheckStatus::Passed
-                    } else {
-                        app::CheckStatus::Failed("Not found on PATH".to_string())
-                    },
-                    cli_path: status.cli_path.clone(),
-                    auth_status: if !status.cli_found {
-                        app::CheckStatus::Skipped
-                    } else if status.has_credential {
-                        app::CheckStatus::Passed
-                    } else {
-                        app::CheckStatus::Skipped
-                    },
-                    install_hint: status.install_hint.clone(),
-                    install_url: String::new(),
-                    auth_hint: status.auth_hint.clone(),
+                let preflight_result = if agent_id.starts_with("custom:")
+                    || agent_registry::lookup_profile_by_id(agent_id).id == "unknown"
+                {
+                    // Custom/unknown agents: command is opaque (`.cmd`, `node script.js`,
+                    // shell function, …); a PATH probe would lie. The real spawn produces
+                    // the authoritative error via `ConnectionFailed`, so skip preflight.
+                    app::PreflightResult::passed_for_custom_agent(&canonical_id)
+                } else {
+                    let status = agent_check::check_agent(agent_id);
+                    app::PreflightResult {
+                        agent_id: canonical_id.clone(),
+                        display_name: status.display_name.clone(),
+                        cli_status: if status.cli_found {
+                            app::CheckStatus::Passed
+                        } else {
+                            app::CheckStatus::Failed("Not found on PATH".to_string())
+                        },
+                        cli_path: status.cli_path.clone(),
+                        auth_status: if !status.cli_found {
+                            app::CheckStatus::Skipped
+                        } else if status.has_credential {
+                            app::CheckStatus::Passed
+                        } else {
+                            app::CheckStatus::Skipped
+                        },
+                        install_hint: status.install_hint.clone(),
+                        install_url: String::new(),
+                        auth_hint: status.auth_hint.clone(),
+                    }
                 };
                 tracing::info!(
                     target: "preflight",
