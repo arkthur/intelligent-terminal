@@ -440,7 +440,16 @@ namespace winrt::TerminalApp::implementation
             co_return false;
         }
 
-        // Read child output while waiting for it to finish.
+        // Wait for the child process first, then drain any remaining
+        // pipe output. This avoids the synchronous ReadFile blocking
+        // indefinitely if winget spawns child processes that inherit
+        // the pipe handle and outlive winget itself.
+        WaitForSingleObject(pi.hProcess, 300000); // 5 min timeout
+
+        // Drain pipe output (non-blocking — child has exited, so the
+        // write end is closed and ReadFile will see EOF promptly).
+        // Keep only the last ~500 bytes to cap memory usage.
+        static constexpr size_t kMaxOutput = 500;
         std::string output;
         if (hasPipe && hReadPipe)
         {
@@ -450,12 +459,14 @@ namespace winrt::TerminalApp::implementation
             {
                 buf[bytesRead] = '\0';
                 output += buf;
+                // Keep only the tail
+                if (output.size() > kMaxOutput * 2)
+                    output = output.substr(output.size() - kMaxOutput);
             }
             CloseHandle(hReadPipe);
             hReadPipe = nullptr;
         }
 
-        WaitForSingleObject(pi.hProcess, 300000); // 5 min timeout
         DWORD exitCode = 1;
         GetExitCodeProcess(pi.hProcess, &exitCode);
         CloseHandle(pi.hProcess);
