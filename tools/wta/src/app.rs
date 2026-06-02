@@ -226,6 +226,36 @@ impl PreflightResult {
         self.cli_status == CheckStatus::Passed
             && matches!(self.auth_status, CheckStatus::Passed | CheckStatus::Skipped)
     }
+
+    /// Synthesize a `Passed` preflight result for a custom or unknown agent
+    /// id. We deliberately do **not** run an out-of-band PATH check for these
+    /// — the user-supplied command can be anything (`.cmd`, `.ps1`,
+    /// `node script.js`, an alias) and any guess we make disagrees with what
+    /// the spawner actually does. Real spawn failures surface via the
+    /// `ConnectionFailed` → `ConnectionState::Failed` lifecycle, which is the
+    /// authoritative error path.
+    ///
+    /// Returning `cli_status=Passed` keeps the TUI out of Setup mode so the
+    /// chat input stays responsive. The display name is derived from the
+    /// canonical id (`custom:<name>` → `<name>`) so the UI never collapses
+    /// to the generic `DEFAULT_PROFILE` "Agent" label.
+    pub fn passed_for_custom_agent(canonical_id: &str) -> Self {
+        let display_name = canonical_id
+            .strip_prefix("custom:")
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| canonical_id.to_string());
+        Self {
+            agent_id: canonical_id.to_string(),
+            display_name,
+            cli_status: CheckStatus::Passed,
+            cli_path: None,
+            auth_status: CheckStatus::Skipped,
+            install_hint: String::new(),
+            install_url: String::new(),
+            auth_hint: String::new(),
+        }
+    }
 }
 
 /// Build the unified setup options list based on the setup reason.
@@ -8559,6 +8589,42 @@ fn prev_word_boundary(input: &str, cursor_pos: usize) -> usize {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    /// Custom-agent preflight regression: when the user's `acpAgent` is a
+    /// `custom:*` id, the preflight must NOT gate the TUI into Setup mode.
+    /// Previously `check_agent("custom:foo")` walked PATH for a literal
+    /// `custom:foo.exe`, always failed, and dropped the TUI into Setup with
+    /// the misleading `DEFAULT_PROFILE` "Agent" display name — blocking
+    /// `/restart` and other chat input until a re-save lifecycle-raced the
+    /// preflight failure.
+    #[test]
+    fn passed_for_custom_agent_never_triggers_setup_mode() {
+        let r = PreflightResult::passed_for_custom_agent("custom:foo");
+        // Identity preserved on the canonical id (downstream retry/auth
+        // paths still see `custom:foo`, not the bare exe name).
+        assert_eq!(r.agent_id, "custom:foo");
+        // Display name comes from the canonical id stripped of the
+        // `custom:` prefix — never the generic `DEFAULT_PROFILE` "Agent".
+        assert_eq!(r.display_name, "foo");
+        // `all_passed()` must return true so the PreflightComplete handler
+        // does NOT enter `AppMode::Setup` ("Agent not installed" banner).
+        assert!(r.all_passed());
+        assert_eq!(r.cli_status, CheckStatus::Passed);
+        assert!(matches!(r.auth_status, CheckStatus::Skipped));
+    }
+
+    /// Defensive: a bare `custom:` (empty name) or a non-`custom:` unknown id
+    /// must not produce an empty display name. Falls back to the canonical id.
+    #[test]
+    fn passed_for_custom_agent_falls_back_when_no_custom_suffix() {
+        let r = PreflightResult::passed_for_custom_agent("custom:");
+        assert_eq!(r.display_name, "custom:");
+        assert!(r.all_passed());
+
+        let r2 = PreflightResult::passed_for_custom_agent("some-unknown-id");
+        assert_eq!(r2.display_name, "some-unknown-id");
+        assert!(r2.all_passed());
+    }
 
     // Helper to create an App for testing (avoids needing real channels for simple state tests).
     fn test_app() -> App {

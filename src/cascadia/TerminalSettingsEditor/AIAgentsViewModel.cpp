@@ -402,15 +402,24 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     bool AIAgentsViewModel::ShowAcpModel()
     {
+        // Show for every built-in agent AND for custom agents. The original
+        // code hid the row for custom:* which then trapped users when a
+        // previously-selected acpModel turned invalid (e.g. credentials
+        // expired) — the stale value was invisible and unclearable.
+        // HasAcpModelList / ShowAcpModelTextBox pick between the dropdown
+        // (when the helper has published available_models via agent_status)
+        // and the free-form textbox fallback.
         if (_isAddingCustomAcpAgent) return false;
-        if (_StartsWithCustom(_GlobalSettings.AcpAgent())) return false;
+        if (_StartsWithCustom(_GlobalSettings.AcpAgent())) return true;
         return _IsKnownAgent(_GlobalSettings.AcpAgent());
     }
 
     bool AIAgentsViewModel::ShowDelegateModel()
     {
+        // Same rationale as ShowAcpModel: show the row for custom delegate
+        // agents so a stale delegateModel value remains visible / clearable.
         if (_isAddingCustomDelegateAgent) return false;
-        if (_StartsWithCustom(_GlobalSettings.DelegateAgent())) return false;
+        if (_StartsWithCustom(_GlobalSettings.DelegateAgent())) return true;
         return _IsKnownAgent(_GlobalSettings.DelegateAgent());
     }
 
