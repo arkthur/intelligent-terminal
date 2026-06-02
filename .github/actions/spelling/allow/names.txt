@@ -50,6 +50,7 @@ paulcam
 PGP
 Pham
 Qwen
+qwen
 Rincewind
 Schoonover
 shadertoy
