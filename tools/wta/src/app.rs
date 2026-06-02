@@ -1,7 +1,5 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use crossterm::queue;
-use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate};
 use ratatui::backend::CrosstermBackend;
 use ratatui::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -1434,13 +1432,18 @@ impl TabSession {
         self.chat_scroll.offset = 0;
     }
 
-    /// Whether the input box is the arrow-key navigational focus target.
-    /// False when the user is browsing a completed turn or a recommendation
-    /// card is showing — in both cases ↑↓ navigate elsewhere. UI indicators
-    /// that should track "is the input cell live" (e.g. the placeholder
-    /// caret cell) gate on this together with the pane's XAML focus.
+    /// Whether the input box is the live, enterable caret target. False when
+    /// the user is browsing a completed turn, a recommendation card is
+    /// showing, or a permission card is up — in all three the input is not
+    /// enterable (`handle_key` routes keys to that surface and returns early),
+    /// so ↑↓ navigate it instead. UI indicators that track "is the input cell
+    /// live" (e.g. the painted caret cell) gate on this together with the
+    /// pane's XAML focus, so a non-enterable state reads the same as lost
+    /// focus.
     pub fn input_has_nav_focus(&self) -> bool {
-        self.selected_completed_turn_idx.is_none() && self.turn.recommendations().is_none()
+        self.selected_completed_turn_idx.is_none()
+            && self.turn.recommendations().is_none()
+            && self.permission.is_empty()
     }
 
     pub fn clear_recommendations(&mut self) {
@@ -3835,47 +3838,24 @@ impl App {
         let total_started = std::time::Instant::now();
 
         let mut frame = terminal.get_frame();
-        let area = frame.area();
 
         let render_started = std::time::Instant::now();
         ui::render(&mut frame, self);
         ui_trace::log_slow("ui_render", render_started.elapsed(), || self.trace_state());
 
-        // Wrap the whole frame in a synchronized-update boundary (CSI ? 2026
-        // h/l, supported by Windows Terminal). Without it, every cursor
-        // call in the ratatui-crossterm backend (`hide_cursor`,
-        // `show_cursor`, `set_cursor_position` — all `execute!`-based, see
-        // ratatui-crossterm lib.rs:288/292/303) flushes stdout on its own,
-        // so WT can render partial states between them — most visibly the
-        // brief cursor-hidden window during the shimmer redraw, which the
-        // eye reads as the inputbox cursor blinking at ~8Hz. Inside a sync
-        // block WT freezes rendering until End and paints the final state
-        // in a single frame.
-        queue!(terminal.backend_mut(), BeginSynchronizedUpdate)?;
-
+        // The text caret is painted as an inverse buffer cell by `ui::input`
+        // in every state, so the OS cursor is always hidden. With no
+        // `show_cursor`/`set_cursor_position` interleaved after the content
+        // flush, there's no partial-frame tearing to hide — hence no need for
+        // a synchronized-update (CSI ? 2026) wrapper around the frame (which
+        // was also the prime suspect for frames being held until the next
+        // redraw on an unfocused pane).
         let flush_started = std::time::Instant::now();
+        terminal.hide_cursor()?;
         terminal.flush()?;
         ui_trace::log_slow("terminal_flush", flush_started.elapsed(), || {
             self.trace_state()
         });
-
-        let cursor_started = std::time::Instant::now();
-        if let Some(position) = ui::input_cursor_position(self, area) {
-            // Order matters: position first, then show. Showing first would
-            // briefly reveal the cursor wherever the flush left it (typically
-            // the last redrawn cell on the chat side) before the move lands.
-            // (Inside the sync block this is academic — WT won't render
-            // either intermediate — but the ordering also documents intent.)
-            terminal.set_cursor_position(position)?;
-            terminal.show_cursor()?;
-        } else {
-            terminal.hide_cursor()?;
-        }
-        ui_trace::log_slow("terminal_cursor", cursor_started.elapsed(), || {
-            self.trace_state()
-        });
-
-        queue!(terminal.backend_mut(), EndSynchronizedUpdate)?;
 
         terminal.swap_buffers();
 
@@ -6238,7 +6218,12 @@ impl App {
                 self.current_tab_mut().accept_command_popup_completion();
             }
             KeyCode::Enter if key.modifiers.contains(KeyModifiers::SHIFT) => {
-                self.current_tab_mut().insert_input_char('\n');
+                // Input editing only acts when the input is the live caret
+                // target. While a recommendation/permission card or a past
+                // turn is highlighted the input is locked (see Char below).
+                if self.current_tab().input_has_nav_focus() {
+                    self.current_tab_mut().insert_input_char('\n');
+                }
             }
             KeyCode::Enter if self.command_popup_visible() => {
                 // Popup is showing — Enter runs the highlighted command
@@ -6396,13 +6381,19 @@ impl App {
                 }
             }
             KeyCode::Backspace if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.current_tab_mut().delete_word_before_cursor();
+                if self.current_tab().input_has_nav_focus() {
+                    self.current_tab_mut().delete_word_before_cursor();
+                }
             }
             KeyCode::Backspace => {
-                self.current_tab_mut().delete_before_cursor();
+                if self.current_tab().input_has_nav_focus() {
+                    self.current_tab_mut().delete_before_cursor();
+                }
             }
             KeyCode::Delete => {
-                self.current_tab_mut().delete_at_cursor();
+                if self.current_tab().input_has_nav_focus() {
+                    self.current_tab_mut().delete_at_cursor();
+                }
             }
             KeyCode::Left if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.current_tab_mut().move_cursor_word_left();
@@ -6429,7 +6420,15 @@ impl App {
                 self.current_tab_mut().chat_scroll.by(-10);
             }
             KeyCode::Char(c) => {
-                self.current_tab_mut().insert_input_char(c);
+                // Only type into the input when it is the live caret target.
+                // When a recommendation/permission card or a past turn is
+                // highlighted the input is locked: keystrokes are ignored so
+                // the buffer can't fill invisibly (no caret) and strand the
+                // user (a non-empty buffer disables Tab/↑ history nav). Press
+                // Esc, or Tab/Shift+Tab back past the ends, to return focus.
+                if self.current_tab().input_has_nav_focus() {
+                    self.current_tab_mut().insert_input_char(c);
+                }
             }
             _ => {}
         }
@@ -12762,6 +12761,52 @@ mod tests {
             3,
             "non-empty input must NOT trigger the chat-scroll fallback",
         );
+    }
+
+    #[test]
+    fn typing_is_ignored_while_a_past_turn_is_selected() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let mut app = test_app();
+        app.current_tab_mut().completed_turns.push(CompletedTurn {
+            prompt: "old prompt".into(),
+            details: Vec::new(),
+            expanded: false,
+            trailing_marker: None,
+        });
+        // Highlight the past turn, as Tab would.
+        app.current_tab_mut().selected_completed_turn_idx = Some(0);
+        assert!(!app.current_tab().input_has_nav_focus());
+
+        app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+
+        assert!(
+            app.current_tab().input.is_empty(),
+            "typing must be ignored while a past turn is highlighted (input locked)",
+        );
+        assert_eq!(
+            app.current_tab().selected_completed_turn_idx,
+            Some(0),
+            "selection must survive the keystroke so Tab/↑ history nav keeps working",
+        );
+    }
+
+    #[test]
+    fn typing_returns_to_input_after_clearing_selection() {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+        let mut app = test_app();
+        app.current_tab_mut().completed_turns.push(CompletedTurn {
+            prompt: "old prompt".into(),
+            details: Vec::new(),
+            expanded: false,
+            trailing_marker: None,
+        });
+        app.current_tab_mut().selected_completed_turn_idx = Some(0);
+
+        // Esc backs out of history nav, then typing lands in the input again.
+        app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert_eq!(app.current_tab().selected_completed_turn_idx, None);
+        app.handle_key(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE));
+        assert_eq!(app.current_tab().input, "x");
     }
 
     #[test]
