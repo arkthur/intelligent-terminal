@@ -523,16 +523,30 @@ fn ensure_installed_in(home: &Path) {
 
 /// Whether the CLI's binary is currently resolvable on `PATH`.
 ///
-/// This is the **authoritative "is the CLI installed" signal** for the
-/// per-CLI install gates below. Earlier wta builds gated install solely on
-/// the presence of `~/.<cli>` (Claude's `~/.claude`, Copilot's
-/// `~/.copilot`, etc.), but every supported CLI leaves that directory
-/// behind on uninstall (containing logs, auth tokens, plugin state, ...),
-/// so the dir-only check fires "install hooks for X" even on machines
-/// where X has been uninstalled. Probing `PATH` via `which::which` matches
-/// what [`status_for`] already does (`locate_binary` at line ~915) and
-/// what the dev probes in [`upgrade_installed_hooks`] use, so we stay
-/// consistent with the rest of the module.
+/// This is the **sole "is the CLI installed" signal** for the per-CLI
+/// install gates below. We deliberately do *not* additionally require
+/// `~/.<cli>` to exist:
+///
+///   * **False negatives on fresh installs.** A user who just installed a
+///     CLI but hasn't launched it yet won't have `~/.<cli>` populated
+///     (Claude, Copilot, Codex, and Gemini all create their state dir
+///     lazily on first run / first auth). Gating on the dir caused the
+///     Settings UI's "Install hooks" button to silently no-op in that
+///     window, with only a debug-level log explaining why.
+///   * **False positives after uninstall.** Every supported CLI leaves
+///     `~/.<cli>` behind on uninstall (logs, auth tokens, plugin state,
+///     ...), so a dir-only check would fire "install hooks for X" even
+///     on machines where X has been uninstalled.
+///
+/// `PATH` is the only signal that correctly answers both cases. The
+/// downstream `<cli> plugin install` / `<cli> extensions install`
+/// commands create whatever state dirs they need themselves, so we
+/// don't need to pre-check for them.
+///
+/// Probing via `which::which` matches what [`status_for`] does
+/// (`locate_binary` below) and what the dev probes in
+/// [`upgrade_installed_hooks`] use, so we stay consistent with the rest
+/// of the module.
 fn cli_binary_on_path(cli: CliKind) -> bool {
     which::which(cli.name()).is_ok()
 }
@@ -558,11 +572,13 @@ fn install_for_claude(home: &Path) {
         );
         return;
     }
+    // `~/.claude` may not exist yet on a freshly installed Claude Code
+    // that the user hasn't launched. The downstream `claude plugin
+    // install` will create it as needed; we only build the path here
+    // for the legacy-settings cleanup pass below (which itself no-ops
+    // when the file is missing — see
+    // `cleanup_legacy_claude_hooks_noop_when_file_missing`).
     let claude_dir = home.join(".claude");
-    if !claude_dir.is_dir() {
-        tracing::debug!(target: "agent_hooks", "no ~/.claude dir; Claude not present");
-        return;
-    }
 
     // Cleanup: prior wta builds merged a tagged `hooks` block directly
     // into ~/.claude/settings.json. Now that we register the plugin via
@@ -665,11 +681,9 @@ fn install_for_codex(home: &Path) {
         );
         return;
     }
-    let codex_dir = home.join(".codex");
-    if !codex_dir.is_dir() {
-        tracing::debug!(target: "agent_hooks", "no ~/.codex dir; Codex not present");
-        return;
-    }
+    // Intentionally no `~/.codex` existence check: a freshly installed
+    // Codex CLI may not have populated that dir yet, and `codex plugin
+    // marketplace add` / `codex plugin add` create it as needed.
 
     let bundle_dir = match bundle::resolve_cli_dir(CliKind::Codex) {
         Some(p) => p,
@@ -756,11 +770,13 @@ fn install_for_copilot(home: &Path) {
         );
         return;
     }
+    // `~/.copilot` may not exist yet on a freshly installed Copilot CLI
+    // that the user hasn't launched. `copilot plugin install` creates
+    // it as needed; we only build the path here for the stale-marketplace
+    // cleanup and `_direct` sweep below (both of which no-op when their
+    // targets are missing — see
+    // `cleanup_stale_copilot_marketplace_noop_when_file_missing`).
     let copilot_dir = home.join(".copilot");
-    if !copilot_dir.is_dir() {
-        tracing::debug!(target: "copilot_hooks", "no ~/.copilot dir; Copilot CLI not present");
-        return;
-    }
 
     let bundle_dir = match bundle::resolve_cli_dir(CliKind::Copilot) {
         Some(p) => p,
@@ -858,11 +874,9 @@ fn install_for_gemini(home: &Path) {
         );
         return;
     }
-    let gemini_dir = home.join(".gemini");
-    if !gemini_dir.is_dir() {
-        tracing::debug!(target: "gemini_hooks", "no ~/.gemini dir; Gemini CLI not present");
-        return;
-    }
+    // Intentionally no `~/.gemini` existence check: a freshly installed
+    // Gemini CLI may not have populated that dir yet, and `gemini
+    // extensions install` creates it as needed.
 
     let bundle_dir = match bundle::resolve_cli_dir(CliKind::Gemini) {
         Some(p) => p,
@@ -5079,16 +5093,22 @@ Registered marketplaces:
     #[test]
     fn install_for_codex_skips_when_home_absent() {
         let tmp = unique_dir("codex-home-absent");
-        // No ~/.codex created. Function should return cleanly without panic
-        // and without spawning `codex` (which may or may not be on PATH on CI).
+        // Smoke test: passing a nonexistent HOME-like dir shouldn't panic.
+        // After the binary-only detection change, the function skips when
+        // `codex` is not on PATH (the common case on CI). On a dev machine
+        // with `codex` installed and a bundle resolvable next to `wta.exe`
+        // the call may proceed further; the contract this test enforces is
+        // "no panic regardless".
         install_for_codex(&tmp);
         let _ = fs::remove_dir_all(tmp);
     }
 
     #[test]
     fn install_dispatches_codex() {
-        // Smoke: dispatch on an empty HOME shouldn't panic when CliKind::Codex
-        // is in CliKind::ALL but ~/.codex doesn't exist.
+        // Smoke: dispatching to all per-CLI installers against an empty
+        // HOME shouldn't panic. Each installer gates on its CLI being on
+        // PATH, so on CI (where none of these CLIs are installed) every
+        // one short-circuits cleanly.
         let tmp = unique_dir("codex-dispatch");
         ensure_installed_in(&tmp);
         let _ = fs::remove_dir_all(tmp);

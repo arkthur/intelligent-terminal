@@ -1071,6 +1071,10 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
     <value>⚠ GitHub Copilot のインストールに失敗しました。ネットワークを確認して再試行してください。</value>
     <comment>{Locked="GitHub Copilot"}</comment>
   </data>
+  <data name="FreOverlay_InstallErrorWingetMissing" xml:space="preserve">
+    <value>⚠ Windows パッケージ マネージャー (winget) がインストールされていないか、利用できません。先にインストールしてから、もう一度お試しください。</value>
+    <comment>{Locked="winget","PATH"} Error shown in the FRE setup overlay when a prerequisite install was attempted but the winget command is not on PATH.</comment>
+  </data>
   <data name="FreOverlay_InstallErrorNode" xml:space="preserve">
     <value>⚠ Node.js のインストールに失敗しました。ネットワークを確認して再試行してください。</value>
     <comment>{Locked="Node.js"}</comment>
@@ -1175,5 +1179,13 @@ In this context, "agent" refers to an AI agent (e.g. Copilot, Claude, Gemini), n
   </data>
   <data name="FreOverlay_AutoDetectShellIntegrationHintLink" xml:space="preserve">
     <value>詳細情報</value>
+  </data>
+  <data name="InitShellIntegrationExecutionPolicyErrorMessage" xml:space="preserve">
+    <value>PowerShell の実行ポリシーがスクリプトをブロックしています。</value>
+    <comment>Body of an error dialog shown after the user tries to install PowerShell shell integration but their PowerShell execution policy (Restricted or AllSigned) is blocking scripts. A separate "Learn how to fix this manually" hyperlink (FreOverlay_ErrorHelpLink) is rendered on its own line below this sentence. {Locked="PowerShell"}</comment>
+  </data>
+  <data name="FreOverlay_InstallErrorShellIntegrationExecutionPolicy" xml:space="preserve">
+    <value>⚠ PowerShell の実行ポリシーがスクリプトをブロックしています。エラー検出はオフになりました。</value>
+    <comment>{Locked="PowerShell"}</comment>
   </data>
 </root>

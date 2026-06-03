@@ -57,10 +57,12 @@ namespace winrt::TerminalApp::implementation
         // the bottom-left error area at a time (see _ShowProblem).
         enum class FreProblemKind
         {
-            CopilotInstall = 0, // hard prerequisite — winget GitHub.Copilot
-            NodeInstall = 1, // hard prerequisite — winget OpenJS.NodeJS.LTS
-            ShellIntegration = 2, // optional feature — error detection
-            Hooks = 3, // optional feature — session management
+            WingetMissing = 0, // hard prerequisite — winget itself unavailable
+            CopilotInstall = 1, // hard prerequisite — winget GitHub.Copilot
+            NodeInstall = 2, // hard prerequisite — winget OpenJS.NodeJS.LTS
+            ShellIntegrationExecutionPolicy = 3, // optional feature — error detection blocked by PowerShell execution policy
+            ShellIntegration = 4, // optional feature — error detection (generic install failure)
+            Hooks = 5, // optional feature — session management
         };
 
         // Show a single problem: set the error message + manual-fix link, then
@@ -81,6 +83,7 @@ namespace winrt::TerminalApp::implementation
         // Detect whether an executable is on PATH.
         static bool _IsAgentInstalled(const wchar_t* name);
         static bool _IsNodeInstalled();
+        static bool _IsWingetInstalled();
 
         // Run a winget install synchronously on a background thread.
         // Returns true on success.

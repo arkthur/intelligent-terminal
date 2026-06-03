@@ -1063,6 +1063,10 @@
     <value>⚠ Échec de l'installation de GitHub Copilot. Vérifiez votre connexion réseau et réessayez.</value>
     <comment>{Locked="GitHub Copilot"}</comment>
   </data>
+  <data name="FreOverlay_InstallErrorWingetMissing" xml:space="preserve">
+    <value>⚠ Le Gestionnaire de package Windows (winget) n'est pas installé ou n'est pas disponible. Installez-le d'abord, puis réessayez.</value>
+    <comment>{Locked="winget","PATH"} Error shown in the FRE setup overlay when a prerequisite install was attempted but the winget command is not on PATH.</comment>
+  </data>
   <data name="FreOverlay_InstallErrorNode" xml:space="preserve">
     <value>⚠ Échec de l'installation de Node.js. Vérifiez votre connexion réseau et réessayez.</value>
     <comment>{Locked="Node.js"}</comment>
@@ -1167,5 +1171,13 @@
   </data>
   <data name="FreOverlay_AutoDetectShellIntegrationHintLink" xml:space="preserve">
     <value>En savoir plus</value>
+  </data>
+  <data name="InitShellIntegrationExecutionPolicyErrorMessage" xml:space="preserve">
+    <value>La stratégie d'exécution de PowerShell bloque les scripts.</value>
+    <comment>Body of an error dialog shown after the user tries to install PowerShell shell integration but their PowerShell execution policy (Restricted or AllSigned) is blocking scripts. A separate "Learn how to fix this manually" hyperlink (FreOverlay_ErrorHelpLink) is rendered on its own line below this sentence. {Locked="PowerShell"}</comment>
+  </data>
+  <data name="FreOverlay_InstallErrorShellIntegrationExecutionPolicy" xml:space="preserve">
+    <value>⚠ La stratégie d'exécution de PowerShell bloque les scripts. Détection des erreurs désactivée.</value>
+    <comment>{Locked="PowerShell"}</comment>
   </data>
 </root>

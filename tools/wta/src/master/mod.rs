@@ -849,6 +849,22 @@ impl acp::Agent for HelperHandler {
             crate::session_registry::build_sessions_changed_notification(),
         )
         .await;
+        // Trace the model the agent actually selected for this session at
+        // INFO. When the WT `acpModel` setting is empty (the "agent default"
+        // case) we forward no setSessionModel, so this current_model_id from
+        // the agent's NewSessionResponse is the only INFO-level record of
+        // which model is really in effect — the acp-client current_model_id
+        // line is debug-only. The explicit case is already covered by the
+        // "forwarding set_session_model" log.
+        let agent_current_model = resp
+            .models
+            .as_ref()
+            .map(|state| state.current_model_id.0.to_string());
+        let agent_model_count = resp
+            .models
+            .as_ref()
+            .map(|state| state.available_models.len())
+            .unwrap_or(0);
         tracing::info!(
             target: "master",
             step = "helper→agent",
@@ -856,6 +872,8 @@ impl acp::Agent for HelperHandler {
             helper_id = ?self.helper_id,
             session_id = ?resp.session_id,
             registry_size = registry_size,
+            current_model_id = ?agent_current_model,
+            available_models = agent_model_count,
             "session bound to helper"
         );
         Ok(resp)

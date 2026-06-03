@@ -112,7 +112,14 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
         // Refresh PATH from the Windows registry so SearchPathW can find
         // CLIs installed after Terminal launched (e.g. WinGet\Links).
-        ::Microsoft::Terminal::WtaProcess::RefreshProcessPath();
+        try
+        {
+            ::Microsoft::Terminal::WtaProcess::RefreshProcessPath();
+        }
+        catch (...)
+        {
+            LOG_CAUGHT_EXCEPTION();
+        }
 
         // ACP-capable agents — use GPO-filtered list so only policy-allowed
         // agents appear in the dropdown. Also skip agents whose CLI isn't
@@ -238,15 +245,15 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
         // Reconcile a *stale* persisted id with the authoritative list.
         // Only fires when the user has actively configured a specific model
         // (non-empty) that this agent doesn't advertise — e.g. switching
-        // agents leaves a leftover id. In that case rewrite to the agent's
-        // advertised default ("default" / "auto") so the dropdown and the
-        // runtime --acp-model value stay in sync.
+        // agents leaves a leftover id. In that case reset to the empty
+        // "agent default" sentinel rather than picking the agent's
+        // "auto"/"default" entry: empty is the unambiguous "send no model
+        // override" state and renders as the ComboBox's "Default"
+        // placeholder, so we never silently mislabel a stale id as a real
+        // model the user didn't choose.
         //
-        // We *don't* reconcile when the persisted id is empty: empty is a
-        // legitimate "use whatever default the agent picks" sentinel that
-        // the user never typed in, and silently writing "default" into
-        // settings.json would be surprising. The visual fallback for that
-        // case lives in CurrentAcpModelEntry().
+        // Empty is already the legitimate "use whatever default the agent
+        // picks" sentinel, so the empty case needs no reconciliation.
         if (newSize > 0)
         {
             const auto current = _GlobalSettings.AcpModel();
@@ -263,24 +270,10 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
                 }
                 if (!matched)
                 {
-                    winrt::hstring fallbackId{};
-                    for (uint32_t i = 0; i < newSize; ++i)
-                    {
-                        const auto id = _acpModelList.GetAt(i).Id();
-                        if (id == L"default" || id == L"auto")
-                        {
-                            fallbackId = id;
-                            break;
-                        }
-                    }
-                    if (fallbackId.empty())
-                    {
-                        fallbackId = _acpModelList.GetAt(0).Id();
-                    }
-                    if (_GlobalSettings.AcpModel() != fallbackId)
-                    {
-                        _GlobalSettings.AcpModel(fallbackId);
-                    }
+                    // Stale leftover id this agent doesn't advertise → reset
+                    // to the empty "agent default" sentinel (send no model
+                    // override), which renders as the "Default" placeholder.
+                    _GlobalSettings.AcpModel(L"");
                 }
             }
         }
@@ -364,26 +357,19 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
             const auto entry = _acpModelList.GetAt(i);
             if (entry.Id() == current) return entry;
         }
-        // Visual-only fallback for the unconfigured case: the user has
-        // never picked a model (empty persisted id), so we surface the
-        // agent's advertised default entry as the selected item instead
-        // of letting the ComboBox render dim PlaceholderText. We *don't*
-        // write to settings here — leaving the empty id in place keeps
-        // wta's "use the agent's own default" semantics intact.
-        // The stale-id case (non-empty + no match) is handled at the
-        // data layer by _RebuildAcpModelListFromCache.
-        if (current.empty() && _acpModelList.Size() > 0)
-        {
-            for (uint32_t i = 0; i < _acpModelList.Size(); ++i)
-            {
-                const auto entry = _acpModelList.GetAt(i);
-                const auto id = entry.Id();
-                if (id == L"default" || id == L"auto") return entry;
-            }
-            return _acpModelList.GetAt(0);
-        }
-        // Empty list (probe hasn't run yet) → ComboBox shows PlaceholderText
-        // briefly until the agent's model list arrives.
+        // Unconfigured case (empty persisted id): return null so the
+        // ComboBox renders its "Default" PlaceholderText. This is the
+        // distinct "agent default — send no model override" state and is
+        // intentionally NOT mapped onto the agent's advertised
+        // "auto"/"default" entry. That advertised entry is a real model in
+        // the agent's support list (e.g. copilot's "auto" router) which,
+        // when explicitly selected, gets forwarded via setSessionModel;
+        // conflating the two would mislabel "no override" (which resolves
+        // to the agent's own server-side default, e.g. claude-sonnet-4.6)
+        // as the "auto" model. The stale-id case (non-empty + no match) is
+        // reset to empty at the data layer by _RebuildAcpModelListFromCache,
+        // so it also lands here and shows the placeholder.
+        // Empty list (probe hasn't run yet) likewise → PlaceholderText.
         return nullptr;
     }
 
@@ -402,15 +388,24 @@ namespace winrt::Microsoft::Terminal::Settings::Editor::implementation
 
     bool AIAgentsViewModel::ShowAcpModel()
     {
+        // Show for every built-in agent AND for custom agents. The original
+        // code hid the row for custom:* which then trapped users when a
+        // previously-selected acpModel turned invalid (e.g. credentials
+        // expired) — the stale value was invisible and unclearable.
+        // HasAcpModelList / ShowAcpModelTextBox pick between the dropdown
+        // (when the helper has published available_models via agent_status)
+        // and the free-form textbox fallback.
         if (_isAddingCustomAcpAgent) return false;
-        if (_StartsWithCustom(_GlobalSettings.AcpAgent())) return false;
+        if (_StartsWithCustom(_GlobalSettings.AcpAgent())) return true;
         return _IsKnownAgent(_GlobalSettings.AcpAgent());
     }
 
     bool AIAgentsViewModel::ShowDelegateModel()
     {
+        // Same rationale as ShowAcpModel: show the row for custom delegate
+        // agents so a stale delegateModel value remains visible / clearable.
         if (_isAddingCustomDelegateAgent) return false;
-        if (_StartsWithCustom(_GlobalSettings.DelegateAgent())) return false;
+        if (_StartsWithCustom(_GlobalSettings.DelegateAgent())) return true;
         return _IsKnownAgent(_GlobalSettings.DelegateAgent());
     }
 

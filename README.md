@@ -25,6 +25,7 @@
   - [Command Palette](#command-palette)
 - [Data & Privacy](#data--privacy)
 - [Building the Code](#building-the-code)
+- [FAQ](./doc/faq.md)
 - [Feedback](#feedback)
 - [Contributing](#contributing)
 - [Code of Conduct](#code-of-conduct)
@@ -50,7 +51,7 @@ Read the [announcement blog post](https://devblogs.microsoft.com/commandline/ann
 ## Installing and running Intelligent Terminal
 
 > [!NOTE]
-> Intelligent Terminal requires Windows 10 version 22H2 or later, or Windows 11. You also need a supported agent CLI and subscription. [GitHub Copilot](https://github.com/features/copilot/cli/) is the default.
+> Intelligent Terminal requires Windows 11 22H2 or later (22621.6060+). You also need a supported agent CLI and subscription. [GitHub Copilot](https://github.com/features/copilot/cli/) is the default.
 
 ### Microsoft Store (recommended)
 
@@ -103,6 +104,7 @@ All shortcuts are customizable through Intelligent Terminal settings.
 | <kbd>Ctrl+Alt+.</kbd> | Open agent pane with error context |
 | <kbd>Ctrl+Shift+/</kbd> | Open agent management |
 | <kbd>Alt+Shift+/</kbd> | Open Command Palette in prompt mode |
+| <kbd>Alt+Shift+B</kbd> | Open an interactive delegate-agent tab with no startup prompt |
 
 ---
 
@@ -214,7 +216,7 @@ Building Intelligent Terminal is the same as building Windows Terminal. See the 
 
 ## Feedback
 
-Intelligent Terminal is in an experimental stage. If you have a feature request or find a bug, [submit an issue](https://github.com/microsoft/intelligent-terminal/issues) on the GitHub repository.
+Intelligent Terminal is in an experimental stage. If you have a feature request or find a bug, [submit an issue](https://github.com/microsoft/intelligent-terminal/issues) on the GitHub repository. When filing a bug, the **Report a bug (collect logs)** command in the Command Palette (<kbd>Ctrl+Shift+P</kbd>) bundles your diagnostic logs into a timestamped ZIP on your Desktop — attach it to the issue so we have full context.
 
 Intelligent Terminal ships as a separate app and installs next to your existing Windows Terminal. If you don't want agents in your terminal, nothing changes for you. With this model, we can learn, experiment, and iterate with you, the community, on what this evolution might look like without breaking your existing Windows Terminal flows.
 

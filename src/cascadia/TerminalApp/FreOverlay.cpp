@@ -10,6 +10,7 @@
 #include "../inc/WtaProcess.h"
 #include "../inc/ShellIntegration.h"
 #include "../inc/RtlHelper.h"
+#include "AgentPaneLog.h"
 
 #include <winrt/Windows.UI.Xaml.Documents.h>
 
@@ -30,12 +31,19 @@ namespace winrt::TerminalApp::implementation
 
     bool FreOverlay::_IsAgentInstalled(const wchar_t* name)
     {
-        wchar_t buf[MAX_PATH];
+        wchar_t buf[MAX_PATH]{};
         if (SearchPathW(nullptr, name, L".exe", MAX_PATH, buf, nullptr) > 0)
+        {
+            _agentPaneLog("[FRE] _IsAgentInstalled: " + winrt::to_string(winrt::hstring{ name }) + " found at " + winrt::to_string(winrt::hstring{ buf }));
             return true;
+        }
         const auto cmdName = std::wstring(name) + L".cmd";
         if (SearchPathW(nullptr, cmdName.c_str(), nullptr, MAX_PATH, buf, nullptr) > 0)
+        {
+            _agentPaneLog("[FRE] _IsAgentInstalled: " + winrt::to_string(winrt::hstring{ name }) + " found at " + winrt::to_string(winrt::hstring{ buf }));
             return true;
+        }
+        _agentPaneLog("[FRE] _IsAgentInstalled: " + winrt::to_string(winrt::hstring{ name }) + " NOT found on PATH");
         return false;
     }
 
@@ -47,6 +55,17 @@ namespace winrt::TerminalApp::implementation
         if (SearchPathW(nullptr, L"npx", L".exe", MAX_PATH, buf, nullptr) > 0)
             return true;
         return false;
+    }
+
+    // Detect whether winget itself is available on PATH. When winget is
+    // missing (e.g. App Installer not installed, or stripped on LTSC/Server
+    // SKUs) the Copilot/Node bootstrap calls would fail with a generic
+    // "install failed" error that wrongly points at the package; surface a
+    // dedicated message that links to the winget setup docs instead.
+    bool FreOverlay::_IsWingetInstalled()
+    {
+        wchar_t buf[MAX_PATH];
+        return SearchPathW(nullptr, L"winget", L".exe", MAX_PATH, buf, nullptr) > 0;
     }
 
     // ── Agent ComboBox ──────────────────────────────────────────────────
@@ -390,29 +409,99 @@ namespace winrt::TerminalApp::implementation
             L"--disable-interactivity",
             id);
 
+        // Create a pipe to capture winget's combined stdout+stderr for
+        // diagnostic logging. The pipe is inheritable so the child
+        // process writes directly to it.
+        SECURITY_ATTRIBUTES sa{};
+        sa.nLength = sizeof(sa);
+        sa.bInheritHandle = TRUE;
+        HANDLE hReadPipe = nullptr, hWritePipe = nullptr;
+        const bool hasPipe = CreatePipe(&hReadPipe, &hWritePipe, &sa, 0);
+        if (hasPipe)
+        {
+            // Prevent the read end from being inherited by the child.
+            SetHandleInformation(hReadPipe, HANDLE_FLAG_INHERIT, 0);
+        }
+
         STARTUPINFOW si{};
         si.cb = sizeof(si);
         si.dwFlags = STARTF_USESHOWWINDOW;
         si.wShowWindow = SW_HIDE;
+        if (hasPipe)
+        {
+            si.dwFlags |= STARTF_USESTDHANDLES;
+            si.hStdOutput = hWritePipe;
+            si.hStdError = hWritePipe;
+            si.hStdInput = nullptr;
+        }
         PROCESS_INFORMATION pi{};
 
         auto success = CreateProcessW(
             nullptr,
             cmdline.data(),
-            nullptr, nullptr, FALSE,
+            nullptr, nullptr, hasPipe ? TRUE : FALSE,
             CREATE_NO_WINDOW,
             nullptr, nullptr, &si, &pi);
 
+        // Close the write end in the parent so ReadFile sees EOF
+        // when the child exits.
+        if (hWritePipe)
+        {
+            CloseHandle(hWritePipe);
+            hWritePipe = nullptr;
+        }
+
         if (!success)
         {
+            _agentPaneLog("[FRE] winget CreateProcess failed: GetLastError=" + std::to_string(GetLastError()));
+            if (hReadPipe) CloseHandle(hReadPipe);
             co_return false;
         }
 
+        // Wait for the child process first, then drain any remaining
+        // pipe output. This avoids the synchronous ReadFile blocking
+        // indefinitely if winget spawns child processes that inherit
+        // the pipe handle and outlive winget itself.
         WaitForSingleObject(pi.hProcess, 300000); // 5 min timeout
+
+        // Drain pipe output (non-blocking — child has exited, so the
+        // write end is closed and ReadFile will see EOF promptly).
+        // Keep only the last ~500 bytes to cap memory usage.
+        static constexpr size_t kMaxOutput = 500;
+        std::string output;
+        if (hasPipe && hReadPipe)
+        {
+            char buf[512];
+            DWORD bytesRead = 0;
+            while (ReadFile(hReadPipe, buf, sizeof(buf) - 1, &bytesRead, nullptr) && bytesRead > 0)
+            {
+                buf[bytesRead] = '\0';
+                output += buf;
+                // Keep only the tail
+                if (output.size() > kMaxOutput * 2)
+                    output = output.substr(output.size() - kMaxOutput);
+            }
+            CloseHandle(hReadPipe);
+            hReadPipe = nullptr;
+        }
+
         DWORD exitCode = 1;
         GetExitCodeProcess(pi.hProcess, &exitCode);
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
+
+        // Log the result — truncate output to avoid unbounded log growth.
+        if (exitCode != 0)
+        {
+            // Trim trailing whitespace
+            while (!output.empty() && (output.back() == '\n' || output.back() == '\r' || output.back() == ' '))
+                output.pop_back();
+            // Cap at 500 chars
+            if (output.size() > 500)
+                output = output.substr(output.size() - 500);
+            _agentPaneLog("[FRE] winget exit=" + std::to_string(exitCode) + " output: " + output);
+        }
+
         co_return exitCode == 0;
     }
 
@@ -453,6 +542,10 @@ namespace winrt::TerminalApp::implementation
         // variable key.
         switch (kind)
         {
+        case FreProblemKind::WingetMissing:
+            ErrorText().Text(RS_(L"FreOverlay_InstallErrorWingetMissing"));
+            url += L"#1-winget-windows-package-manager";
+            break;
         case FreProblemKind::CopilotInstall:
             ErrorText().Text(RS_(L"FreOverlay_InstallErrorCopilot"));
             url += L"#31-github-copilot-cli";
@@ -460,6 +553,20 @@ namespace winrt::TerminalApp::implementation
         case FreProblemKind::NodeInstall:
             ErrorText().Text(RS_(L"FreOverlay_InstallErrorNode"));
             url += L"#2-nodejs-lts--shared-prerequisite";
+            break;
+        case FreProblemKind::ShellIntegrationExecutionPolicy:
+            ErrorText().Text(RS_(L"FreOverlay_InstallErrorShellIntegrationExecutionPolicy"));
+            url += L"#4-powershell-shell-integration";
+            // Same remediation as generic shell-integration failure: turn
+            // off error detection so the user can save and continue. Once
+            // they fix execution policy they can re-enable it from Settings.
+            AutoDetectToggle().IsOn(false);
+            _UpdateSuggestionEnabledState();
+            if (_settings)
+            {
+                _settings.GlobalSettings().AutoErrorDetectionEnabled(false);
+                _settings.GlobalSettings().AutoFixEnabled(false);
+            }
             break;
         case FreProblemKind::ShellIntegration:
             ErrorText().Text(RS_(L"FreOverlay_InstallErrorShellIntegration"));
@@ -538,11 +645,34 @@ namespace winrt::TerminalApp::implementation
         const bool needsCopilot = (agentId == L"copilot") && !_IsAgentInstalled(L"copilot");
         const bool needsNode = (agentId == L"claude" || agentId == L"codex") && !_IsNodeInstalled();
 
+        _agentPaneLog("[FRE] Save: agent=" + winrt::to_string(agentId)
+            + " needsCopilot=" + (needsCopilot ? "y" : "n")
+            + " needsNode=" + (needsNode ? "y" : "n")
+            + " detect=" + (AutoDetectToggle().IsOn() ? "on" : "off")
+            + " suggest=" + (AutoErrorToggle().IsOn() ? "on" : "off")
+            + " hooks=" + (SessionManagementToggle().IsOn() ? "on" : "off"));
+
+        // If any bootstrap step needs winget, make sure winget itself is
+        // available before kicking off the install — otherwise the user
+        // gets a generic "install failed" error that wrongly points at
+        // the package's docs instead of the winget setup docs.
+        if (needsCopilot || needsNode)
+        {
+            if (!_IsWingetInstalled())
+            {
+                _agentPaneLog("[FRE] winget not found on PATH");
+                _ShowProblem(FreProblemKind::WingetMissing);
+                co_return;
+            }
+        }
+
         if (needsCopilot)
         {
+            _agentPaneLog("[FRE] Installing GitHub.Copilot via winget");
             bool ok = co_await _WingetInstallAsync(L"GitHub.Copilot");
             auto self = weak.get();
             if (!self) co_return;
+            _agentPaneLog("[FRE] Copilot install: " + std::string(ok ? "ok" : "FAILED"));
             if (!ok)
             {
                 _ShowProblem(FreProblemKind::CopilotInstall);
@@ -551,9 +681,11 @@ namespace winrt::TerminalApp::implementation
         }
         if (needsNode)
         {
+            _agentPaneLog("[FRE] Installing Node.js via winget");
             bool ok = co_await _WingetInstallAsync(L"OpenJS.NodeJS.LTS");
             auto self = weak.get();
             if (!self) co_return;
+            _agentPaneLog("[FRE] Node.js install: " + std::string(ok ? "ok" : "FAILED"));
             if (!ok)
             {
                 _ShowProblem(FreProblemKind::NodeInstall);
@@ -567,7 +699,29 @@ namespace winrt::TerminalApp::implementation
         // CLIs without restarting Terminal.
         if (needsCopilot || needsNode)
         {
-            ::Microsoft::Terminal::WtaProcess::RefreshProcessPath();
+            _agentPaneLog("[FRE] Refreshing process PATH from registry");
+            try
+            {
+                ::Microsoft::Terminal::WtaProcess::RefreshProcessPath();
+
+                // Verify WinGet\Links is now on PATH
+                wchar_t localAppData[MAX_PATH]{};
+                GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+                if (localAppData[0])
+                {
+                    auto wingetLinks = std::wstring(localAppData) + L"\\Microsoft\\WinGet\\Links";
+                    wchar_t pathBuf[32767]{};
+                    GetEnvironmentVariableW(L"PATH", pathBuf, 32767);
+                    std::wstring path{ pathBuf };
+                    bool hasLinks = (path.find(wingetLinks) != std::wstring::npos);
+                    _agentPaneLog("[FRE] PATH after refresh: WinGet\\Links " + std::string(hasLinks ? "present" : "MISSING"));
+                }
+            }
+            catch (...)
+            {
+                _agentPaneLog("[FRE] RefreshProcessPath threw an exception");
+                LOG_CAUGHT_EXCEPTION();
+            }
         }
 
         // 4+5. Install hooks and shell integration. Run both, collect any
@@ -576,6 +730,7 @@ namespace winrt::TerminalApp::implementation
         // Save retries them.
         bool hooksFailed = false;
         bool shellIntegFailed = false;
+        bool shellIntegEpBlocked = false;
 
         // 4. Hooks — skip if GPO blocks it or settings unavailable.
         if (SessionManagementToggle().IsOn() &&
@@ -585,10 +740,12 @@ namespace winrt::TerminalApp::implementation
             auto self = weak.get();
             if (!self) co_return;
 
+            _agentPaneLog("[FRE] Installing hooks for " + winrt::to_string(agentId));
             bool hooksOk = co_await _InstallHooksAsync(agentId);
             self = weak.get();
             if (!self) co_return;
 
+            _agentPaneLog("[FRE] Hooks install: " + std::string(hooksOk ? "ok" : "FAILED"));
             if (!hooksOk)
             {
                 hooksFailed = true;
@@ -601,14 +758,36 @@ namespace winrt::TerminalApp::implementation
             auto self = weak.get();
             if (!self) co_return;
 
+            _agentPaneLog("[FRE] Installing shell integration");
             co_await winrt::resume_background();
             namespace SI = ::Microsoft::Terminal::ShellIntegration;
             const auto pwsh7Result = SI::InstallForTarget(SI::Target::Pwsh);
-            const auto winPsResult = SI::InstallForTarget(SI::Target::WindowsPowerShell);
+            const auto windowsPsResult = SI::InstallForTarget(SI::Target::WindowsPowerShell);
 
-            if (!pwsh7Result.success || !winPsResult.success)
+            {
+                std::string detail = "[FRE] Shell integration: pwsh7=";
+                detail += pwsh7Result.success ? "ok" : "FAILED";
+                if (!pwsh7Result.success && !pwsh7Result.errorMessage.empty())
+                    detail += " (" + winrt::to_string(winrt::hstring{ pwsh7Result.errorMessage }) + ")";
+                detail += " winPs=";
+                detail += windowsPsResult.success ? "ok" : "FAILED";
+                if (!windowsPsResult.success && !windowsPsResult.errorMessage.empty())
+                    detail += " (" + winrt::to_string(winrt::hstring{ windowsPsResult.errorMessage }) + ")";
+                _agentPaneLog(detail);
+            }
+
+            if (!pwsh7Result.success || !windowsPsResult.success)
             {
                 shellIntegFailed = true;
+                // If either host's failure was specifically the execution
+                // policy, surface the policy-specific message instead of the
+                // generic write-failed one. The user needs different
+                // remediation (Set-ExecutionPolicy / GPO) vs. a transient
+                // file write failure.
+                if (pwsh7Result.executionPolicyBlocked || windowsPsResult.executionPolicyBlocked)
+                {
+                    shellIntegEpBlocked = true;
+                }
             }
         }
 
@@ -616,12 +795,15 @@ namespace winrt::TerminalApp::implementation
         // hooks; the unshown failure stays enabled and is retried on next Save.
         if (hooksFailed || shellIntegFailed)
         {
+            _agentPaneLog("[FRE] Showing problem: "
+                + std::string(shellIntegFailed ? "ShellIntegration" : "Hooks"));
             co_await winrt::resume_foreground(Dispatcher());
             auto self = weak.get();
             if (!self) co_return;
 
-            _ShowProblem(shellIntegFailed ? FreProblemKind::ShellIntegration
-                                          : FreProblemKind::Hooks);
+            _ShowProblem(shellIntegEpBlocked ? FreProblemKind::ShellIntegrationExecutionPolicy
+                                             : shellIntegFailed ? FreProblemKind::ShellIntegration
+                                                                : FreProblemKind::Hooks);
             co_return;
         }
 
@@ -636,6 +818,7 @@ namespace winrt::TerminalApp::implementation
             // "(will install)" — confirms the install actually landed.
             _PopulateAgentComboBox();
 
+            _agentPaneLog("[FRE] Completed — raising Completed event");
             SaveButton().Content(winrt::box_value(RS_(L"FreOverlay_SaveButton/Content")));
             SaveButton().IsEnabled(true);
             Completed.raise(*this, nullptr);

@@ -1116,6 +1116,10 @@
     <value>⚠ Не вдалося встановити GitHub Copilot. Перевірте мережеве підключення та спробуйте знову.</value>
     <comment>{Locked="GitHub Copilot"}</comment>
   </data>
+  <data name="FreOverlay_InstallErrorWingetMissing" xml:space="preserve">
+    <value>⚠ Диспетчер пакетів Windows (winget) не інстальовано або він недоступний. Спочатку інсталюйте його, а потім спробуйте знову.</value>
+    <comment>{Locked="winget","PATH"} Error shown in the FRE setup overlay when a prerequisite install was attempted but the winget command is not on PATH.</comment>
+  </data>
   <data name="FreOverlay_InstallErrorNode" xml:space="preserve">
     <value>⚠ Не вдалося встановити Node.js. Перевірте мережеве підключення та спробуйте знову.</value>
     <comment>{Locked="Node.js"}</comment>
@@ -1221,5 +1225,13 @@
   </data>
   <data name="FreOverlay_AutoDetectShellIntegrationHintLink" xml:space="preserve">
     <value>Дізнатися більше</value>
+  </data>
+  <data name="InitShellIntegrationExecutionPolicyErrorMessage" xml:space="preserve">
+    <value>Політика виконання PowerShell блокує сценарії.</value>
+    <comment>Body of an error dialog shown after the user tries to install PowerShell shell integration but their PowerShell execution policy (Restricted or AllSigned) is blocking scripts. A separate "Learn how to fix this manually" hyperlink (FreOverlay_ErrorHelpLink) is rendered on its own line below this sentence. {Locked="PowerShell"}</comment>
+  </data>
+  <data name="FreOverlay_InstallErrorShellIntegrationExecutionPolicy" xml:space="preserve">
+    <value>⚠ Політика виконання PowerShell блокує сценарії. Виявлення помилок вимкнено.</value>
+    <comment>{Locked="PowerShell"}</comment>
   </data>
 </root>
