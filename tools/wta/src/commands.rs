@@ -115,11 +115,11 @@ pub enum ParseOutcome {
     Command(ParsedCommand),
     /// Looks like a slash-command attempt (`/foo`) but `foo` isn't
     /// registered. Carries the attempted token *with* its leading `/`
-    /// (e.g. `"/claer"`) for the "Unknown command" advisory. The caller
+    /// (e.g. `"/nope"`) for the "Unknown command" advisory. The caller
     /// still sends the raw line as a prompt so the user doesn't lose input.
     Unknown(String),
     /// Not a command at all (no `/`, or `//literal` escape). Send as prompt.
-    NotACommand,
+    NotCommand,
 }
 
 impl PartialEq for ParsedCommand {
@@ -173,8 +173,8 @@ pub fn parse(input: &str) -> Option<ParsedCommand> {
 /// match so the caller never re-implements the slash/escape rules.
 ///
 /// - `/help` → [`ParseOutcome::Command`]
-/// - `/claer foo` → [`ParseOutcome::Unknown`]`("/claer")`
-/// - `hello`, `//etc/hosts`, `/` (bare) → [`ParseOutcome::NotACommand`]
+/// - `/nope foo` → [`ParseOutcome::Unknown`]`("/nope")`
+/// - `hello`, `//etc/hosts`, `/` (bare) → [`ParseOutcome::NotCommand`]
 pub fn classify(input: &str) -> ParseOutcome {
     if let Some(cmd) = parse(input) {
         return ParseOutcome::Command(cmd);
@@ -193,7 +193,7 @@ pub fn classify(input: &str) -> ParseOutcome {
         }
     }
 
-    ParseOutcome::NotACommand
+    ParseOutcome::NotCommand
 }
 
 /// Return the [`CommandSpec`] for the given name (case-insensitive), or

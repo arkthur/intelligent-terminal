@@ -6537,7 +6537,7 @@ impl App {
                 ));
                 false
             }
-            ParseOutcome::NotACommand => false,
+            ParseOutcome::NotCommand => false,
         }
     }
 
