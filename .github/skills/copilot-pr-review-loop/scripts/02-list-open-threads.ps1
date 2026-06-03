@@ -70,10 +70,11 @@ function Invoke-GhGraphQL {
 }
 
 if (-not $Owner -or -not $Repo) {
-    $repoInfo = gh repo view --json owner,name | ConvertFrom-Json
+    $repoJson = gh repo view --json owner,name
     if ($LASTEXITCODE -ne 0) {
         throw "gh repo view failed (exit $LASTEXITCODE). Pass -Owner and -Repo explicitly or run from inside a gh-detected repo."
     }
+    $repoInfo = $repoJson | ConvertFrom-Json
     if (-not $Owner) { $Owner = $repoInfo.owner.login }
     if (-not $Repo)  { $Repo  = $repoInfo.name }
 }
