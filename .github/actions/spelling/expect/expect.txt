@@ -611,7 +611,6 @@ gdip
 gdirenderer
 gdnbaselines
 Geddy
-Gotchas
 geopol
 GETALIAS
 GETALIASES
@@ -1320,7 +1319,6 @@ propsys
 PROPTITLE
 propvar
 propvariant
-PRRT
 psa
 PSECURITY
 pseudoconsole

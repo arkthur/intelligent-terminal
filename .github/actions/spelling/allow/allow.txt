@@ -263,3 +263,5 @@ yeelam
 ymdhms
 ZDOTDIR
 zzzzz
+
+Gotchas
