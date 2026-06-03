@@ -540,6 +540,40 @@ namespace winrt::TerminalApp::implementation
         _SetSavingState(true);
         ErrorPanel().Visibility(Visibility::Collapsed);
 
+        // 2b. Optional artificial delay for testing the overlay UX on
+        // machines where every step finishes too fast to actually see
+        // the busy state. Set the environment variable
+        // WT_FRE_SAVE_DELAY_MS=<ms> before launching WT to make the
+        // overlay linger that long after the flow starts; defaults to
+        // 0 (no delay) so it's a no-op in normal use.
+        {
+            wchar_t buf[16]{};
+            const auto n = ::GetEnvironmentVariableW(L"WT_FRE_SAVE_DELAY_MS", buf, ARRAYSIZE(buf));
+            if (n > 0 && n < ARRAYSIZE(buf))
+            {
+                try
+                {
+                    const auto ms = std::stoi(buf);
+                    if (ms > 0)
+                    {
+                        co_await winrt::resume_after(std::chrono::milliseconds{ ms });
+                        // resume_after lands us on a thread-pool thread;
+                        // marshal back to the UI thread before the rest of
+                        // the flow touches XAML controls (otherwise the
+                        // next UI access throws RPC_E_WRONG_THREAD and the
+                        // IAsyncAction swallows it, leaving the overlay
+                        // stuck forever).
+                        co_await winrt::resume_foreground(Dispatcher());
+                        if (!weak.get()) co_return;
+                    }
+                }
+                catch (...)
+                {
+                    // Ignore malformed values — debug-only knob, not worth surfacing.
+                }
+            }
+        }
+
         // 3. Install prerequisites if needed (blocking — cannot proceed without these)
         const bool needsCopilot = (agentId == L"copilot") && !_IsAgentInstalled(L"copilot");
         const bool needsNode = (agentId == L"claude" || agentId == L"codex") && !_IsNodeInstalled();
