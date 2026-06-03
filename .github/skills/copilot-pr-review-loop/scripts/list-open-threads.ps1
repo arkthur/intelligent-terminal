@@ -1,14 +1,16 @@
 <#
 .SYNOPSIS
-    List open, non-outdated Copilot review threads on a pull request.
+    List open, non-outdated review threads on a pull request.
 
 .DESCRIPTION
     Fetches review threads via the GraphQL API and prints the ones that are
     both unresolved AND non-outdated — i.e. the ones that still need a
-    decision in the current loop iteration.
+    decision in the current loop iteration. Threads from all reviewers
+    (Copilot, humans, other bots) are included; the loop's triage step
+    decides what to do with each.
 
-    Outdated threads (Copilot's earlier comments on lines that have since
-    been rewritten) are not actionable in the current round and should be
+    Outdated threads (earlier comments on lines that have since been
+    rewritten) are not actionable in the current round and should be
     cleaned up at convergence via cleanup-outdated.ps1.
 
 .PARAMETER Owner
@@ -79,12 +81,11 @@ $threads = $data.data.repository.pullRequest.reviewThreads.nodes
 
 $open = $threads | Where-Object {
     -not $_.isResolved -and
-    -not $_.isOutdated -and
-    $_.comments.nodes[0].author.login -eq 'copilot-pull-request-reviewer'
+    -not $_.isOutdated
 }
 
 if (-not $open) {
-    Write-Output 'No open Copilot threads.'
+    Write-Output 'No open threads.'
     return
 }
 
@@ -96,6 +97,7 @@ foreach ($t in $open) {
     }
     [pscustomobject]@{
         ThreadId  = $t.id
+        Author    = $c.author.login
         Path      = "$($c.path):$($c.line)"
         CreatedAt = $c.createdAt
         Body      = $body -replace "`r?`n", ' '

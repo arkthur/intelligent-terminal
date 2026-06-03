@@ -82,7 +82,7 @@ review can still coexist with a stale open thread you forgot to resolve.
 | Outdated threads still appear in the open-threads list | Run [scripts/cleanup-outdated.ps1](scripts/cleanup-outdated.ps1) once at convergence |
 | Unsure whether to fix or decline a finding | Apply the rubric in [references/triage-criteria.md](references/triage-criteria.md) |
 | Need a reply that conveys "fixed", "declined", or "drift" | Use a template from [references/reply-templates.md](references/reply-templates.md) |
-| `list-open-threads` still shows resolved-looking threads | Filter for `!isResolved && !isOutdated && author=copilot-pull-request-reviewer` (the script already does this) |
+| `list-open-threads` still shows resolved-looking threads | Filter is `!isResolved && !isOutdated` only — the script already does this; resolved-looking but still-open threads usually mean someone resolved the GitHub UI conversation without the GraphQL `resolveReviewThread` mutation completing |
 
 ## References
 
